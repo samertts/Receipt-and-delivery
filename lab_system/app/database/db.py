@@ -1,7 +1,7 @@
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from lab_system.app.settings.config import DB_PATH
+from lab_system.app.settings.config import CONFIG
 
 SCHEMA_VERSION = 3
 
@@ -102,7 +102,7 @@ DEFAULT_SETTINGS = {
     'receipt.template': 'default',
     'printer.mode': 'A4',
     'backup.auto_enabled': '0',
-    'backup.path': str((Path(DB_PATH).parent / 'lab_system' / 'storage' / 'backups').resolve()),
+    'backup.path': str((Path(CONFIG.db_path).parent / 'lab_system' / 'storage' / 'backups').resolve()),
 }
 
 
@@ -124,7 +124,7 @@ def migrate_db(conn: sqlite3.Connection) -> None:
 
 
 def init_db():
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(CONFIG.db_path) as conn:
         conn.executescript(SCHEMA)
         migrate_db(conn)
         conn.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('schema_version',?)", (str(SCHEMA_VERSION),))
@@ -134,7 +134,7 @@ def init_db():
 
 @contextmanager
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(CONFIG.db_path)
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA foreign_keys = ON;')
     try:
