@@ -1,0 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+body { font-family: Tahoma, Arial, sans-serif; }
+.gov-card { @apply border border-slate-300 rounded-sm bg-white p-4; }
+.gov-btn { @apply bg-slate-700 text-white px-4 py-2 rounded-sm text-sm; }
