@@ -1,41 +1,46 @@
-# نظام إدارة الاستلام المختبري (Desktop Native)
+# نظام إدارة الاستلام المختبري
 
-تطبيق مكتبي محلي بالكامل (Offline) مبني بـ **PySide6 + SQLite** لإدارة إيصالات ومعاملات المختبرات بأسلوب حكومي عراقي.
+تطبيق مكتبي حكومي عراقي **Native Desktop** مبني بـ **PySide6 + SQLite** ويعمل بالكامل دون إنترنت.
 
-## الميزات
-- تسجيل دخول محلي وصلاحيات (Admin/Supervisor/User/Auditor)
-- إنشاء إيصالات مع ترقيم تلقائي بصيغة `LAB-YYYY-XXXXXX`
-- حفظ عناصر العينات مع تحقق القاعدة: `total = valid + damaged + rejected + non-conforming`
-- تدقيق غير قابل للتعديل (Audit Logs)
-- تخزين مرفقات خارج قاعدة البيانات في `storage/attachments`
-- بنية جاهزة للتوسعة (تقارير، طباعة، نسخ احتياطي، مزامنة مستقبلية)
+## الوظائف المنجزة
+- تسجيل دخول محلي وصلاحيات (Admin/Supervisor/User/Auditor).
+- إدارة المستخدمين (إضافة + عرض).
+- إدارة مؤسسات ديناميكية عبر قاعدة البيانات.
+- أنواع معاملات ديناميكية وأنواع عينات ديناميكية من جداول إعدادات.
+- إنشاء إيصال رسمي مع ترقيم تلقائي `LAB-YYYY-XXXXXX`.
+- تحقق إلزامي لمعادلة العينات قبل الحفظ.
+- أرشيف إيصالات محلي مع بحث سريع.
+- تدقيق Audit Logs غير قابل للتعديل.
+- إدارة مرفقات خارج SQLite مع hash وضغط صور.
+- PDF احترافي مع QR + Barcode وتوقيعات.
+- نسخ احتياطي محلي.
 
-## الهيكل
-- `lab_system/app/ui`: واجهات PySide6
-- `lab_system/app/database`: تهيئة SQLite والـ schema
-- `lab_system/app/services`: منطق الأعمال
-- `lab_system/app/printing`: توليد PDF باستخدام ReportLab + QR + Barcode
-- `lab_system/storage`: receipts/attachments/exports/backups/temp
-- `installer/LabReceipt.iss`: سكربت Inno Setup
+## هيكل المشروع
+- `lab_system/app/ui` واجهات النوافذ.
+- `lab_system/app/database` تهيئة ومخطط SQLite.
+- `lab_system/app/services` منطق الأعمال.
+- `lab_system/app/printing` طباعة PDF.
+- `.github/workflows/build.yml` بناء تلقائي ويندوز.
+- `lab_system/installer/LabReceipt.iss` إعداد مثبت Inno Setup.
 
-## التشغيل
+## التشغيل المحلي
 ```bash
 python -m venv .venv
-. .venv/bin/activate  # Windows: .venv\Scripts\activate
+. .venv/bin/activate
 pip install -r requirements.txt
 python main.py
 ```
 
 ## بيانات الدخول الافتراضية
-- Username: `admin`
-- Password: `Admin@123`
+- username: `admin`
+- password: `Admin@123`
 
 ## بناء ملف تنفيذي
 ```bash
 pyinstaller --noconfirm --onefile --windowed --icon=lab_system/assets/icons/app.ico main.py
 ```
 
-## إنشاء المثبّت (Inno Setup)
-1. ابنِ EXE عبر PyInstaller.
-2. افتح `installer/LabReceipt.iss` في Inno Setup.
-3. Compile لإنتاج `LabReceiptSetup.exe`.
+## إنشاء مثبت LabReceiptSetup.exe
+1. أنشئ EXE أولاً عبر PyInstaller.
+2. افتح `lab_system/installer/LabReceipt.iss` عبر Inno Setup.
+3. نفّذ Compile لإنتاج `LabReceiptSetup.exe`.

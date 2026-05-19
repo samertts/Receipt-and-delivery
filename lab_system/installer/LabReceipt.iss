@@ -8,7 +8,7 @@ Compression=lzma
 SolidCompression=yes
 
 [Files]
-Source: "dist\main.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\LabReceiptSystem.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "lab_system\assets\*"; DestDir: "{app}\assets"; Flags: recursesubdirs createallsubdirs
 
 [Dirs]
@@ -19,5 +19,5 @@ Name: "{app}\storage\backups"
 Name: "{app}\storage\temp"
 
 [Icons]
-Name: "{commondesktop}\نظام إدارة الاستلام المختبري"; Filename: "{app}\main.exe"
-Name: "{group}\نظام إدارة الاستلام المختبري"; Filename: "{app}\main.exe"
+Name: "{commondesktop}\نظام إدارة الاستلام المختبري"; Filename: "{app}\LabReceiptSystem.exe"
+Name: "{group}\نظام إدارة الاستلام المختبري"; Filename: "{app}\LabReceiptSystem.exe"
