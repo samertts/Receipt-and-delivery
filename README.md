@@ -21,7 +21,7 @@
 - `lab_system/app/services` منطق الأعمال.
 - `lab_system/app/printing` طباعة PDF.
 - `.github/workflows/build.yml` بناء تلقائي ويندوز.
-- `lab_system/installer/LabReceipt.iss` إعداد مثبت Inno Setup.
+- `installer/setup.iss` إعداد مثبت Inno Setup.
 
 ## التشغيل المحلي
 ```bash
@@ -37,10 +37,10 @@ python main.py
 
 ## بناء ملف تنفيذي
 ```bash
-pyinstaller --noconfirm --onefile --windowed --icon=lab_system/assets/icons/app.ico main.py
+pyinstaller --noconfirm --onefile --windowed --icon=assets/icons/app.ico main.py
 ```
 
 ## إنشاء مثبت LabReceiptSetup.exe
 1. أنشئ EXE أولاً عبر PyInstaller.
-2. افتح `lab_system/installer/LabReceipt.iss` عبر Inno Setup.
+2. افتح `installer/setup.iss` عبر Inno Setup.
 3. نفّذ Compile لإنتاج `LabReceiptSetup.exe`.
