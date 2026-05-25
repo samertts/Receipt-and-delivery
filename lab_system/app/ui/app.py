@@ -9,7 +9,7 @@ from lab_system.app.audit.logger import log_action
 from lab_system.app.database.db import init_db
 from lab_system.app.services.auth_service import AuthService
 from lab_system.app.services.catalog_service import list_sample_types, list_transaction_types, seed_defaults
-from lab_system.app.services.org_service import list_organizations
+from lab_system.app.services.org_service import list_organizations, search_organizations, set_organization_status, upsert_organization
 from lab_system.app.services.receipt_service import (
     archive_receipt, create_receipt, get_receipt, search_receipts, soft_delete_receipt, update_receipt
 )
@@ -196,6 +196,66 @@ class ReceiptArchivePage(QWidget):
         soft_delete_receipt(rid, self.user['id']); log_action(self.user['id'], 'receipt_soft_deleted', str(rid)); self.load_rows()
 
 
+class InstitutionsPage(QWidget):
+    def __init__(self, user):
+        super().__init__(); self.user = user; self.edit_id = None
+        l = QVBoxLayout(self)
+        top = QHBoxLayout(); self.search = QLineEdit(); self.search.setPlaceholderText('بحث مؤسسة')
+        self.status_filter = QComboBox(); self.status_filter.addItems(['', 'Active', 'Inactive'])
+        btn = QPushButton('بحث'); btn.clicked.connect(self.load_rows)
+        top.addWidget(self.search); top.addWidget(self.status_filter); top.addWidget(btn); l.addLayout(top)
+
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(['ID','الاسم','الرمز','النوع','المحافظة','الحالة'])
+        self.table.cellClicked.connect(self.select_row)
+        l.addWidget(self.table)
+
+        f = QGridLayout()
+        self.name = QLineEdit(); self.code = QLineEdit(); self.org_type = QComboBox(); self.org_type.addItems(['Hospital','Public Health Laboratory','Central Laboratory','Primary Healthcare Center','Blood Bank','Referral Center','Private Laboratory','Other'])
+        self.gov = QLineEdit(); self.addr = QLineEdit(); self.phone = QLineEdit(); self.email = QLineEdit()
+        self.notes = QTextEdit(); self.status = QComboBox(); self.status.addItems(['Active','Inactive'])
+        fields=[('الاسم',self.name),('الرمز',self.code),('النوع',self.org_type),('المحافظة',self.gov),('العنوان',self.addr),('الهاتف',self.phone),('البريد',self.email),('الحالة',self.status),('ملاحظات',self.notes)]
+        for i,(n,w) in enumerate(fields): f.addWidget(QLabel(n),i,0); f.addWidget(w,i,1)
+        l.addLayout(f)
+
+        a=QHBoxLayout(); save=QPushButton('حفظ المؤسسة'); save.clicked.connect(self.save_org)
+        archive=QPushButton('أرشفة'); archive.clicked.connect(self.archive_selected)
+        new=QPushButton('جديد'); new.clicked.connect(self.reset_form)
+        a.addWidget(save); a.addWidget(archive); a.addWidget(new); l.addLayout(a)
+        self.load_rows()
+
+    def load_rows(self):
+        rows = search_organizations(self.search.text(), self.status_filter.currentText())
+        self.table.setRowCount(len(rows))
+        for r,row in enumerate(rows):
+            vals=[row['id'],row['name'],row['code'],row['org_type'],row['governorate'],row['status']]
+            for c,v in enumerate(vals): self.table.setItem(r,c,QTableWidgetItem(str(v)))
+
+    def select_row(self,row,_):
+        self.edit_id = int(self.table.item(row,0).text())
+        self.name.setText(self.table.item(row,1).text()); self.code.setText(self.table.item(row,2).text())
+        self.gov.setText(self.table.item(row,4).text()); self.status.setCurrentText(self.table.item(row,5).text())
+
+    def save_org(self):
+        try:
+            payload={'id':self.edit_id,'name':self.name.text(),'code':self.code.text(),'org_type':self.org_type.currentText(),'governorate':self.gov.text(),'address':self.addr.text(),'phone':self.phone.text(),'email':self.email.text(),'logo_path':'','notes':self.notes.toPlainText(),'status':self.status.currentText()}
+            org_id=upsert_organization(payload)
+            log_action(self.user['id'],'organization_upsert',str(org_id))
+            self.load_rows(); self.reset_form(); QMessageBox.information(self,'تم','تم حفظ المؤسسة')
+        except Exception as exc:
+            QMessageBox.warning(self,'خطأ',str(exc))
+
+    def archive_selected(self):
+        if not self.edit_id: return
+        set_organization_status(self.edit_id,'Archived')
+        log_action(self.user['id'],'organization_archived',str(self.edit_id))
+        self.load_rows(); self.reset_form()
+
+    def reset_form(self):
+        self.edit_id=None
+        self.name.clear(); self.code.clear(); self.gov.clear(); self.addr.clear(); self.phone.clear(); self.email.clear(); self.notes.clear(); self.status.setCurrentText('Active')
+
+
 class MainWindow(QMainWindow):
     def __init__(self, user) -> None:
         super().__init__(); self.user = user
@@ -207,16 +267,18 @@ class MainWindow(QMainWindow):
         self.receipt_form = ReceiptFormPage(user, self._refresh_archive)
         self.receipt_archive = ReceiptArchivePage(user, self._open_receipt)
 
+        self.institutions_page = InstitutionsPage(user)
         items = [
             ('dashboard', QLabel(f'مرحباً {user["full_name"]}')),
             ('new_receipt', self.receipt_form),
             ('receipt_archive', self.receipt_archive),
+            ('institutions', self.institutions_page),
             ('settings', QLabel('الإعدادات')),
             ('audit', QLabel('سجل التدقيق')),
         ]
         for _, w in items:
             page = QWidget(); v = QVBoxLayout(page); v.addWidget(w); self.pages.addWidget(page)
-        for name in ['لوحة التحكم', 'إيصال جديد', 'أرشيف الإيصالات', 'الإعدادات', 'سجل التدقيق']:
+        for name in ['لوحة التحكم', 'إيصال جديد', 'أرشيف الإيصالات', 'إدارة المؤسسات', 'الإعدادات', 'سجل التدقيق']:
             self.sidebar.addItem(name)
 
         self.sidebar.currentRowChanged.connect(self.pages.setCurrentIndex); self.sidebar.setCurrentRow(0)
