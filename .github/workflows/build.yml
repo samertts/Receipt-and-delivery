@@ -4,10 +4,13 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Repository
@@ -39,6 +42,11 @@ jobs:
             exit /b 1
           )
 
+          if not exist installer (
+            echo ERROR: installer directory not found
+            exit /b 1
+          )
+
           echo Project structure verified successfully.
 
       - name: Build EXE
@@ -66,15 +74,19 @@ jobs:
         run: |
           if not exist dist\LabReceiptSystem.exe (
             echo ERROR: EXE output not found
+            dir dist
             exit /b 1
           )
 
           echo EXE verified successfully.
 
       - name: Install Inno Setup
-        shell: cmd
+        shell: powershell
         run: |
-          choco install innosetup -y
+          choco install innosetup -y --no-progress
+          if (!(Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+            throw "Inno Setup was not installed correctly."
+          }
 
       - name: Verify Installer Script
         shell: cmd
@@ -91,17 +103,30 @@ jobs:
         run: |
           "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\setup.iss
 
+      - name: Verify Installer Output
+        shell: cmd
+        run: |
+          if not exist installer\Output\LabReceiptSetup.exe (
+            echo ERROR: Installer output not found
+            dir installer\Output
+            exit /b 1
+          )
+
+          echo Installer verified successfully.
+
       - name: Upload EXE Artifact
         uses: actions/upload-artifact@v4
         with:
           name: LabReceiptSystem
           path: dist/LabReceiptSystem.exe
+          if-no-files-found: error
 
       - name: Upload Setup Artifact
         uses: actions/upload-artifact@v4
         with:
           name: LabReceiptSetup
           path: installer/Output/*.exe
+          if-no-files-found: error
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -110,3 +135,4 @@ jobs:
           files: |
             dist/LabReceiptSystem.exe
             installer/Output/*.exe
+          fail_on_unmatched_files: true
