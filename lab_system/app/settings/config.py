@@ -13,6 +13,7 @@ class AppConfig:
     db_path: Path
     app_name: str
     version_file: Path
+    app_version: str
 
 
 def _resolve_storage_root(app_name: str) -> Path:
@@ -26,6 +27,12 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 ROOT_DIR = BASE_DIR.parent
 STORAGE_ROOT = _resolve_storage_root('LabReceiptSystem')
 
+def _read_app_version(version_file: Path) -> str:
+    if version_file.exists():
+        return version_file.read_text(encoding='utf-8').strip() or '0.0.0'
+    return '0.0.0'
+
+
 CONFIG = AppConfig(
     base_dir=BASE_DIR,
     app_dir=ROOT_DIR,
@@ -34,6 +41,7 @@ CONFIG = AppConfig(
     db_path=STORAGE_ROOT / 'database' / 'lab_system.db',
     app_name=APP_NAME,
     version_file=ROOT_DIR / 'VERSION',
+    app_version=_read_app_version(ROOT_DIR / 'VERSION'),
 )
 
 for folder in [

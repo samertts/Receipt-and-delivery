@@ -2,7 +2,6 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
 import hashlib
-from pathlib import Path
 from lab_system.app.settings.config import CONFIG
 
 SCHEMA_VERSION = 4
@@ -118,7 +117,7 @@ DEFAULT_SETTINGS = {
     'receipt.template': 'default',
     'printer.mode': 'A4',
     'backup.auto_enabled': '0',
-    'backup.path': str((Path(CONFIG.db_path).parent / 'lab_system' / 'storage' / 'backups').resolve()),
+    'backup.path': str((CONFIG.storage_dir / 'backups').resolve()),
 }
 
 
@@ -143,7 +142,7 @@ def migrate_db(conn: sqlite3.Connection) -> None:
             _record_migration(conn, 'v3_attachments_thumbnail_path', statement)
 
     if current < 4:
-        conn.execute("INSERT OR IGNORE INTO schema_version(id, version, app_version, updated_at) VALUES(1, 4, '1.0.0', ?)", (datetime.now().isoformat(timespec='seconds'),))
+        conn.execute("INSERT OR IGNORE INTO schema_version(id, version, app_version, updated_at) VALUES(1, ?, ?, ?)", (SCHEMA_VERSION, CONFIG.app_version, datetime.now().isoformat(timespec='seconds'),))
         _record_migration(conn, 'v4_lifecycle_metadata', 'schema_version + migration_history initialization')
 
 
@@ -153,7 +152,7 @@ def init_db():
         migrate_db(conn)
         now = datetime.now().isoformat(timespec='seconds')
         conn.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('schema_version',?)", (str(SCHEMA_VERSION),))
-        conn.execute("INSERT OR REPLACE INTO schema_version(id, version, app_version, updated_at) VALUES(1, ?, ?, ?)", (SCHEMA_VERSION, '1.0.0', now))
+        conn.execute("INSERT OR REPLACE INTO schema_version(id, version, app_version, updated_at) VALUES(1, ?, ?, ?)", (SCHEMA_VERSION, CONFIG.app_version, now))
         for k, v in DEFAULT_SETTINGS.items():
             conn.execute('INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)', (k, v))
 
