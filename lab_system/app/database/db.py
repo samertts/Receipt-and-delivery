@@ -101,6 +101,12 @@ CREATE TABLE IF NOT EXISTS migration_history (
  status TEXT NOT NULL CHECK(status IN ('applied','rolled_back','failed')),
  notes TEXT DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS migration_lock (
+ id INTEGER PRIMARY KEY CHECK(id = 1),
+ is_locked INTEGER NOT NULL DEFAULT 0,
+ owner TEXT DEFAULT '',
+ updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS backups (id INTEGER PRIMARY KEY AUTOINCREMENT, backup_file TEXT NOT NULL, created_at TEXT NOT NULL, created_by INTEGER, notes TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, action TEXT NOT NULL, machine_name TEXT NOT NULL, timestamp TEXT NOT NULL, details TEXT DEFAULT '');
 CREATE INDEX IF NOT EXISTS idx_receipts_no ON receipts(receipt_no);
@@ -148,8 +154,14 @@ def migrate_db(conn: sqlite3.Connection) -> None:
 
 def init_db():
     with sqlite3.connect(CONFIG.db_path) as conn:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA foreign_keys = ON;")
         conn.executescript(SCHEMA)
-        migrate_db(conn)
+        _acquire_migration_lock(conn)
+        try:
+            migrate_db(conn)
+        finally:
+            _release_migration_lock(conn)
         now = datetime.now().isoformat(timespec='seconds')
         conn.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('schema_version',?)", (str(SCHEMA_VERSION),))
         conn.execute("INSERT OR REPLACE INTO schema_version(id, version, app_version, updated_at) VALUES(1, ?, ?, ?)", (SCHEMA_VERSION, CONFIG.app_version, now))
@@ -162,6 +174,7 @@ def get_conn():
     conn = sqlite3.connect(CONFIG.db_path)
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA foreign_keys = ON;')
+    conn.execute('PRAGMA journal_mode=WAL;')
     try:
         yield conn
         conn.commit()
@@ -176,4 +189,21 @@ def _record_migration(conn: sqlite3.Connection, migration_key: str, payload: str
         """INSERT OR REPLACE INTO migration_history(migration_key, checksum, applied_at, status, notes)
         VALUES(?, ?, ?, 'applied', ?)""",
         (migration_key, checksum, datetime.now().isoformat(timespec='seconds'), notes),
+    )
+
+
+
+def _acquire_migration_lock(conn: sqlite3.Connection) -> None:
+    now = datetime.now().isoformat(timespec='seconds')
+    conn.execute("INSERT OR IGNORE INTO migration_lock(id, is_locked, owner, updated_at) VALUES(1, 0, '', ?)", (now,))
+    row = conn.execute("SELECT is_locked FROM migration_lock WHERE id=1").fetchone()
+    if row and int(row[0]) == 1:
+        raise RuntimeError('Migration lock is active; aborting concurrent migration.')
+    conn.execute("UPDATE migration_lock SET is_locked=1, owner='init_db', updated_at=? WHERE id=1", (now,))
+
+
+def _release_migration_lock(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        "UPDATE migration_lock SET is_locked=0, owner='', updated_at=? WHERE id=1",
+        (datetime.now().isoformat(timespec='seconds'),),
     )
