@@ -1,0 +1,138 @@
+name: Build Windows Application
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        shell: cmd
+        run: |
+          python -m pip install --upgrade pip
+
+          if exist requirements.txt (
+            pip install -r requirements.txt
+          )
+
+          pip install pyinstaller
+
+      - name: Verify Project Structure
+        shell: cmd
+        run: |
+          echo Checking project structure...
+
+          if not exist main.py (
+            echo ERROR: main.py not found
+            exit /b 1
+          )
+
+          if not exist installer (
+            echo ERROR: installer directory not found
+            exit /b 1
+          )
+
+          echo Project structure verified successfully.
+
+      - name: Build EXE
+        shell: cmd
+        run: |
+          echo Starting PyInstaller build...
+
+          pyinstaller ^
+            --noconfirm ^
+            --clean ^
+            --onefile ^
+            --windowed ^
+            --name LabReceiptSystem ^
+            main.py
+
+          if errorlevel 1 (
+            echo ERROR: PyInstaller build failed
+            exit /b 1
+          )
+
+          echo EXE build completed successfully.
+
+      - name: Verify EXE Output
+        shell: cmd
+        run: |
+          if not exist dist\LabReceiptSystem.exe (
+            echo ERROR: EXE output not found
+            dir dist
+            exit /b 1
+          )
+
+          echo EXE verified successfully.
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: |
+          choco install innosetup -y --no-progress
+          if (!(Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+            throw "Inno Setup was not installed correctly."
+          }
+
+      - name: Verify Installer Script
+        shell: cmd
+        run: |
+          if not exist installer\setup.iss (
+            echo ERROR: installer/setup.iss not found
+            exit /b 1
+          )
+
+          echo Installer script verified successfully.
+
+      - name: Build Installer
+        shell: cmd
+        run: |
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\setup.iss
+
+      - name: Verify Installer Output
+        shell: cmd
+        run: |
+          if not exist installer\Output\LabReceiptSetup.exe (
+            echo ERROR: Installer output not found
+            dir installer\Output
+            exit /b 1
+          )
+
+          echo Installer verified successfully.
+
+      - name: Upload EXE Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LabReceiptSystem
+          path: dist/LabReceiptSystem.exe
+          if-no-files-found: error
+
+      - name: Upload Setup Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LabReceiptSetup
+          path: installer/Output/*.exe
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/LabReceiptSystem.exe
+            installer/Output/*.exe
+          fail_on_unmatched_files: true
