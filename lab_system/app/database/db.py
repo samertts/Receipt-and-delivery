@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from lab_system.app.settings.config import CONFIG
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 3
 
 SCHEMA = '''
 PRAGMA foreign_keys = ON;
@@ -48,20 +48,16 @@ CREATE TABLE IF NOT EXISTS receipts (
  receiver_job_title TEXT DEFAULT '',
  auth_doc_no TEXT DEFAULT '',
  auth_date TEXT,
- received_at TEXT,
  created_at TEXT NOT NULL,
- updated_at TEXT,
- archived_at TEXT,
  notes TEXT DEFAULT '',
+ transport_info TEXT DEFAULT '',
+ additional_comments TEXT DEFAULT '',
  status TEXT NOT NULL CHECK(status IN ('Draft','Approved','Rejected','Archived','Cancelled')),
  created_by INTEGER,
- updated_by INTEGER,
- is_deleted INTEGER NOT NULL DEFAULT 0,
  FOREIGN KEY(tx_type_id) REFERENCES transaction_types(id),
  FOREIGN KEY(sender_org_id) REFERENCES organizations(id),
  FOREIGN KEY(receiver_org_id) REFERENCES organizations(id),
- FOREIGN KEY(created_by) REFERENCES users(id),
- FOREIGN KEY(updated_by) REFERENCES users(id)
+ FOREIGN KEY(created_by) REFERENCES users(id)
 );
 CREATE TABLE IF NOT EXISTS receipt_items (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,9 +70,6 @@ CREATE TABLE IF NOT EXISTS receipt_items (
  non_conforming_count INTEGER NOT NULL,
  transport_condition TEXT DEFAULT '',
  notes TEXT DEFAULT '',
- created_at TEXT,
- updated_at TEXT,
- is_deleted INTEGER NOT NULL DEFAULT 0,
  FOREIGN KEY(receipt_id) REFERENCES receipts(id) ON DELETE CASCADE,
  FOREIGN KEY(sample_type_id) REFERENCES sample_types(id)
 );
@@ -97,12 +90,7 @@ CREATE TABLE IF NOT EXISTS backups (id INTEGER PRIMARY KEY AUTOINCREMENT, backup
 CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, action TEXT NOT NULL, machine_name TEXT NOT NULL, timestamp TEXT NOT NULL, details TEXT DEFAULT '');
 CREATE INDEX IF NOT EXISTS idx_receipts_no ON receipts(receipt_no);
 CREATE INDEX IF NOT EXISTS idx_receipts_created ON receipts(created_at);
-CREATE INDEX IF NOT EXISTS idx_receipts_tx_type ON receipts(tx_type_id);
-CREATE INDEX IF NOT EXISTS idx_receipts_sender ON receipts(sender_org_id);
-CREATE INDEX IF NOT EXISTS idx_receipts_receiver ON receipts(receiver_org_id);
-CREATE INDEX IF NOT EXISTS idx_receipts_status ON receipts(status);
 CREATE INDEX IF NOT EXISTS idx_items_sample ON receipt_items(sample_type_id);
-CREATE INDEX IF NOT EXISTS idx_receipts_deleted ON receipts(is_deleted);
 CREATE INDEX IF NOT EXISTS idx_org_code ON organizations(code);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 '''
@@ -133,25 +121,6 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     if current < 3:
         if 'thumbnail_path' not in _table_columns(conn, 'attachments'):
             conn.execute("ALTER TABLE attachments ADD COLUMN thumbnail_path TEXT DEFAULT ''")
-
-    if current < 4:
-        for col, ddl in [
-            ('received_at', "ALTER TABLE receipts ADD COLUMN received_at TEXT"),
-            ('updated_at', "ALTER TABLE receipts ADD COLUMN updated_at TEXT"),
-            ('archived_at', "ALTER TABLE receipts ADD COLUMN archived_at TEXT"),
-            ('updated_by', "ALTER TABLE receipts ADD COLUMN updated_by INTEGER"),
-            ('is_deleted', "ALTER TABLE receipts ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0"),
-        ]:
-            if col not in _table_columns(conn, 'receipts'):
-                conn.execute(ddl)
-
-        for col, ddl in [
-            ('created_at', "ALTER TABLE receipt_items ADD COLUMN created_at TEXT"),
-            ('updated_at', "ALTER TABLE receipt_items ADD COLUMN updated_at TEXT"),
-            ('is_deleted', "ALTER TABLE receipt_items ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0"),
-        ]:
-            if col not in _table_columns(conn, 'receipt_items'):
-                conn.execute(ddl)
 
 
 def init_db():
