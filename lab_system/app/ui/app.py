@@ -2,7 +2,6 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
-    QFormLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -22,7 +21,15 @@ from lab_system.app.services.auth_service import AuthService
 from lab_system.app.services.seed_service import seed_organizations
 from lab_system.app.services.user_service import seed_default_users
 from lab_system.app.services.catalog_service import seed_defaults
+from lab_system.app.ui.audit_page import AuditPage
+from lab_system.app.ui.backup_page import BackupPage
+from lab_system.app.ui.org_page import OrgPage
+from lab_system.app.ui.receipts_page import ReceiptsPage
+from lab_system.app.ui.reports_page import ReportsPage
+from lab_system.app.ui.settings_page import SettingsPage
+from lab_system.app.ui.users_page import UsersPage
 from lab_system.app.utils.constants import APP_NAME, DEFAULT_WINDOW_SIZE, THEME
+from lab_system.app.utils.errors import AuthenticationError
 
 
 class LoginWindow(QDialog):
@@ -30,19 +37,19 @@ class LoginWindow(QDialog):
         super().__init__()
         self.user = None
         self.auth = AuthService()
-        self.setWindowTitle('تسجيل الدخول')
+        self.setWindowTitle("تسجيل الدخول")
         self.setLayoutDirection(Qt.RightToLeft)
         self.setFixedWidth(420)
 
         layout = QVBoxLayout(self)
         title = QLabel(APP_NAME)
-        title.setStyleSheet('font-size:18px;font-weight:700;')
+        title.setStyleSheet("font-size:18px;font-weight:700;")
         self.username = QLineEdit()
-        self.username.setPlaceholderText('اسم المستخدم')
+        self.username.setPlaceholderText("اسم المستخدم")
         self.password = QLineEdit()
-        self.password.setPlaceholderText('كلمة المرور')
+        self.password.setPlaceholderText("كلمة المرور")
         self.password.setEchoMode(QLineEdit.Password)
-        submit = QPushButton('دخول')
+        submit = QPushButton("دخول")
         submit.clicked.connect(self._login)
 
         layout.addWidget(title)
@@ -52,28 +59,28 @@ class LoginWindow(QDialog):
 
     def _login(self) -> None:
         try:
-            self.user = self.auth.login(self.username.text().strip(), self.password.text())
-            log_action(self.user['id'], 'login_success', 'desktop_login')
+            self.user = self.auth.login(
+                self.username.text().strip(), self.password.text()
+            )
+            log_action(self.user["id"], "login_success", "desktop_login")
             self.accept()
+        except AuthenticationError as exc:
+            QMessageBox.warning(self, "خطأ", str(exc))
         except Exception as exc:
-            QMessageBox.warning(self, 'خطأ', str(exc))
+            log_action("unknown", "login_error", str(exc))
+            QMessageBox.warning(self, "خطأ", f"حدث خطأ غير متوقع: {exc}")
 
 
 class DashboardPage(QWidget):
     def __init__(self, user) -> None:
         super().__init__()
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel('لوحة التحكم الرئيسية'))
-        layout.addWidget(QLabel(f'مرحباً {user["full_name"]} - الصلاحية: {user["role"]}'))
-        layout.addWidget(QLabel('هذه النسخة توفر البنية الأساسية الجاهزة للتوسع.'))
-
-
-class PlaceholderPage(QWidget):
-    def __init__(self, title: str, description: str) -> None:
-        super().__init__()
-        layout = QFormLayout(self)
-        layout.addRow(QLabel(title))
-        layout.addRow(QLabel(description))
+        welcome = QLabel(f"مرحباً {user['full_name']}")
+        welcome.setStyleSheet("font-size:18px;font-weight:700;")
+        layout.addWidget(welcome)
+        role = QLabel(f"الصلاحية: {user['role']}")
+        layout.addWidget(role)
+        layout.addWidget(QLabel("نظام إدارة الاستلام المختبري - الإصدار 1.0.0"))
 
 
 class MainWindow(QMainWindow):
@@ -90,21 +97,27 @@ class MainWindow(QMainWindow):
         sidebar = QListWidget()
         sidebar.setFixedWidth(240)
         items = [
-            ('dashboard', 'لوحة التحكم'),
-            ('auth', 'المستخدمون والصلاحيات'),
-            ('settings', 'الإعدادات'),
-            ('audit', 'سجل التدقيق'),
-            ('backup', 'النسخ الاحتياطي'),
+            ("dashboard", "لوحة التحكم"),
+            ("receipts", "الإيصالات"),
+            ("orgs", "الجهات والمؤسسات"),
+            ("auth", "المستخدمون والصلاحيات"),
+            ("reports", "التقارير"),
+            ("settings", "الإعدادات"),
+            ("audit", "سجل التدقيق"),
+            ("backup", "النسخ الاحتياطي"),
         ]
         for _, label in items:
             sidebar.addItem(label)
 
         self.pages = QStackedWidget()
         self.pages.addWidget(DashboardPage(user))
-        self.pages.addWidget(PlaceholderPage('إطار المستخدمين', 'إدارة المستخدمين والصلاحيات كبنية أساسية.'))
-        self.pages.addWidget(PlaceholderPage('إطار الإعدادات', 'إعدادات النظام المركزية محفوظة محلياً.'))
-        self.pages.addWidget(PlaceholderPage('إطار التدقيق', 'بنية سجل تدقيق immutable جاهزة للتوسع.'))
-        self.pages.addWidget(PlaceholderPage('إطار النسخ الاحتياطي', 'بنية النسخ الاحتياطي والاستعادة.'))
+        self.pages.addWidget(ReceiptsPage(user))
+        self.pages.addWidget(OrgPage(user))
+        self.pages.addWidget(UsersPage(user))
+        self.pages.addWidget(ReportsPage(user))
+        self.pages.addWidget(SettingsPage(user))
+        self.pages.addWidget(AuditPage(user))
+        self.pages.addWidget(BackupPage(user))
 
         sidebar.currentRowChanged.connect(self.pages.setCurrentIndex)
         sidebar.setCurrentRow(0)
@@ -121,8 +134,11 @@ class MainWindow(QMainWindow):
 APP_STYLESHEET = f"""
 QMainWindow, QWidget {{ background-color: {THEME['bg']}; color: {THEME['text']}; font-size: 13pt; }}
 QPushButton {{ background-color: {THEME['primary']}; color: white; border: none; padding: 8px; min-height: 34px; }}
+QPushButton:hover {{ background-color: #1a3d6e; }}
 QLineEdit {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; min-height: 34px; padding: 4px; }}
 QListWidget {{ background: {THEME['panel']}; border: 1px solid #D1D5DB; }}
+QTableWidget {{ background: {THEME['panel']}; border: 1px solid #D1D5DB; }}
+QHeaderView::section {{ background-color: {THEME['panel']}; padding: 8px; border: 1px solid #D1D5DB; }}
 """
 
 
