@@ -55,18 +55,8 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Filename: "{app}\{#MyAppExeName}"; Description: "تشغيل النظام"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
-Type: filesifempty; Name: "{localappdata}\LabReceiptSystem\database"
-Type: filesifempty; Name: "{localappdata}\LabReceiptSystem\attachments"
-Type: filesifempty; Name: "{localappdata}\LabReceiptSystem\backups"
-Type: filesifempty; Name: "{localappdata}\LabReceiptSystem\logs"
-Type: filesifempty; Name: "{localappdata}\LabReceiptSystem\exports"
-Type: filesifempty; Name: "{localappdata}\LabReceiptSystem\settings"
-Type: filesifempty; Name: "{localappdata}\LabReceiptSystem\templates"
-Type: filesifempty; Name: "{localappdata}\LabReceiptSystem\receipts"
-Type: filesifempty; Name: "{localappdata}\LabReceiptSystem\recovery"
-Type: filesifempty; Name: "{localappdata}\LabReceiptSystem\diagnostics"
-Type: filesifempty; Name: "{localappdata}\LabReceiptSystem\migrations"
-Type: filesifempty; Name: "{localappdata}\LabReceiptSystem\updates"
+Type: filesandordirs; Name: "{localappdata}\LabReceiptSystem\temp"
+Type: dirifempty; Name: "{localappdata}\LabReceiptSystem\temp"
 Type: dirifempty; Name: "{localappdata}\LabReceiptSystem"
 
 [UninstallRun]
