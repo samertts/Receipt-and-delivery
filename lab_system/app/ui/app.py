@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 
 from lab_system.app.audit.logger import log_action
 from lab_system.app.database.db import init_db
+from lab_system.app.diagnostics.startup import diagnose_and_report, run_all_checks, self_repair
 from lab_system.app.services.auth_service import AuthService
 from lab_system.app.services.seed_service import seed_organizations
 from lab_system.app.services.user_service import seed_default_users
@@ -75,12 +76,23 @@ class DashboardPage(QWidget):
     def __init__(self, user) -> None:
         super().__init__()
         layout = QVBoxLayout(self)
-        welcome = QLabel(f"مرحباً {user['full_name']}")
-        welcome.setStyleSheet("font-size:18px;font-weight:700;")
-        layout.addWidget(welcome)
-        role = QLabel(f"الصلاحية: {user['role']}")
-        layout.addWidget(role)
+
+        header = QLabel(f"مرحباً {user['full_name']}")
+        header.setStyleSheet("font-size:18px;font-weight:700;")
+        layout.addWidget(header)
+
+        layout.addWidget(QLabel(f"الصلاحية: {user['role']}"))
         layout.addWidget(QLabel("نظام إدارة الاستلام المختبري - الإصدار 1.0.0"))
+
+        diag = run_all_checks()
+        status = QLabel()
+        if diag["all_ok"]:
+            status.setText("✓ جميع الأنظمة تعمل بشكل طبيعي")
+            status.setStyleSheet("color: green; font-weight: bold;")
+        else:
+            status.setText("⚠ توجد مشكلات في النظام — راجع سجل التشخيص")
+            status.setStyleSheet("color: orange; font-weight: bold;")
+        layout.addWidget(status)
 
 
 class MainWindow(QMainWindow):
@@ -143,6 +155,11 @@ QHeaderView::section {{ background-color: {THEME['panel']}; padding: 8px; border
 
 
 def run() -> None:
+    repairs = self_repair()
+    diag = run_all_checks()
+    if not diag["all_ok"]:
+        print(diagnose_and_report())
+
     init_db()
     seed_default_users()
     seed_organizations()

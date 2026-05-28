@@ -1,0 +1,189 @@
+"""
+Startup diagnostics and self-repair for the desktop application.
+
+Runs on every startup to detect and repair common issues.
+"""
+
+import sqlite3
+from pathlib import Path
+from datetime import datetime
+
+from lab_system.app.settings.config import CONFIG, STORAGE_DIR
+from lab_system.app.utils.logging import setup_file_logging
+
+logger = setup_file_logging(STORAGE_DIR / "logs", "INFO")
+
+
+EXPECTED_INDEXES = {
+    "idx_receipts_no", "idx_receipts_created", "idx_org_code",
+    "idx_items_sample", "idx_users_username",
+}
+
+
+def check_indexes() -> dict:
+    """Verify that all required indexes exist in the database."""
+    db_path = CONFIG.db_path
+    if not db_path.exists():
+        return {"ok": False, "errors": ["Database does not exist"]}
+    try:
+        conn = sqlite3.connect(str(db_path))
+        rows = conn.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL;").fetchall()
+        present = {row[0] for row in rows}
+        missing = EXPECTED_INDEXES - present
+        conn.close()
+        return {"ok": len(missing) == 0, "present": sorted(present), "missing": sorted(missing)}
+    except Exception as e:
+        return {"ok": False, "errors": [str(e)]}
+
+
+def check_integrity() -> dict:
+    """Run SQLite integrity check and return results."""
+    results = {"db_ok": False, "wal_ok": False, "tables_ok": False, "errors": []}
+    db_path = CONFIG.db_path
+    if not db_path.exists():
+        results["errors"].append(f"Database file not found: {db_path}")
+        return results
+
+    try:
+        conn = sqlite3.connect(str(db_path))
+        row = conn.execute("PRAGMA integrity_check;").fetchone()
+        if row and row[0] == "ok":
+            results["db_ok"] = True
+        else:
+            results["errors"].append(f"Integrity check failed: {row}")
+        conn.close()
+    except Exception as e:
+        results["errors"].append(f"Integrity check error: {e}")
+
+    try:
+        conn = sqlite3.connect(str(db_path))
+        mode = conn.execute("PRAGMA journal_mode;").fetchone()
+        if mode and mode[0].upper() == "WAL":
+            results["wal_ok"] = True
+        conn.close()
+    except Exception as e:
+        results["errors"].append(f"WAL check error: {e}")
+
+    return results
+
+
+def check_folders() -> dict:
+    """Verify all required storage folders exist, create if missing."""
+    required = [
+        "database", "attachments", "logs", "backups", "exports",
+        "settings", "templates", "recovery", "diagnostics",
+        "migrations", "updates", "temp", "receipts",
+    ]
+    created = []
+    missing = []
+    for folder in required:
+        path = STORAGE_DIR / folder
+        if not path.exists():
+            try:
+                path.mkdir(parents=True, exist_ok=True)
+                created.append(folder)
+            except Exception as e:
+                missing.append(f"{folder}: {e}")
+    return {"created": created, "missing": missing}
+
+
+def check_config() -> dict:
+    """Verify configuration integrity."""
+    issues = []
+    if not CONFIG.db_path.parent.exists():
+        issues.append("Database directory does not exist")
+    if CONFIG.app_version == "0.0.0":
+        issues.append("App version is 0.0.0 (VERSION file may be missing)")
+    return {"issues": issues, "version": CONFIG.app_version}
+
+
+def run_all_checks() -> dict:
+    """Run all startup checks and return a consolidated report."""
+    report = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "integrity": check_integrity(),
+        "indexes": check_indexes(),
+        "folders": check_folders(),
+        "config": check_config(),
+        "all_ok": False,
+    }
+    report["all_ok"] = (
+        report["integrity"]["db_ok"]
+        and len(report["integrity"]["errors"]) == 0
+        and report["indexes"]["ok"]
+        and len(report["config"]["issues"]) == 0
+    )
+    return report
+
+
+def self_repair() -> list:
+    """Attempt to repair common startup issues. Returns list of actions taken."""
+    actions = []
+    folder_check = check_folders()
+    for f in folder_check["created"]:
+        actions.append(f"Created missing folder: {f}")
+
+    db_path = CONFIG.db_path
+    if not db_path.exists():
+        try:
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            conn = sqlite3.connect(str(db_path))
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA foreign_keys = ON;")
+            conn.close()
+            actions.append(f"Recreated missing database: {db_path}")
+        except Exception as e:
+            actions.append(f"Failed to recreate database: {e}")
+
+    return actions
+
+
+def diagnose_and_report() -> str:
+    """Run full diagnostics and return a human-readable report."""
+    integrity = check_integrity()
+    folders = check_folders()
+    cfg = check_config()
+
+    lines = [
+        "=" * 60,
+        "Lab Receipt System — Startup Diagnostics",
+        "=" * 60,
+        f"Timestamp: {datetime.now().isoformat(timespec='seconds')}",
+        f"Version: {cfg['version']}",
+        f"DB Path: {CONFIG.db_path}",
+        f"Storage: {STORAGE_DIR}",
+        "",
+        "--- Database ---",
+        f"  Integrity: {'OK' if integrity['db_ok'] else 'FAIL'}",
+        f"  WAL mode: {'OK' if integrity['wal_ok'] else 'FAIL'}",
+    ]
+    for err in integrity["errors"]:
+        lines.append(f"  ERROR: {err}")
+
+    index_info = check_indexes()
+    lines.append("")
+    lines.append("--- Indexes ---")
+    if index_info["ok"]:
+        lines.append(f"  All {len(index_info['present'])} indexes present")
+    else:
+        lines.append(f"  Missing indexes: {', '.join(index_info['missing'])}")
+
+    lines.append("")
+    lines.append("--- Folders ---")
+    if folders["created"]:
+        lines.append(f"  Created: {', '.join(folders['created'])}")
+    if folders["missing"]:
+        lines.append(f"  Missing: {', '.join(folders['missing'])}")
+    if not folders["created"] and not folders["missing"]:
+        lines.append("  All OK")
+
+    lines.append("")
+    lines.append("--- Configuration ---")
+    if cfg["issues"]:
+        for i in cfg["issues"]:
+            lines.append(f"  WARNING: {i}")
+    else:
+        lines.append("  OK")
+    lines.append("=" * 60)
+
+    return "\n".join(lines)

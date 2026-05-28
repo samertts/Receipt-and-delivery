@@ -12,3 +12,4 @@ class AuditLog(UUIDMixin, TimestampMixin, Base):
     action_type: Mapped[str] = mapped_column(String(80), index=True)
     ip_address: Mapped[str] = mapped_column(String(64), index=True)
     details: Mapped[str] = mapped_column(Text, default="")
+    machine_name: Mapped[str] = mapped_column(String(100), default="")

@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,4 +20,9 @@ class TransactionItem(UUIDMixin, TimestampMixin, Base):
     transport_condition: Mapped[str] = mapped_column(String(100))
     notes: Mapped[str] = mapped_column(Text, default="")
 
-    transaction = relationship("Transaction", back_populates="items")
+    transaction: Mapped["Transaction"] = relationship(
+        "Transaction", back_populates="items"
+    )
+
+
+from app.models.transaction import Transaction

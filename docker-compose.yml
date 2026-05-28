@@ -1,25 +1,55 @@
 version: '3.9'
+
 services:
   db:
-    image: postgres:16
+    image: postgres:16-alpine
+    container_name: lab_db
     environment:
       POSTGRES_DB: lab_txn
       POSTGRES_USER: lab_user
-      POSTGRES_PASSWORD: lab_pass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lab_pass}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lab_user -d lab_txn"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build: ./backend
-    env_file: .env
-    depends_on: [db]
+    container_name: lab_backend
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://lab_user:${POSTGRES_PASSWORD:-lab_pass}@db:5432/lab_txn
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - lab_data:/app/storage
+    restart: unless-stopped
+
   frontend:
     build: ./frontend
-    depends_on: [backend]
+    container_name: lab_frontend
+    depends_on:
+      - backend
     ports:
       - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      VITE_API_URL: http://localhost:8000/api
+    restart: unless-stopped
+
 volumes:
   pgdata:
+  lab_data:

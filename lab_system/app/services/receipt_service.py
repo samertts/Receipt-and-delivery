@@ -1,10 +1,10 @@
 from datetime import datetime
-from lab_system.app.database.db import get_conn
+from lab_system.app.database import db as _db
 
 
 def next_receipt_no():
     year = datetime.now().year
-    with get_conn() as conn:
+    with _db.get_conn() as conn:
         row = conn.execute(
             "SELECT receipt_no FROM receipts WHERE receipt_no LIKE ? ORDER BY id DESC LIMIT 1",
             (f"LAB-{year}-%",),
@@ -25,7 +25,7 @@ def create_receipt(data, items, user_id):
         non_conf = int(i["non_conforming_count"])
         if total != valid + damaged + rejected + non_conf:
             raise ValueError("Invalid item totals")
-    with get_conn() as conn:
+    with _db.get_conn() as conn:
         no = next_receipt_no()
         cur = conn.execute(
             """INSERT INTO receipts(receipt_no,tx_type_id,sender_org_id,receiver_org_id,
@@ -75,7 +75,7 @@ def create_receipt(data, items, user_id):
 
 
 def get_receipt(receipt_id):
-    with get_conn() as conn:
+    with _db.get_conn() as conn:
         r = conn.execute(
             """SELECT r.*, so.name sender_org, ro.name receiver_org, t.name tx_type
                 FROM receipts r
@@ -109,7 +109,7 @@ def update_receipt(receipt_id, data, items):
         non_conf = int(i["non_conforming_count"])
         if total != valid + damaged + rejected + non_conf:
             raise ValueError("Invalid item totals")
-    with get_conn() as conn:
+    with _db.get_conn() as conn:
         conn.execute(
             """UPDATE receipts SET tx_type_id=?,sender_org_id=?,receiver_org_id=?,
                 sender_name=?,receiver_name=?,sender_job_title=?,receiver_job_title=?,
@@ -154,12 +154,12 @@ def update_receipt(receipt_id, data, items):
 
 
 def delete_receipt(receipt_id):
-    with get_conn() as conn:
+    with _db.get_conn() as conn:
         conn.execute("DELETE FROM receipts WHERE id=?", (receipt_id,))
 
 
 def set_receipt_status(receipt_id, status):
-    with get_conn() as conn:
+    with _db.get_conn() as conn:
         conn.execute("UPDATE receipts SET status=? WHERE id=?", (status, receipt_id))
 
 
@@ -192,7 +192,7 @@ def list_receipts(
         where.append("r.created_at <= ?")
         params.append(f"{date_to}T23:59:59")
     clauses = " AND ".join(where)
-    with get_conn() as conn:
+    with _db.get_conn() as conn:
         total = conn.execute(
             f"""SELECT COUNT(*) c FROM receipts r
                 JOIN organizations so ON so.id=r.sender_org_id

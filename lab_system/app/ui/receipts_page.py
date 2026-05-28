@@ -163,18 +163,19 @@ class ReceiptsPage(QWidget):
         )
         self.table.setRowCount(len(rows))
         for i, r in enumerate(rows):
-            self.table.setItem(i, 0, QTableWidgetItem(r["receipt_no"]))
-            self.table.setItem(i, 1, QTableWidgetItem(r["tx_type"]))
-            self.table.setItem(i, 2, QTableWidgetItem(r["sender_org"] or ""))
-            self.table.setItem(i, 3, QTableWidgetItem(r["receiver_org"] or ""))
-            self.table.setItem(i, 4, QTableWidgetItem(r["created_at"] or ""))
-            status_code = r["status"]
+            rd = dict(r)
+            self.table.setItem(i, 0, QTableWidgetItem(rd["receipt_no"]))
+            self.table.setItem(i, 1, QTableWidgetItem(rd["tx_type"]))
+            self.table.setItem(i, 2, QTableWidgetItem(rd["sender_org"] or ""))
+            self.table.setItem(i, 3, QTableWidgetItem(rd["receiver_org"] or ""))
+            self.table.setItem(i, 4, QTableWidgetItem(rd["created_at"] or ""))
+            status_code = rd["status"]
             _, status_ar = STATUS_STYLES.get(status_code, ("", status_code))
             item = QTableWidgetItem(status_ar)
             color, _ = STATUS_STYLES.get(status_code, ("#000", ""))
             item.setForeground(Qt.GlobalColor(color) if color.startswith("#") else None)
             self.table.setItem(i, 5, item)
-            self.table.setItem(i, 6, QTableWidgetItem(r.get("sender_name", "")))
+            self.table.setItem(i, 6, QTableWidgetItem(rd.get("sender_name", "")))
 
             actions_widget = QWidget()
             actions_layout = QHBoxLayout(actions_widget)

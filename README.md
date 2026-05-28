@@ -1,46 +1,114 @@
 # نظام إدارة الاستلام المختبري
 
-تطبيق مكتبي حكومي عراقي **Native Desktop** مبني بـ **PySide6 + SQLite** ويعمل بالكامل دون إنترنت.
+**Iraqi Laboratory Receipt & Delivery Management System**
 
-## الوظائف المنجزة
-- تسجيل دخول محلي وصلاحيات (Admin/Supervisor/User/Auditor).
-- إدارة المستخدمين (إضافة + عرض).
-- إدارة مؤسسات ديناميكية عبر قاعدة البيانات.
-- أنواع معاملات ديناميكية وأنواع عينات ديناميكية من جداول إعدادات.
-- إنشاء إيصال رسمي مع ترقيم تلقائي `LAB-YYYY-XXXXXX`.
-- تحقق إلزامي لمعادلة العينات قبل الحفظ.
-- أرشيف إيصالات محلي مع بحث سريع.
-- تدقيق Audit Logs غير قابل للتعديل.
-- إدارة مرفقات خارج SQLite مع hash وضغط صور.
-- PDF احترافي مع QR + Barcode وتوقيعات.
-- نسخ احتياطي محلي.
+تطبيق متكامل لإدارة استلام وتسليم العينات والمواد المختبرية، مع دعم واجهة سطح المكتب (PySide6) وواجهة ويب (FastAPI + Vue 3).
+
+---
+
+## المميزات
+
+- **إيصالات استلام وتسليم** مع ترقيم تلقائي `LAB-YYYY-XXXXXX`
+- **التحقق الإلزامي لمعادلة العينات** قبل الحفظ
+- **إدارة المستخدمين والصلاحيات** (Admin / Supervisor / User / Auditor)
+- **إدارة المؤسسات** الديناميكية
+- **أنواع معاملات وأنواع عينات** ديناميكية
+- **PDF احترافي** مع QR Code و Barcode وتوقيعات
+- **سجل تدقيق (Audit Log)** غير قابل للتعديل
+- **إدارة المرفقات** مع SHA-256 hash وضغط صور
+- **نسخ احتياطي محلي**
+- **واجهة سطح مكتب** (PySide6 + SQLite)
+- **واجهة ويب** (FastAPI + Vue 3 + PostgreSQL)
+- **ـPWA** (Progressive Web App) مع دعم عدم الاتصال
+- **ـAPI RESTful** مع توثيق Swagger
+- **ـDocker** support
+- **ـCI/CD** via GitHub Actions
+
+---
 
 ## هيكل المشروع
-- `lab_system/app/ui` واجهات النوافذ.
-- `lab_system/app/database` تهيئة ومخطط SQLite.
-- `lab_system/app/services` منطق الأعمال.
-- `lab_system/app/printing` طباعة PDF.
-- `.github/workflows/build.yml` بناء تلقائي ويندوز.
-- `installer/setup.iss` إعداد مثبت Inno Setup.
 
-## التشغيل المحلي
+```
+├── backend/                    # FastAPI web API
+│   ├── app/
+│   │   ├── api/v1/            # API endpoints
+│   │   ├── core/              # Config, security, logging, exceptions
+│   │   ├── db/                # Database session & base
+│   │   ├── models/            # SQLAlchemy models
+│   │   ├── schemas/           # Pydantic schemas
+│   │   └── services/          # Business logic
+│   └── tests/                 # API tests
+├── frontend/                   # Vue 3 PWA
+│   └── src/
+│       ├── api/               # API client
+│       ├── components/        # Layout & shared components
+│       ├── pages/             # Page components
+│       ├── router/            # Vue Router
+│       └── stores/            # Pinia stores
+├── lab_system/                 # PySide6 desktop app
+│   └── app/
+│       ├── auth/              # Authentication & permissions
+│       ├── database/          # SQLite schema & migrations
+│       ├── printing/          # PDF generation
+│       ├── services/          # Business logic
+│       └── ui/                # Desktop UI
+├── scripts/                    # Utility scripts
+├── installer/                  # Windows installer (Inno Setup)
+├── tests/                     # Desktop app tests
+├── docker-compose.yml         # Docker setup
+└── .env.example               # Environment template
+```
+
+---
+
+## التشغيل السريع
+
+### واجهة سطح المكتب
+
 ```bash
-python -m venv .venv
-. .venv/bin/activate
 pip install -r requirements.txt
 python main.py
 ```
 
-## بيانات الدخول الافتراضية
-- username: `admin`
-- password: `Admin@123`
+### واجهة الويب (API)
 
-## بناء ملف تنفيذي
 ```bash
-pyinstaller --noconfirm --onefile --windowed --icon=assets/icons/app.ico main.py
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
 ```
 
-## إنشاء مثبت LabReceiptSetup.exe
-1. أنشئ EXE أولاً عبر PyInstaller.
-2. افتح `installer/setup.iss` عبر Inno Setup.
-3. نفّذ Compile لإنتاج `LabReceiptSetup.exe`.
+الوثائق التفاعلية: http://localhost:8000/api/docs
+
+### باستخدام Docker
+
+```bash
+cp .env.example .env
+docker compose up -d
+```
+
+### بيانات الدخول الافتراضية
+
+| المستخدم | كلمة المرور | الصلاحية |
+|---------|------------|---------|
+| admin | Admin@123 | Admin |
+
+⚠️ **يجب تغيير كلمة المرور الافتراضية فور تسجيل الدخول الأول.**
+
+---
+
+## التوثيق
+
+| الملف | الوصف |
+|------|-------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | شرح العمارة التقنية |
+| [SECURITY.md](SECURITY.md) | السياسات الأمنية |
+| [API.md](API.md) | توثيق API |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | دليل المساهمة |
+| [CHANGELOG.md](CHANGELOG.md) | سجل التغييرات |
+
+---
+
+## الترخيص
+
+هذا النظام مملوك لـ Iraqi Health Laboratory Directorate.

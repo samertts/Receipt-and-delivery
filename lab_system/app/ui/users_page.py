@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from lab_system.app.audit.logger import log_action
-from lab_system.app.database.db import get_conn
+from lab_system.app.database import db as _db
 from lab_system.app.services.org_service import list_organizations
 from lab_system.app.services.user_service import (
     create_user,
@@ -110,13 +110,14 @@ class UsersPage(QWidget):
         users = list_users()
         self.table.setRowCount(len(users))
         for i, u in enumerate(users):
-            self.table.setItem(i, 0, QTableWidgetItem(u["full_name"]))
-            self.table.setItem(i, 1, QTableWidgetItem(u["username"]))
-            self.table.setItem(i, 2, QTableWidgetItem(u["role"]))
+            ud = dict(u)
+            self.table.setItem(i, 0, QTableWidgetItem(ud["full_name"]))
+            self.table.setItem(i, 1, QTableWidgetItem(ud["username"]))
+            self.table.setItem(i, 2, QTableWidgetItem(ud["role"]))
             self.table.setItem(
-                i, 3, QTableWidgetItem(u.get("institution_name") or "-")
+                i, 3, QTableWidgetItem(ud.get("institution_name") or "-")
             )
-            self.table.setItem(i, 4, QTableWidgetItem(u["status"]))
+            self.table.setItem(i, 4, QTableWidgetItem(ud["status"]))
 
             actions_widget = QWidget()
             actions_layout = QHBoxLayout(actions_widget)
@@ -165,7 +166,7 @@ class UsersPage(QWidget):
             self.refresh()
 
     def _enable_user(self, user_id):
-        with get_conn() as conn:
+        with _db.get_conn() as conn:
             conn.execute("UPDATE users SET status='Active' WHERE id=?", (user_id,))
         log_action(
             self.current_user["id"],

@@ -1,6 +1,24 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-body { font-family: Tahoma, Arial, sans-serif; }
-.gov-card { @apply border border-slate-300 rounded-sm bg-white p-4; }
-.gov-btn { @apply bg-slate-700 text-white px-4 py-2 rounded-sm text-sm; }
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  direction: rtl;
+}
+
+.gov-card {
+  @apply bg-white rounded-xl shadow-sm border border-slate-200;
+}
+
+.gov-btn {
+  @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors;
+}
+
+.gov-btn-primary {
+  @apply gov-btn bg-blue-900 text-white hover:bg-blue-800;
+}
+
+.gov-btn-secondary {
+  @apply gov-btn bg-slate-100 text-slate-700 hover:bg-slate-200;
+}

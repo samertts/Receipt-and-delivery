@@ -79,14 +79,7 @@ jobs:
         run: |
           echo Starting PyInstaller build...
 
-          pyinstaller ^
-          --noconfirm ^
-          --clean ^
-          --onefile ^
-          --windowed ^
-          --name LabReceiptSystem ^
-          --icon=assets/icons/app.ico ^
-          main.py
+          pyinstaller --noconfirm --clean lab_system.spec
 
           if errorlevel 1 (
           echo ERROR: PyInstaller build failed

@@ -1,47 +1,58 @@
+; Inno Setup Script for Lab Receipt System
+; Iraqi Laboratory Receipt & Delivery Management System
+
+#define MyAppName "نظام إدارة الاستلام المختبري"
+#define MyAppVersion "1.0.0"
+#define MyAppPublisher "Iraqi Health Laboratory Directorate"
+#define MyAppURL "https://github.com/samertts/Receipt-and-delivery"
+#define MyAppExeName "LabReceiptSystem.exe"
+
 [Setup]
-AppName=Lab Receipt System
-AppVersion=1.0.0
-AppPublisher=Iraqi Health Laboratory Directorate
+AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+AppPublisherURL={#MyAppURL}
 DefaultDirName={autopf}\LabReceiptSystem
-DefaultGroupName=Lab Receipt System
+DefaultGroupName={#MyAppName}
 OutputDir=Output
 OutputBaseFilename=LabReceiptSetup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayIcon={app}\LabReceiptSystem.exe
-UsePreviousAppDir=yes
-UsePreviousGroup=yes
-CloseApplications=yes
+DisableProgramGroupPage=yes
+UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "arabic"; MessagesFile: "compiler:Languages\Arabic.isl"
+
+[Tasks]
+Name: "desktopicon"; Description: "إنشاء اختصار على سطح المكتب"; GroupDescription: "اختصارات:"; Flags: checkedonce
 
 [Files]
-Source: "..\dist\LabReceiptSystem.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\assets\*"; DestDir: "{app}\assets"; Flags: recursesubdirs createallsubdirs
+Source: "dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
 Name: "{localappdata}\LabReceiptSystem\database"
 Name: "{localappdata}\LabReceiptSystem\attachments"
-Name: "{localappdata}\LabReceiptSystem\logs"
 Name: "{localappdata}\LabReceiptSystem\backups"
+Name: "{localappdata}\LabReceiptSystem\logs"
 Name: "{localappdata}\LabReceiptSystem\exports"
 Name: "{localappdata}\LabReceiptSystem\settings"
 Name: "{localappdata}\LabReceiptSystem\templates"
+Name: "{localappdata}\LabReceiptSystem\receipts"
 Name: "{localappdata}\LabReceiptSystem\recovery"
 Name: "{localappdata}\LabReceiptSystem\diagnostics"
 Name: "{localappdata}\LabReceiptSystem\migrations"
 Name: "{localappdata}\LabReceiptSystem\updates"
 
 [Icons]
-Name: "{autodesktop}\نظام إدارة الاستلام المختبري"; Filename: "{app}\LabReceiptSystem.exe"
-Name: "{group}\نظام إدارة الاستلام المختبري"; Filename: "{app}\LabReceiptSystem.exe"
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
-[Code]
-procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-begin
-  if CurUninstallStep = usPostUninstall then begin
-    MsgBox('Application binaries were removed. Institutional data under %LOCALAPPDATA%\\LabReceiptSystem was preserved.', mbInformation, MB_OK);
-  end;
-end;
+[Run]
+Filename: "{app}\{#MyAppExeName}"; Description: "تشغيل النظام"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+Filename: "{cmd}"; Parameters: "/C echo تم إلغاء التثبيت. البيانات保存在: {localappdata}\LabReceiptSystem"; Flags: runhidden

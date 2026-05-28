@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from lab_system.app.audit.logger import log_action
-from lab_system.app.database.db import get_conn
+from lab_system.app.database import db as _db
 from lab_system.app.services.org_service import list_organizations, upsert_organization
 
 ORG_TYPES = [
@@ -209,14 +209,15 @@ class OrgPage(QWidget):
 
         self.table.setRowCount(len(filtered))
         for i, o in enumerate(filtered):
-            self.table.setItem(i, 0, QTableWidgetItem(o["name"]))
-            self.table.setItem(i, 1, QTableWidgetItem(o["code"]))
-            self.table.setItem(i, 2, QTableWidgetItem(o.get("org_type", "")))
-            self.table.setItem(i, 3, QTableWidgetItem(o.get("governorate", "")))
-            self.table.setItem(i, 4, QTableWidgetItem(o.get("phone", "")))
-            self.table.setItem(i, 5, QTableWidgetItem(o.get("email", "")))
-            self.table.setItem(i, 6, QTableWidgetItem(o.get("status", "")))
-            self.table.setItem(i, 7, QTableWidgetItem(o.get("notes", "")))
+            od = dict(o)
+            self.table.setItem(i, 0, QTableWidgetItem(od["name"]))
+            self.table.setItem(i, 1, QTableWidgetItem(od["code"]))
+            self.table.setItem(i, 2, QTableWidgetItem(od.get("org_type", "")))
+            self.table.setItem(i, 3, QTableWidgetItem(od.get("governorate", "")))
+            self.table.setItem(i, 4, QTableWidgetItem(od.get("phone", "")))
+            self.table.setItem(i, 5, QTableWidgetItem(od.get("email", "")))
+            self.table.setItem(i, 6, QTableWidgetItem(od.get("status", "")))
+            self.table.setItem(i, 7, QTableWidgetItem(od.get("notes", "")))
 
             actions_widget = QWidget()
             actions_layout = QHBoxLayout(actions_widget)
@@ -263,7 +264,7 @@ class OrgPage(QWidget):
 
     def _toggle_status(self, org_id, current_status):
         new_status = "Inactive" if current_status == "Active" else "Active"
-        with get_conn() as conn:
+        with _db.get_conn() as conn:
             conn.execute(
                 "UPDATE organizations SET status=? WHERE id=?",
                 (new_status, org_id),

@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from PIL import Image
 from lab_system.app.settings.config import STORAGE_DIR
-from lab_system.app.database.db import get_conn
+from lab_system.app.database import db as _db
 
 ALLOWED = {'.pdf','.jpg','.jpeg','.png'}
 
@@ -17,7 +17,7 @@ def save_attachment(receipt_id:int, src_path:str, category:str):
     else:
         shutil.copy2(src,target)
     h=hashlib.sha256(target.read_bytes()).hexdigest()
-    with get_conn() as conn:
+    with _db.get_conn() as conn:
         conn.execute('INSERT INTO attachments(receipt_id,file_path,file_type,file_hash,category,created_at) VALUES(?,?,?,?,?,?)',
                      (receipt_id,str(target),target.suffix.lower(),h,category,datetime.now().isoformat(timespec='seconds')))
     return str(target), h

@@ -2,7 +2,7 @@ import csv
 from datetime import datetime
 from pathlib import Path
 
-from lab_system.app.database.db import get_conn
+from lab_system.app.database import db as _db
 from lab_system.app.settings.config import STORAGE_DIR
 
 
@@ -24,7 +24,7 @@ def receipt_summary(date_from="", date_to="", group_by="day"):
     elif group_by == "type":
         date_col = "t.name"
 
-    with get_conn() as conn:
+    with _db.get_conn() as conn:
         by_status = conn.execute(
             f"""SELECT r.status, COUNT(*) cnt
                 FROM receipts r WHERE {clauses}
@@ -63,7 +63,7 @@ def sample_summary(date_from="", date_to=""):
         params.append(f"{date_to}T23:59:59")
     clauses = " AND ".join(where)
 
-    with get_conn() as conn:
+    with _db.get_conn() as conn:
         rows = conn.execute(
             f"""SELECT st.name sample_name,
                     SUM(ri.total_count) total,
