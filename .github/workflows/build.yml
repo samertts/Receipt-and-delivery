@@ -46,33 +46,28 @@ jobs:
 
           echo Project structure verified successfully.
 
-      - name: Create Placeholder Icon If Missing
+      - name: Verify VERSION File
+        shell: cmd
+        run: |
+          if not exist VERSION (
+            echo 1.0.0 > VERSION
+            echo WARNING: VERSION file was missing, created with default 1.0.0
+          )
+          echo App version: 
+          type VERSION
+
+      - name: Verify Assets
         shell: powershell
         run: |
-          if (!(Test-Path "assets/icons/app.ico")) {
-            Add-Type -AssemblyName System.Drawing
-
-            $bitmap = New-Object System.Drawing.Bitmap 256,256
-            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-
-            $graphics.Clear([System.Drawing.Color]::RoyalBlue)
-
-            $iconPath = "assets/icons/app.ico"
-
-            $icon = [System.Drawing.Icon]::ExtractAssociatedIcon("$env:WINDIR\System32\notepad.exe")
-
-            $stream = New-Object System.IO.FileStream($iconPath, [System.IO.FileMode]::Create)
-            $icon.Save($stream)
-            $stream.Close()
-
-            $graphics.Dispose()
-            $bitmap.Dispose()
-
-            Write-Host "Placeholder icon created successfully."
+          $icon = "assets\icons\app.ico"
+          if (-not (Test-Path $icon)) {
+            Write-Host "WARNING: app.ico missing, building without icon"
+          } elseif ((Get-Item $icon).Length -eq 0) {
+            Write-Host "WARNING: app.ico is empty, building without icon"
+          } else {
+            Write-Host "app.ico exists and is valid"
           }
-          else {
-            Write-Host "Icon already exists."
-          }
+          Write-Host "Assets verification complete."
 
       - name: Build EXE
         shell: cmd
