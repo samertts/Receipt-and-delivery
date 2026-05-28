@@ -16,7 +16,7 @@ BLOCK_CIPHER_LIST = None
 
 a = Analysis(
     ['main.py'],
-    pathex=[str(Path(__file__).parent)],
+    pathex=[str(Path.cwd())],
     binaries=[],
     datas=[
         ('assets', 'assets'),
