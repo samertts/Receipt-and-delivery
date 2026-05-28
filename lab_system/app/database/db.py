@@ -4,7 +4,7 @@ from datetime import datetime
 import hashlib
 from lab_system.app.settings.config import CONFIG
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 SCHEMA = '''
 PRAGMA foreign_keys = ON;
@@ -109,6 +109,19 @@ CREATE TABLE IF NOT EXISTS migration_lock (
 );
 CREATE TABLE IF NOT EXISTS backups (id INTEGER PRIMARY KEY AUTOINCREMENT, backup_file TEXT NOT NULL, created_at TEXT NOT NULL, created_by INTEGER, notes TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, action TEXT NOT NULL, machine_name TEXT NOT NULL, timestamp TEXT NOT NULL, details TEXT DEFAULT '');
+CREATE TABLE IF NOT EXISTS sync_queue (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ entity_type TEXT NOT NULL,
+ entity_id INTEGER NOT NULL,
+ action TEXT NOT NULL CHECK(action IN ('create','update','delete')),
+ payload TEXT DEFAULT '',
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','synced','conflict','failed')),
+ retry_count INTEGER NOT NULL DEFAULT 0,
+ created_at TEXT NOT NULL,
+ synced_at TEXT DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_sync_status ON sync_queue(status);
+CREATE INDEX IF NOT EXISTS idx_sync_entity ON sync_queue(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_receipts_no ON receipts(receipt_no);
 CREATE INDEX IF NOT EXISTS idx_receipts_created ON receipts(created_at);
 CREATE INDEX IF NOT EXISTS idx_items_sample ON receipt_items(sample_type_id);
@@ -150,6 +163,25 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     if current < 4:
         conn.execute("INSERT OR IGNORE INTO schema_version(id, version, app_version, updated_at) VALUES(1, ?, ?, ?)", (SCHEMA_VERSION, CONFIG.app_version, datetime.now().isoformat(timespec='seconds'),))
         _record_migration(conn, 'v4_lifecycle_metadata', 'schema_version + migration_history initialization')
+
+    if current < 5:
+        statement = 'sync_queue table with indexes for future synchronization'
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS sync_queue (
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             entity_type TEXT NOT NULL,
+             entity_id INTEGER NOT NULL,
+             action TEXT NOT NULL CHECK(action IN ('create','update','delete')),
+             payload TEXT DEFAULT '',
+             status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','synced','conflict','failed')),
+             retry_count INTEGER NOT NULL DEFAULT 0,
+             created_at TEXT NOT NULL,
+             synced_at TEXT DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS idx_sync_status ON sync_queue(status);
+            CREATE INDEX IF NOT EXISTS idx_sync_entity ON sync_queue(entity_type, entity_id);
+        """)
+        _record_migration(conn, 'v5_sync_queue', statement)
 
 
 def init_db():
