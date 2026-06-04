@@ -4,8 +4,11 @@ Comprehensive tests for desktop app services.
 Uses a temporary SQLite file for isolated testing (fixes :memory: isolation issue).
 """
 
-import sys, os, sqlite3, tempfile, shutil
-from datetime import datetime
+import sys
+import os
+import sqlite3
+import tempfile
+import shutil
 from pathlib import Path
 from contextlib import contextmanager
 
@@ -132,9 +135,9 @@ class TestReceiptServiceFull:
         assert len(r) == 0
 
     def test_7_delete_receipt(self):
-        from lab_system.app.services.receipt_service import create_receipt, get_receipt, delete_receipt
+        from lab_system.app.services.receipt_service import create_receipt, get_receipt, hard_delete_receipt
         rid, _ = create_receipt(self._data(), [self._item()], 1)
-        delete_receipt(rid)
+        hard_delete_receipt(rid)
         assert get_receipt(rid)[0] is None
 
     def test_8_validation(self):

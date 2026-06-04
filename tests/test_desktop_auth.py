@@ -69,21 +69,23 @@ class TestDesktopUsernameValidation:
 class TestDesktopPermissions:
     def test_admin_permissions(self):
         from lab_system.app.auth.permissions import ROLE_PERMISSIONS
-        assert "manage_users" in ROLE_PERMISSIONS["Admin"]
-        assert "view_dashboard" in ROLE_PERMISSIONS["Admin"]
+        assert "users.create" in ROLE_PERMISSIONS["Admin"]
+        assert "dashboard.view" in ROLE_PERMISSIONS["Admin"]
+        assert "settings.update" in ROLE_PERMISSIONS["Admin"]
 
     def test_user_permissions(self):
         from lab_system.app.auth.permissions import ROLE_PERMISSIONS
-        assert "view_dashboard" in ROLE_PERMISSIONS["User"]
-        assert "manage_users" not in ROLE_PERMISSIONS["User"]
+        assert "dashboard.view" in ROLE_PERMISSIONS["User"]
+        assert "users.create" not in ROLE_PERMISSIONS["User"]
+        assert "receipts.create" in ROLE_PERMISSIONS["User"]
 
     def test_require_permission_valid(self):
         from lab_system.app.auth.permissions import require_permission
-        require_permission("Admin", "manage_users")
+        require_permission("Admin", "users.create")
 
     def test_require_permission_invalid(self):
         from lab_system.app.auth.permissions import require_permission
         from lab_system.app.utils.errors import AuthorizationError
         import pytest
         with pytest.raises(AuthorizationError):
-            require_permission("User", "manage_users")
+            require_permission("User", "users.create")

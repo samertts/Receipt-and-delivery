@@ -5,7 +5,6 @@ Runs on every startup to detect and repair common issues.
 """
 
 import sqlite3
-from pathlib import Path
 from datetime import datetime
 
 from lab_system.app.settings.config import CONFIG, STORAGE_DIR

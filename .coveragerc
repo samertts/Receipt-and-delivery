@@ -1,0 +1,21 @@
+[run]
+omit =
+    lab_system/app/ui/*
+    lab_system/storage/*
+    lab_system/assets/*
+    lab_system/installer/*
+    lab_system/app/reports/*
+    lab_system/app/printing/*
+    lab_system/app/models/*
+    backend/*
+    frontend/*
+    scripts/*
+    deploy/*
+    */__init__.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:

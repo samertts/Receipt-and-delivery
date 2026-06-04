@@ -253,7 +253,7 @@ class ReceiptsPage(QWidget):
             log_action(
                 self.current_user["id"],
                 "receipt_created",
-                f"إنشاء إيصال جديد",
+                "إنشاء إيصال جديد",
             )
             self._load()
 

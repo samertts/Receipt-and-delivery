@@ -2,7 +2,7 @@
 Database recovery and backup verification service.
 
 Provides tools to verify backup integrity, detect database corruption,
-and attempt recovery from WAL or backup files.
+attempt recovery from WAL or backup files, and manage backup retention.
 """
 
 import shutil
@@ -13,8 +13,12 @@ from pathlib import Path
 from lab_system.app.database import db as _db
 from lab_system.app.settings.config import DB_PATH, STORAGE_DIR
 from lab_system.app.utils.logging import setup_file_logging
+from lab_system.app.database.db import rebuild_fts
 
 logger = setup_file_logging(STORAGE_DIR / "logs", "INFO")
+
+BACKUP_DIR = STORAGE_DIR / "backups"
+SNAPSHOT_DIR = STORAGE_DIR / "snapshots"
 
 
 def verify_backup(path: Path | str) -> dict:
@@ -44,11 +48,10 @@ def verify_backup(path: Path | str) -> dict:
 
 def list_backups() -> list[dict]:
     """Return metadata for all backup files stored in the backups directory."""
-    backups_dir = STORAGE_DIR / "backups"
     records = []
-    if not backups_dir.exists():
+    if not BACKUP_DIR.exists():
         return records
-    for f in sorted(backups_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+    for f in sorted(BACKUP_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
         if f.suffix == ".db":
             info = f.stat()
             records.append({
@@ -60,6 +63,14 @@ def list_backups() -> list[dict]:
     return records
 
 
+def _get_backup_record(path: str) -> dict | None:
+    with _db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM backups WHERE backup_file = ?", (path,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
 def restore_from_backup(backup_path: Path | str) -> dict:
     """Restore the production database from a verified backup file."""
     backup_path = Path(backup_path)
@@ -69,6 +80,10 @@ def restore_from_backup(backup_path: Path | str) -> dict:
         result["error"] = verification.get("error", "Backup verification failed")
         return result
     try:
+        # Create a snapshot of current DB before overwriting
+        snapshot_result = create_recovery_snapshot("pre_restore")
+        result["pre_restore_snapshot"] = snapshot_result.get("path")
+
         dest = DB_PATH
         backup_dest = dest.with_suffix(".db.corrupted")
         if dest.exists():
@@ -77,6 +92,14 @@ def restore_from_backup(backup_path: Path | str) -> dict:
         with _db.get_conn() as conn:
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA foreign_keys = ON;")
+        # Verify restored DB
+        verify = verify_backup(dest)
+        if not verify["valid"]:
+            # Rollback
+            if backup_dest.exists():
+                shutil.move(str(backup_dest), str(dest))
+            result["error"] = "Restored database failed integrity check"
+            return result
         result["success"] = True
         result["restored_path"] = str(dest)
     except Exception as e:
@@ -96,4 +119,144 @@ def delete_backup(backup_path: Path | str) -> dict:
         result["success"] = True
     except Exception as e:
         result["error"] = str(e)
+    return result
+
+
+def create_recovery_snapshot(reason="manual") -> dict:
+    """Create a point-in-time snapshot of the current database."""
+    SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    name = f"snapshot_{reason}_{ts}.db"
+    target = SNAPSHOT_DIR / name
+    try:
+        shutil.copy2(str(DB_PATH), str(target))
+        return {"success": True, "path": str(target), "name": name}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def list_snapshots() -> list[dict]:
+    records = []
+    if not SNAPSHOT_DIR.exists():
+        return records
+    for f in sorted(SNAPSHOT_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        if f.suffix == ".db":
+            info = f.stat()
+            records.append({
+                "path": str(f), "name": f.name, "size": info.st_size,
+                "created": datetime.fromtimestamp(info.st_mtime).isoformat(timespec="seconds"),
+            })
+    return records
+
+
+def auto_backup(notes="auto") -> dict:
+    """Create automatic backup and enforce retention policy."""
+    from lab_system.app.services.backup_service import create_backup
+    try:
+        path = create_backup(user_id=None, notes=notes)
+        enforce_retention()
+        return {"success": True, "path": path}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def enforce_retention(max_backups=30) -> int:
+    """Remove oldest backups exceeding max_backups. Returns number deleted."""
+    backups = list_backups()
+    if len(backups) <= max_backups:
+        return 0
+    deleted = 0
+    for b in backups[max_backups:]:
+        result = delete_backup(b["path"])
+        if result["success"]:
+            deleted += 1
+    return deleted
+
+
+def validate_recovery(backup_path: Path | str) -> dict:
+    """Validate that a backup can be restored successfully (dry run)."""
+    backup_path = Path(backup_path)
+    result = {"valid": False, "checks": []}
+
+    v = verify_backup(backup_path)
+    result["checks"].append({"name": "integrity", "passed": v["valid"], "detail": v.get("error")})
+    if not v["valid"]:
+        result["valid"] = False
+        return result
+
+    try:
+        conn = sqlite3.connect(str(backup_path))
+        tables = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '\\_%' ESCAPE '\\'"
+        ).fetchall()
+        table_count = len(tables)
+        result["checks"].append({"name": "tables", "passed": table_count > 0, "detail": f"{table_count} tables"})
+
+        row = conn.execute("SELECT COUNT(*) c FROM receipts").fetchone()
+        result["checks"].append({"name": "receipts_count", "passed": True, "detail": f"{row[0]} receipts"})
+
+        row = conn.execute("SELECT COUNT(*) c FROM users").fetchone()
+        result["checks"].append({"name": "users_count", "passed": row[0] > 0, "detail": f"{row[0]} users"})
+        conn.close()
+    except Exception as e:
+        result["checks"].append({"name": "read_error", "passed": False, "detail": str(e)})
+
+    result["valid"] = all(c["passed"] for c in result["checks"])
+    return result
+
+
+def detect_corruption() -> dict:
+    """Check current database for corruption."""
+    result = {"ok": True, "errors": []}
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        row = conn.execute("PRAGMA integrity_check;").fetchone()
+        if not row or row[0] != "ok":
+            result["ok"] = False
+            result["errors"].append(f"Integrity: {row}")
+        # Check WAL
+        wal_path = str(DB_PATH) + "-wal"
+        if Path(wal_path).exists() and Path(wal_path).stat().st_size > 0:
+            result["wal_size"] = Path(wal_path).stat().st_size
+        conn.close()
+    except Exception as e:
+        result["ok"] = False
+        result["errors"].append(str(e))
+    return result
+
+
+def attempt_recovery() -> dict:
+    """Attempt to recover the database from WAL or latest backup."""
+    result = {"success": False, "actions": []}
+
+    # First try checkpointing WAL
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+        conn.close()
+        result["actions"].append("WAL checkpoint performed")
+
+        verify = detect_corruption()
+        if verify["ok"]:
+            result["success"] = True
+            logger.info("Database recovered via WAL checkpoint")
+            return result
+    except Exception as e:
+        result["actions"].append(f"WAL checkpoint failed: {e}")
+
+    # Fall back to latest backup
+    backups = list_backups()
+    if backups:
+        latest = backups[0]
+        restore_result = restore_from_backup(latest["path"])
+        if restore_result["success"]:
+            result["success"] = True
+            result["actions"].append(f"Restored from backup: {latest['name']}")
+            rebuild_fts()
+            logger.info(f"Database recovered from backup: {latest['name']}")
+        else:
+            result["actions"].append(f"Backup restore failed: {restore_result.get('error')}")
+    else:
+        result["actions"].append("No backup available for recovery")
+
     return result

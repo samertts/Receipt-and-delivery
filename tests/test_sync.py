@@ -1,4 +1,8 @@
-import sys, os, sqlite3, tempfile, shutil
+import sys
+import os
+import sqlite3
+import tempfile
+import shutil
 from pathlib import Path
 from contextlib import contextmanager
 import pytest
@@ -53,7 +57,6 @@ def _clean_queue():
 
 class TestSyncQueue:
     def test_enqueue_create(self):
-        from lab_system.app.database import db as _db
         from lab_system.app.sync.service import SyncService
         svc = SyncService()
         eid = svc.enqueue('receipts', 1, 'create', '{"test": true}')

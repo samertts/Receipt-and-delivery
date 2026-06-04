@@ -220,7 +220,7 @@ class ReceiptDetailDialog(QDialog):
                 "receipt_printed",
                 f"طباعة الإيصال: {receipt['receipt_no']}",
             )
-            subprocess.Popen([str(path)], shell=True)
+            subprocess.Popen([str(path)], shell=False)
         except Exception as e:
             QMessageBox.warning(self, "خطأ", f"فشل الطباعة: {e}")
 
@@ -250,6 +250,6 @@ class ReceiptDetailDialog(QDialog):
     @staticmethod
     def _open_file(file_path):
         try:
-            subprocess.Popen([str(file_path)], shell=True)
+            subprocess.Popen([str(file_path)], shell=False)
         except Exception:
             QMessageBox.warning(None, "خطأ", "تعذر فتح الملف")

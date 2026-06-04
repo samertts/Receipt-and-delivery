@@ -10,5 +10,9 @@ class AuthorizationError(AppError):
     pass
 
 
+class SessionExpiredError(AppError):
+    pass
+
+
 class ValidationError(AppError):
     pass

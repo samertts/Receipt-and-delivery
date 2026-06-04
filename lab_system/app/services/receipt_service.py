@@ -1,4 +1,5 @@
 from datetime import datetime
+from lab_system.app.audit.logger import log_action
 from lab_system.app.database import db as _db
 
 
@@ -153,14 +154,156 @@ def update_receipt(receipt_id, data, items):
             )
 
 
-def delete_receipt(receipt_id):
+def soft_delete_receipt(receipt_id, user_id=None):
+    now = datetime.now().isoformat(timespec="seconds")
     with _db.get_conn() as conn:
+        conn.execute("UPDATE receipts SET deleted_at=? WHERE id=?", (now, receipt_id))
+        conn.execute("DELETE FROM receipts_fts WHERE rowid=?", (receipt_id,))
+    log_action(user_id, 'soft_delete', f'Receipt {receipt_id}')
+
+
+def hard_delete_receipt(receipt_id, user_id=None):
+    with _db.get_conn() as conn:
+        conn.execute("DELETE FROM receipts_fts WHERE rowid=?", (receipt_id,))
+        conn.execute("DELETE FROM receipt_items WHERE receipt_id=?", (receipt_id,))
+        conn.execute("DELETE FROM attachments WHERE receipt_id=?", (receipt_id,))
         conn.execute("DELETE FROM receipts WHERE id=?", (receipt_id,))
+    log_action(user_id, 'hard_delete', f'Receipt {receipt_id}')
 
 
-def set_receipt_status(receipt_id, status):
+def restore_receipt(receipt_id, user_id=None):
     with _db.get_conn() as conn:
-        conn.execute("UPDATE receipts SET status=? WHERE id=?", (status, receipt_id))
+        conn.execute("UPDATE receipts SET deleted_at=NULL WHERE id=?", (receipt_id,))
+        row = conn.execute(
+            "SELECT receipt_no, sender_name, receiver_name FROM receipts WHERE id=?",
+            (receipt_id,),
+        ).fetchone()
+        if row:
+            conn.execute(
+                "INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name) VALUES(?,?,?,?)",
+                (receipt_id, row["receipt_no"], row["sender_name"], row["receiver_name"]),
+            )
+    log_action(user_id, 'restore', f'Receipt {receipt_id}')
+
+
+VALID_TRANSITIONS = {
+    'Draft': ['Approved', 'Rejected', 'Cancelled'],
+    'Approved': ['Archived', 'Cancelled'],
+    'Rejected': ['Draft'],
+    'Archived': ['Draft'],
+    'Cancelled': ['Draft'],
+}
+
+
+def validate_status_transition(from_status, to_status):
+    allowed = VALID_TRANSITIONS.get(from_status, [])
+    if to_status not in allowed:
+        raise ValueError(
+            f'Cannot transition from "{from_status}" to "{to_status}". '
+            f'Allowed: {", ".join(allowed) if allowed else "none"}'
+        )
+
+
+def _record_receipt_history(conn, receipt_id, field_name, old_value, new_value, changed_by):
+    now = datetime.now().isoformat(timespec='seconds')
+    conn.execute(
+        """INSERT INTO receipt_history(receipt_id, field_name, old_value, new_value, changed_by, changed_at)
+           VALUES(?, ?, ?, ?, ?, ?)""",
+        (receipt_id, field_name, old_value, new_value, changed_by, now),
+    )
+
+
+def change_receipt_status(receipt_id, new_status, user_id=None):
+    with _db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT status, receipt_no FROM receipts WHERE id=?", (receipt_id,)
+        ).fetchone()
+        if not row:
+            raise ValueError(f'Receipt {receipt_id} not found')
+        old_status = row['status']
+        if old_status == new_status:
+            return
+        validate_status_transition(old_status, new_status)
+        conn.execute("UPDATE receipts SET status=? WHERE id=?", (new_status, receipt_id))
+        _record_receipt_history(
+            conn, receipt_id, 'status', old_status, new_status, user_id
+        )
+    log_action(user_id, 'status_change',
+               f'Receipt {receipt_id}: {old_status} → {new_status}')
+
+
+def approve_receipt(receipt_id, user_id=None):
+    return change_receipt_status(receipt_id, 'Approved', user_id)
+
+
+def reject_receipt(receipt_id, user_id=None):
+    return change_receipt_status(receipt_id, 'Rejected', user_id)
+
+
+def archive_receipt(receipt_id, user_id=None):
+    return change_receipt_status(receipt_id, 'Archived', user_id)
+
+
+def unarchive_receipt(receipt_id, user_id=None):
+    return change_receipt_status(receipt_id, 'Draft', user_id)
+
+
+def cancel_receipt(receipt_id, user_id=None):
+    return change_receipt_status(receipt_id, 'Cancelled', user_id)
+
+
+def batch_update_status(ids, new_status, user_id=None):
+    results = []
+    for rid in ids:
+        try:
+            change_receipt_status(rid, new_status, user_id)
+            results.append((rid, 'ok', ''))
+        except (ValueError, Exception) as e:
+            results.append((rid, 'error', str(e)))
+    return results
+
+
+def batch_soft_delete(ids, user_id=None):
+    results = []
+    for rid in ids:
+        try:
+            soft_delete_receipt(rid, user_id)
+            results.append((rid, 'ok', ''))
+        except Exception as e:
+            results.append((rid, 'error', str(e)))
+    return results
+
+
+def get_receipt_history(receipt_id):
+    with _db.get_conn() as conn:
+        rows = conn.execute(
+            """SELECT rh.*, u.full_name changed_by_name
+               FROM receipt_history rh
+               LEFT JOIN users u ON u.id = rh.changed_by
+               WHERE rh.receipt_id = ?
+               ORDER BY rh.changed_at ASC""",
+            (receipt_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def set_receipt_status(receipt_id, new_status, user_id=None):
+    """Direct status update (skips transition validation)."""
+    with _db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT status FROM receipts WHERE id=?", (receipt_id,)
+        ).fetchone()
+        if not row:
+            raise ValueError(f'Receipt {receipt_id} not found')
+        old_status = row['status']
+        if old_status == new_status:
+            return
+        conn.execute("UPDATE receipts SET status=? WHERE id=?", (new_status, receipt_id))
+        _record_receipt_history(
+            conn, receipt_id, 'status', old_status, new_status, user_id
+        )
+    log_action(user_id, 'status_change',
+               f'Receipt {receipt_id}: {old_status} → {new_status}')
 
 
 def list_receipts(
@@ -171,28 +314,41 @@ def list_receipts(
     date_to="",
     page=1,
     page_size=20,
+    include_deleted=False,
 ):
     off = (page - 1) * page_size
-    where = ["1=1"]
+    where = ["(r.deleted_at IS NULL OR r.deleted_at = '')"]
     params = []
-    if q:
-        where.append("(r.receipt_no LIKE ? OR so.name LIKE ? OR ro.name LIKE ?)")
-        key = f"%{q}%"
-        params.extend([key, key, key])
-    if status:
-        where.append("r.status=?")
-        params.append(status)
-    if tx_type_id:
-        where.append("r.tx_type_id=?")
-        params.append(tx_type_id)
-    if date_from:
-        where.append("r.created_at >= ?")
-        params.append(f"{date_from}T00:00:00")
-    if date_to:
-        where.append("r.created_at <= ?")
-        params.append(f"{date_to}T23:59:59")
-    clauses = " AND ".join(where)
+    if include_deleted:
+        where = ["1=1"]
     with _db.get_conn() as conn:
+        if q:
+            fts_terms = q.strip().replace('"', '""')
+            fts_q = " OR ".join(f'{t}*' for t in fts_terms.split())
+            fts_rows = conn.execute(
+                "SELECT rowid FROM receipts_fts WHERE receipts_fts MATCH ? LIMIT ?",
+                (fts_q, page_size * 10),
+            ).fetchall()
+            fts_rowids = [str(r[0]) for r in fts_rows]
+            if fts_rowids:
+                where.append(f"r.id IN ({','.join(fts_rowids)})")
+            else:
+                where.append("(r.receipt_no LIKE ? OR so.name LIKE ? OR ro.name LIKE ?)")
+                key = f"%{q}%"
+                params.extend([key, key, key])
+        if status:
+            where.append("r.status=?")
+            params.append(status)
+        if tx_type_id:
+            where.append("r.tx_type_id=?")
+            params.append(tx_type_id)
+        if date_from:
+            where.append("r.created_at >= ?")
+            params.append(f"{date_from}T00:00:00")
+        if date_to:
+            where.append("r.created_at <= ?")
+            params.append(f"{date_to}T23:59:59")
+        clauses = " AND ".join(where)
         total = conn.execute(
             f"""SELECT COUNT(*) c FROM receipts r
                 JOIN organizations so ON so.id=r.sender_org_id

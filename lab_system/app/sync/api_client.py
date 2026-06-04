@@ -72,7 +72,7 @@ class APIClient:
         return SyncResponse(
             success=False,
             status_code=501,
-            message=f'APIClient._send() not implemented — sync is not yet activated',
+            message='APIClient._send() not implemented — sync is not yet activated',
         )
 
 

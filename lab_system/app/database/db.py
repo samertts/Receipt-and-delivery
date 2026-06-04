@@ -1,10 +1,12 @@
 import sqlite3
+import shutil
 from contextlib import contextmanager
 from datetime import datetime
 import hashlib
+from pathlib import Path
 from lab_system.app.settings.config import CONFIG
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 8
 
 SCHEMA = '''
 PRAGMA foreign_keys = ON;
@@ -32,6 +34,7 @@ CREATE TABLE IF NOT EXISTS users (
  phone TEXT DEFAULT '',
  notes TEXT DEFAULT '',
  status TEXT NOT NULL DEFAULT 'Active' CHECK(status IN ('Active','Inactive')),
+ password_changed_at TEXT DEFAULT '',
  FOREIGN KEY(institution_id) REFERENCES organizations(id)
 );
 CREATE TABLE IF NOT EXISTS transaction_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, is_active INTEGER NOT NULL DEFAULT 1);
@@ -53,6 +56,7 @@ CREATE TABLE IF NOT EXISTS receipts (
  notes TEXT DEFAULT '',
  transport_info TEXT DEFAULT '',
  additional_comments TEXT DEFAULT '',
+ deleted_at TEXT DEFAULT '',
  status TEXT NOT NULL CHECK(status IN ('Draft','Approved','Rejected','Archived','Cancelled')),
  created_by INTEGER,
  FOREIGN KEY(tx_type_id) REFERENCES transaction_types(id),
@@ -60,15 +64,25 @@ CREATE TABLE IF NOT EXISTS receipts (
  FOREIGN KEY(receiver_org_id) REFERENCES organizations(id),
  FOREIGN KEY(created_by) REFERENCES users(id)
 );
+CREATE TABLE IF NOT EXISTS receipt_history (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ receipt_id INTEGER NOT NULL,
+ field_name TEXT NOT NULL,
+ old_value TEXT DEFAULT '',
+ new_value TEXT DEFAULT '',
+ changed_by INTEGER REFERENCES users(id),
+ changed_at TEXT NOT NULL,
+ FOREIGN KEY(receipt_id) REFERENCES receipts(id) ON DELETE CASCADE
+);
 CREATE TABLE IF NOT EXISTS receipt_items (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  receipt_id INTEGER NOT NULL,
  sample_type_id INTEGER NOT NULL,
- total_count INTEGER NOT NULL,
- valid_count INTEGER NOT NULL,
- damaged_count INTEGER NOT NULL,
- rejected_count INTEGER NOT NULL,
- non_conforming_count INTEGER NOT NULL,
+ total_count INTEGER NOT NULL CHECK(total_count >= 0),
+ valid_count INTEGER NOT NULL CHECK(valid_count >= 0),
+ damaged_count INTEGER NOT NULL CHECK(damaged_count >= 0),
+ rejected_count INTEGER NOT NULL CHECK(rejected_count >= 0),
+ non_conforming_count INTEGER NOT NULL CHECK(non_conforming_count >= 0),
  transport_condition TEXT DEFAULT '',
  notes TEXT DEFAULT '',
  FOREIGN KEY(receipt_id) REFERENCES receipts(id) ON DELETE CASCADE,
@@ -107,8 +121,14 @@ CREATE TABLE IF NOT EXISTS migration_lock (
  owner TEXT DEFAULT '',
  updated_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS backups (id INTEGER PRIMARY KEY AUTOINCREMENT, backup_file TEXT NOT NULL, created_at TEXT NOT NULL, created_by INTEGER, notes TEXT DEFAULT '');
-CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, action TEXT NOT NULL, machine_name TEXT NOT NULL, timestamp TEXT NOT NULL, details TEXT DEFAULT '');
+CREATE TABLE IF NOT EXISTS backups (id INTEGER PRIMARY KEY AUTOINCREMENT, backup_file TEXT NOT NULL, created_at TEXT NOT NULL, created_by INTEGER REFERENCES users(id), notes TEXT DEFAULT '');
+CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER REFERENCES users(id), action TEXT NOT NULL, machine_name TEXT NOT NULL, timestamp TEXT NOT NULL, details TEXT DEFAULT '');
+CREATE TABLE IF NOT EXISTS login_attempts (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ username TEXT NOT NULL,
+ success INTEGER NOT NULL DEFAULT 0,
+ attempted_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS sync_queue (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  entity_type TEXT NOT NULL,
@@ -122,12 +142,53 @@ CREATE TABLE IF NOT EXISTS sync_queue (
 );
 CREATE INDEX IF NOT EXISTS idx_sync_status ON sync_queue(status);
 CREATE INDEX IF NOT EXISTS idx_sync_entity ON sync_queue(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_user ON login_attempts(username, attempted_at);
 CREATE INDEX IF NOT EXISTS idx_receipts_no ON receipts(receipt_no);
 CREATE INDEX IF NOT EXISTS idx_receipts_created ON receipts(created_at);
 CREATE INDEX IF NOT EXISTS idx_items_sample ON receipt_items(sample_type_id);
 CREATE INDEX IF NOT EXISTS idx_org_code ON organizations(code);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_receipts_status_created ON receipts(status, created_at);
+CREATE VIRTUAL TABLE IF NOT EXISTS receipts_fts USING fts5(receipt_no, sender_name, receiver_name, content='receipts', content_rowid='id');
+CREATE VIRTUAL TABLE IF NOT EXISTS organizations_fts USING fts5(name, code, content='organizations', content_rowid='id');
+CREATE TRIGGER IF NOT EXISTS receipts_ai AFTER INSERT ON receipts BEGIN
+    INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name)
+    VALUES (NEW.id, NEW.receipt_no, NEW.sender_name, NEW.receiver_name);
+END;
+CREATE TRIGGER IF NOT EXISTS receipts_ad AFTER DELETE ON receipts BEGIN
+    DELETE FROM receipts_fts WHERE rowid = OLD.id;
+END;
+CREATE TRIGGER IF NOT EXISTS receipts_au AFTER UPDATE ON receipts BEGIN
+    DELETE FROM receipts_fts WHERE rowid = OLD.id;
+    INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name)
+    VALUES (NEW.id, NEW.receipt_no, NEW.sender_name, NEW.receiver_name);
+END;
+CREATE TRIGGER IF NOT EXISTS organizations_ai AFTER INSERT ON organizations BEGIN
+    INSERT INTO organizations_fts(rowid, name, code)
+    VALUES (NEW.id, NEW.name, NEW.code);
+END;
+CREATE TRIGGER IF NOT EXISTS organizations_ad AFTER DELETE ON organizations BEGIN
+    DELETE FROM organizations_fts WHERE rowid = OLD.id;
+END;
+CREATE TRIGGER IF NOT EXISTS organizations_au AFTER UPDATE ON organizations BEGIN
+    DELETE FROM organizations_fts WHERE rowid = OLD.id;
+    INSERT INTO organizations_fts(rowid, name, code)
+    VALUES (NEW.id, NEW.name, NEW.code);
+END;
 '''
+
+
+def rebuild_fts():
+    with get_conn() as conn:
+        conn.executescript("""
+            DELETE FROM receipts_fts;
+            INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name)
+            SELECT id, receipt_no, sender_name, receiver_name FROM receipts WHERE deleted_at IS NULL OR deleted_at = '';
+            DELETE FROM organizations_fts;
+            INSERT INTO organizations_fts(rowid, name, code)
+            SELECT id, name, code FROM organizations;
+        """)
+
 
 DEFAULT_SETTINGS = {
     'receipt.numbering_prefix': 'LAB',
@@ -136,7 +197,12 @@ DEFAULT_SETTINGS = {
     'receipt.template': 'default',
     'printer.mode': 'A4',
     'backup.auto_enabled': '0',
+    'backup.retention_max': '30',
     'backup.path': str((CONFIG.storage_dir / 'backups').resolve()),
+    'session.timeout_minutes': '15',
+    'security.max_login_attempts': '5',
+    'security.login_lockout_minutes': '5',
+    'security.force_password_change_days': '0',
 }
 
 
@@ -183,8 +249,134 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         """)
         _record_migration(conn, 'v5_sync_queue', statement)
 
+    if current < 6:
+        conn.executescript("""
+            ALTER TABLE users ADD COLUMN password_changed_at TEXT DEFAULT '';
+            CREATE TABLE IF NOT EXISTS login_attempts (
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             username TEXT NOT NULL,
+             success INTEGER NOT NULL DEFAULT 0,
+             attempted_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_login_attempts_user ON login_attempts(username, attempted_at);
+        """)
+        _record_migration(conn, 'v6_security_hardening', 'password_changed_at + login_attempts table')
+
+    if current < 7:
+        if 'deleted_at' not in _table_columns(conn, 'receipts'):
+            conn.execute("ALTER TABLE receipts ADD COLUMN deleted_at TEXT DEFAULT '';")
+        conn.executescript("""
+            CREATE INDEX IF NOT EXISTS idx_receipts_deleted ON receipts(deleted_at);
+            CREATE INDEX IF NOT EXISTS idx_receipts_status_created ON receipts(status, created_at);
+        """)
+        conn.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS receipts_fts USING fts5(
+                receipt_no, sender_name, receiver_name,
+                content='receipts', content_rowid='id'
+            )
+        """)
+        conn.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS organizations_fts USING fts5(
+                name, code,
+                content='organizations', content_rowid='id'
+            )
+        """)
+        conn.execute("INSERT INTO receipts_fts(receipts_fts) VALUES('rebuild')")
+        conn.execute("INSERT INTO organizations_fts(organizations_fts) VALUES('rebuild')")
+        # FTS sync triggers
+        conn.executescript("""
+            CREATE TRIGGER IF NOT EXISTS receipts_ai AFTER INSERT ON receipts BEGIN
+                INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name)
+                VALUES (NEW.id, NEW.receipt_no, NEW.sender_name, NEW.receiver_name);
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS receipts_ad AFTER DELETE ON receipts BEGIN
+                DELETE FROM receipts_fts WHERE rowid = OLD.id;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS receipts_au AFTER UPDATE ON receipts BEGIN
+                DELETE FROM receipts_fts WHERE rowid = OLD.id;
+                INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name)
+                VALUES (NEW.id, NEW.receipt_no, NEW.sender_name, NEW.receiver_name);
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS organizations_ai AFTER INSERT ON organizations BEGIN
+                INSERT INTO organizations_fts(rowid, name, code)
+                VALUES (NEW.id, NEW.name, NEW.code);
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS organizations_ad AFTER DELETE ON organizations BEGIN
+                DELETE FROM organizations_fts WHERE rowid = OLD.id;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS organizations_au AFTER UPDATE ON organizations BEGIN
+                DELETE FROM organizations_fts WHERE rowid = OLD.id;
+                INSERT INTO organizations_fts(rowid, name, code)
+                VALUES (NEW.id, NEW.name, NEW.code);
+            END;
+        """)
+        _recreate_table_with_fk(conn, 'backups')
+        _recreate_table_with_fk(conn, 'audit_logs')
+        _record_migration(conn, 'v7_data_integrity', 'soft delete, FTS5, indexes, FKs, CHECKs')
+
+    if current < 8:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS receipt_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                receipt_id INTEGER NOT NULL,
+                field_name TEXT NOT NULL,
+                old_value TEXT DEFAULT '',
+                new_value TEXT DEFAULT '',
+                changed_by INTEGER REFERENCES users(id),
+                changed_at TEXT NOT NULL,
+                FOREIGN KEY(receipt_id) REFERENCES receipts(id) ON DELETE CASCADE
+            )
+        """)
+        _record_migration(conn, 'v8_receipt_history', 'receipt history table')
+
+
+def _recreate_table_with_fk(conn: sqlite3.Connection, table: str) -> None:
+    tables = {
+        'backups': """CREATE TABLE IF NOT EXISTS _new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            backup_file TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            created_by INTEGER REFERENCES users(id),
+            notes TEXT DEFAULT ''
+        )""",
+        'audit_logs': """CREATE TABLE IF NOT EXISTS _new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(id),
+            action TEXT NOT NULL,
+            machine_name TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            details TEXT DEFAULT ''
+        )""",
+    }
+    ddl = tables.get(table)
+    if not ddl:
+        return
+    conn.execute(f"SAVEPOINT sp_fk_{table}")
+    conn.execute(ddl)
+    conn.execute(f"INSERT OR IGNORE INTO _new SELECT * FROM {table}")
+    conn.execute(f"DROP TABLE {table}")
+    conn.execute(f"ALTER TABLE _new RENAME TO {table}")
+    conn.execute(f"RELEASE sp_fk_{table}")
+
+
+def _backup_before_migration():
+    db_path = Path(CONFIG.db_path)
+    if not db_path.exists():
+        return
+    backup_dir = db_path.parent / 'migration_backups'
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_path = backup_dir / f'pre_migration_{timestamp}.db'
+    shutil.copy2(str(db_path), str(backup_path))
+
 
 def init_db():
+    _backup_before_migration()
     with sqlite3.connect(CONFIG.db_path) as conn:
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA foreign_keys = ON;")

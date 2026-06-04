@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from lab_system.app.database import db as _db
-from lab_system.app.sync.api_client import api_client, APIClient, SyncPayload
+from lab_system.app.sync.api_client import APIClient, SyncPayload
 from lab_system.app.sync.device import get_device_id, get_branch_id
 
 

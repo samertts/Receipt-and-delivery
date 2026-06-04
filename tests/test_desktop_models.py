@@ -58,7 +58,6 @@ class TestReceiptService:
         self.conn.commit()
 
     def test_next_receipt_no_format(self):
-        from lab_system.app.services.receipt_service import next_receipt_no
         # Override get_conn to use our test connection
         no = f"LAB-{datetime.now().year}-000001"
         assert no.startswith("LAB-")

@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+env:
+  PYTHON_VERSION: '3.11'
+
 jobs:
   build:
     runs-on: windows-latest
@@ -24,26 +27,22 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller ruff bandit pip-audit
 
       - name: Verify Project Structure
         shell: cmd
         run: |
           echo Checking project structure...
-
           if not exist main.py (
           echo ERROR: main.py not found
           exit /b 1
           )
-
           if not exist assets (
           mkdir assets
           )
-
           if not exist assets\icons (
           mkdir assets\icons
           )
-
           echo Project structure verified successfully.
 
       - name: Verify VERSION File
@@ -53,7 +52,7 @@ jobs:
             echo 1.0.0 > VERSION
             echo WARNING: VERSION file was missing, created with default 1.0.0
           )
-          echo App version: 
+          echo App version:
           type VERSION
 
       - name: Verify Assets
@@ -69,18 +68,86 @@ jobs:
           }
           Write-Host "Assets verification complete."
 
+      - name: Python Syntax Check
+        shell: cmd
+        run: |
+          python -m py_compile main.py
+          for /r lab_system %%i in (*.py) do python -m py_compile "%%i"
+          echo All Python files compile OK.
+
+      - name: Ruff Linting
+        shell: cmd
+        continue-on-error: true
+        run: |
+          ruff check --output-format=github lab_system/ tests/
+          echo RUFF_EXIT_CODE=%errorlevel%
+
+      - name: Bandit Security Scan
+        shell: cmd
+        continue-on-error: true
+        run: |
+          bandit -r lab_system/ -f sarif -o bandit-results.sarif || echo Bandit found issues
+          echo BANDIT_EXIT_CODE=%errorlevel%
+
+      - name: pip-audit Vulnerability Scan
+        shell: cmd
+        continue-on-error: true
+        run: |
+          pip-audit -r requirements.txt --desc
+          echo PIPAUDIT_EXIT_CODE=%errorlevel%
+
+      - name: Run Tests with Coverage
+        shell: cmd
+        run: |
+          python -m pytest tests/ --cov=lab_system --cov-config=.coveragerc --cov-report=xml:coverage.xml --cov-report=html:coverage_html --cov-report=term --junitxml=test-results.xml
+          if errorlevel 1 (
+          echo ERROR: Tests failed
+          exit /b 1
+          )
+          echo All tests passed.
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage_html/
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.xml
+
+      - name: Upload Bandit Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-results
+          path: bandit-results.sarif
+
+      - name: Build Diagnostics
+        shell: cmd
+        run: |
+          echo === System Info ===
+          python --version
+          pip list
+          echo === Disk Space ===
+          wmic logicaldisk get size,freespace,caption
+          echo === Directory Structure ===
+          dir /s /b lab_system\app\*.py | find /c /v ""
+          echo source files
+          dir /s /b tests\*.py | find /c /v ""
+          echo test files
+
       - name: Build EXE
         shell: cmd
         run: |
           echo Starting PyInstaller build...
-
           pyinstaller --noconfirm --clean lab_system.spec
-
           if errorlevel 1 (
           echo ERROR: PyInstaller build failed
+          type dist\LabReceiptSystem\warn-LabReceiptSystem.txt 2>nul || echo No warnings file
           exit /b 1
           )
-
           echo EXE build completed successfully.
 
       - name: Verify EXE Output
@@ -88,10 +155,11 @@ jobs:
         run: |
           if not exist dist\LabReceiptSystem.exe (
           echo ERROR: EXE output not found
+          dir dist\
           exit /b 1
           )
-
-          echo EXE verified successfully.
+          echo EXE verified. Size:
+          dir dist\LabReceiptSystem.exe
 
       - name: Install Inno Setup
         shell: cmd
@@ -114,6 +182,12 @@ jobs:
         with:
           name: LabReceiptSetup
           path: installer/Output/LabReceiptSetup.exe
+
+      - name: Upload Build Diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics
+          path: dist\LabReceiptSystem\
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
