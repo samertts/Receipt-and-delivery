@@ -26,10 +26,13 @@ def check_indexes() -> dict:
         return {"ok": False, "errors": ["Database does not exist"]}
     try:
         conn = sqlite3.connect(str(db_path))
-        rows = conn.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL;").fetchall()
-        present = {row[0] for row in rows}
-        missing = EXPECTED_INDEXES - present
-        conn.close()
+        conn.execute("PRAGMA busy_timeout = 3000;")
+        try:
+            rows = conn.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL;").fetchall()
+            present = {row[0] for row in rows}
+            missing = EXPECTED_INDEXES - present
+        finally:
+            conn.close()
         return {"ok": len(missing) == 0, "present": sorted(present), "missing": sorted(missing)}
     except Exception as e:
         return {"ok": False, "errors": [str(e)]}
@@ -45,21 +48,27 @@ def check_integrity() -> dict:
 
     try:
         conn = sqlite3.connect(str(db_path))
-        row = conn.execute("PRAGMA integrity_check;").fetchone()
-        if row and row[0] == "ok":
-            results["db_ok"] = True
-        else:
-            results["errors"].append(f"Integrity check failed: {row}")
-        conn.close()
+        conn.execute("PRAGMA busy_timeout = 3000;")
+        try:
+            row = conn.execute("PRAGMA integrity_check;").fetchone()
+            if row and row[0] == "ok":
+                results["db_ok"] = True
+            else:
+                results["errors"].append(f"Integrity check failed: {row}")
+        finally:
+            conn.close()
     except Exception as e:
         results["errors"].append(f"Integrity check error: {e}")
 
     try:
         conn = sqlite3.connect(str(db_path))
-        mode = conn.execute("PRAGMA journal_mode;").fetchone()
-        if mode and mode[0].upper() == "WAL":
-            results["wal_ok"] = True
-        conn.close()
+        conn.execute("PRAGMA busy_timeout = 3000;")
+        try:
+            mode = conn.execute("PRAGMA journal_mode;").fetchone()
+            if mode and mode[0].upper() == "WAL":
+                results["wal_ok"] = True
+        finally:
+            conn.close()
     except Exception as e:
         results["errors"].append(f"WAL check error: {e}")
 
@@ -127,9 +136,11 @@ def self_repair() -> list:
         try:
             db_path.parent.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(str(db_path))
-            conn.execute("PRAGMA journal_mode=WAL;")
-            conn.execute("PRAGMA foreign_keys = ON;")
-            conn.close()
+            try:
+                conn.execute("PRAGMA journal_mode=WAL;")
+                conn.execute("PRAGMA foreign_keys = ON;")
+            finally:
+                conn.close()
             actions.append(f"Recreated missing database: {db_path}")
         except Exception as e:
             actions.append(f"Failed to recreate database: {e}")

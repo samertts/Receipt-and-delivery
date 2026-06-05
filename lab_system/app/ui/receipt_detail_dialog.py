@@ -240,7 +240,7 @@ class ReceiptDetailDialog(QDialog):
             log_action(
                 self.current_user["id"],
                 "attachment_added",
-                f"إرفاق ملف: {path}",
+                f"إرفاق ملف: {Path(path).name}",
             )
             QMessageBox.information(self, "نجاح", "تم إرفاق الملف")
             self._load()

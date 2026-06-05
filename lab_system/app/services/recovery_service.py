@@ -5,6 +5,7 @@ Provides tools to verify backup integrity, detect database corruption,
 attempt recovery from WAL or backup files, and manage backup retention.
 """
 
+import os
 import shutil
 import sqlite3
 from datetime import datetime
@@ -21,6 +22,14 @@ BACKUP_DIR = STORAGE_DIR / "backups"
 SNAPSHOT_DIR = STORAGE_DIR / "snapshots"
 
 
+def _validate_path_in_dir(path: Path, allowed_dir: Path) -> Path:
+    resolved = path.resolve()
+    allowed = allowed_dir.resolve()
+    if not str(resolved).startswith(str(allowed)):
+        raise ValueError(f"Path {resolved} is not inside {allowed}")
+    return resolved
+
+
 def verify_backup(path: Path | str) -> dict:
     """Check whether a backup file has a valid SQLite header and passes integrity check."""
     path = Path(path)
@@ -34,13 +43,16 @@ def verify_backup(path: Path | str) -> dict:
         return result
     try:
         conn = sqlite3.connect(str(path))
-        row = conn.execute("PRAGMA integrity_check;").fetchone()
-        if row and row[0] == "ok":
-            result["integrity_ok"] = True
-            result["valid"] = True
-        else:
-            result["error"] = f"Integrity check failed: {row}"
-        conn.close()
+        conn.execute("PRAGMA busy_timeout = 3000;")
+        try:
+            row = conn.execute("PRAGMA integrity_check;").fetchone()
+            if row and row[0] == "ok":
+                result["integrity_ok"] = True
+                result["valid"] = True
+            else:
+                result["error"] = f"Integrity check failed: {row}"
+        finally:
+            conn.close()
     except Exception as e:
         result["error"] = str(e)
     return result
@@ -71,18 +83,28 @@ def _get_backup_record(path: str) -> dict | None:
     return dict(row) if row else None
 
 
+def _checkpoint_wal():
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("PRAGMA busy_timeout = 5000;")
+    try:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+    finally:
+        conn.close()
+
+
 def restore_from_backup(backup_path: Path | str) -> dict:
     """Restore the production database from a verified backup file."""
-    backup_path = Path(backup_path)
+    backup_path = _validate_path_in_dir(Path(backup_path), BACKUP_DIR)
     result = {"success": False, "error": None, "restored_path": None}
     verification = verify_backup(backup_path)
     if not verification["valid"]:
         result["error"] = verification.get("error", "Backup verification failed")
         return result
     try:
-        # Create a snapshot of current DB before overwriting
         snapshot_result = create_recovery_snapshot("pre_restore")
         result["pre_restore_snapshot"] = snapshot_result.get("path")
+
+        _checkpoint_wal()
 
         dest = DB_PATH
         backup_dest = dest.with_suffix(".db.corrupted")
@@ -92,10 +114,9 @@ def restore_from_backup(backup_path: Path | str) -> dict:
         with _db.get_conn() as conn:
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA foreign_keys = ON;")
-        # Verify restored DB
+        rebuild_fts()
         verify = verify_backup(dest)
         if not verify["valid"]:
-            # Rollback
             if backup_dest.exists():
                 shutil.move(str(backup_dest), str(dest))
             result["error"] = "Restored database failed integrity check"
@@ -109,8 +130,14 @@ def restore_from_backup(backup_path: Path | str) -> dict:
 
 def delete_backup(backup_path: Path | str) -> dict:
     """Remove a backup file from disk and its database record."""
-    backup_path = Path(backup_path)
     result = {"success": False, "error": None}
+    backup_path = Path(backup_path)
+    if backup_path.exists():
+        try:
+            backup_path = _validate_path_in_dir(backup_path, BACKUP_DIR)
+        except ValueError as e:
+            result["error"] = str(e)
+            return result
     try:
         if backup_path.exists():
             backup_path.unlink()
@@ -175,7 +202,7 @@ def enforce_retention(max_backups=30) -> int:
 
 def validate_recovery(backup_path: Path | str) -> dict:
     """Validate that a backup can be restored successfully (dry run)."""
-    backup_path = Path(backup_path)
+    backup_path = _validate_path_in_dir(Path(backup_path), BACKUP_DIR)
     result = {"valid": False, "checks": []}
 
     v = verify_backup(backup_path)
@@ -186,18 +213,21 @@ def validate_recovery(backup_path: Path | str) -> dict:
 
     try:
         conn = sqlite3.connect(str(backup_path))
-        tables = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '\\_%' ESCAPE '\\'",
-        ).fetchall()
-        table_count = len(tables)
-        result["checks"].append({"name": "tables", "passed": table_count > 0, "detail": f"{table_count} tables"})
+        conn.execute("PRAGMA busy_timeout = 3000;")
+        try:
+            tables = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '\\_%' ESCAPE '\\'",
+            ).fetchall()
+            table_count = len(tables)
+            result["checks"].append({"name": "tables", "passed": table_count > 0, "detail": f"{table_count} tables"})
 
-        row = conn.execute("SELECT COUNT(*) c FROM receipts").fetchone()
-        result["checks"].append({"name": "receipts_count", "passed": True, "detail": f"{row[0]} receipts"})
+            row = conn.execute("SELECT COUNT(*) c FROM receipts").fetchone()
+            result["checks"].append({"name": "receipts_count", "passed": True, "detail": f"{row[0]} receipts"})
 
-        row = conn.execute("SELECT COUNT(*) c FROM users").fetchone()
-        result["checks"].append({"name": "users_count", "passed": row[0] > 0, "detail": f"{row[0]} users"})
-        conn.close()
+            row = conn.execute("SELECT COUNT(*) c FROM users").fetchone()
+            result["checks"].append({"name": "users_count", "passed": row[0] > 0, "detail": f"{row[0]} users"})
+        finally:
+            conn.close()
     except Exception as e:
         result["checks"].append({"name": "read_error", "passed": False, "detail": str(e)})
 
@@ -210,15 +240,17 @@ def detect_corruption() -> dict:
     result = {"ok": True, "errors": []}
     try:
         conn = sqlite3.connect(str(DB_PATH))
-        row = conn.execute("PRAGMA integrity_check;").fetchone()
-        if not row or row[0] != "ok":
-            result["ok"] = False
-            result["errors"].append(f"Integrity: {row}")
-        # Check WAL
-        wal_path = str(DB_PATH) + "-wal"
-        if Path(wal_path).exists() and Path(wal_path).stat().st_size > 0:
-            result["wal_size"] = Path(wal_path).stat().st_size
-        conn.close()
+        conn.execute("PRAGMA busy_timeout = 3000;")
+        try:
+            row = conn.execute("PRAGMA integrity_check;").fetchone()
+            if not row or row[0] != "ok":
+                result["ok"] = False
+                result["errors"].append(f"Integrity: {row}")
+            wal_path = DB_PATH.with_name(DB_PATH.name + "-wal")
+            if wal_path.exists() and wal_path.stat().st_size > 0:
+                result["wal_size"] = wal_path.stat().st_size
+        finally:
+            conn.close()
     except Exception as e:
         result["ok"] = False
         result["errors"].append(str(e))
@@ -229,13 +261,12 @@ def attempt_recovery() -> dict:
     """Attempt to recover the database from WAL or latest backup."""
     result = {"success": False, "actions": []}
 
-    # First try checkpointing WAL
     try:
         conn = sqlite3.connect(str(DB_PATH))
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+        conn.execute("PRAGMA busy_timeout = 5000;")
+        conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
         conn.close()
         result["actions"].append("WAL checkpoint performed")
-
         verify = detect_corruption()
         if verify["ok"]:
             result["success"] = True
@@ -244,7 +275,6 @@ def attempt_recovery() -> dict:
     except Exception as e:
         result["actions"].append(f"WAL checkpoint failed: {e}")
 
-    # Fall back to latest backup
     backups = list_backups()
     if backups:
         latest = backups[0]
@@ -252,7 +282,6 @@ def attempt_recovery() -> dict:
         if restore_result["success"]:
             result["success"] = True
             result["actions"].append(f"Restored from backup: {latest['name']}")
-            rebuild_fts()
             logger.info(f"Database recovered from backup: {latest['name']}")
         else:
             result["actions"].append(f"Backup restore failed: {restore_result.get('error')}")

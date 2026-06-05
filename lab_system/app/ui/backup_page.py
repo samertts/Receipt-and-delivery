@@ -57,15 +57,14 @@ class BackupPage(QWidget):
 
     def _do_backup(self):
         check_permission(self.current_user, 'backup.create')
+        from pathlib import Path
         try:
             path = create_backup(user_id=self.current_user.get("id"))
             log_action(
                 self.current_user["id"],
                 "backup_created",
-                f"نسخة احتياطية: {path}",
+                f"نسخة احتياطية: {Path(path).name}",
             )
-            QMessageBox.information(self, "نجاح", "تم إنشاء النسخة الاحتياطية بنجاح")
-            self.refresh()
         except Exception as e:
             QMessageBox.warning(
                 self, "خطأ", f"فشل إنشاء النسخة الاحتياطية: {e}",
@@ -134,7 +133,7 @@ class BackupPage(QWidget):
             log_action(
                 self.current_user["id"],
                 "backup_restored",
-                f"استعادة من: {backup_path}",
+                f"استعادة من: {Path(backup_path).name}",
             )
             QMessageBox.information(
                 self, "نجاح", "تمت استعادة قاعدة البيانات. يرجى إعادة تشغيل التطبيق.",

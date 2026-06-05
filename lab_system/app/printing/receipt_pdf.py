@@ -268,12 +268,16 @@ def generate_receipt_pdf(receipt_no, institution, tx_type, date_text,
     elements.append(Spacer(1, 10 * mm))
 
     # ---- QR Code ----
+    temp_files = []
     try:
         qr_data = f"{receipt_no}|{institution}|{date_text}|{tx_type}"
         qr_img = qrcode.make(qr_data)
-        qr_path = STORAGE_DIR / "temp" / f"{receipt_no}_qr.png"
-        qr_path.parent.mkdir(parents=True, exist_ok=True)
+        import tempfile
+        qr_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        qr_tmp.close()
+        qr_path = Path(qr_tmp.name)
         qr_img.save(str(qr_path))
+        temp_files.append(qr_path)
         qr_rl = RLImage(str(qr_path), width=3 * cm, height=3 * cm)
         elements.append(qr_rl)
     except Exception:
@@ -281,11 +285,14 @@ def generate_receipt_pdf(receipt_no, institution, tx_type, date_text,
 
     # ---- Barcode ----
     try:
-        bar_path = STORAGE_DIR / "temp" / f"{receipt_no}_bar"
-        bar_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(f"{bar_path}.png", "wb") as f:
+        import tempfile
+        bar_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        bar_tmp.close()
+        bar_path = Path(bar_tmp.name)
+        with open(str(bar_path), "wb") as f:
             Code128(receipt_no, writer=ImageWriter()).write(f)
-        bar_rl = RLImage(f"{bar_path}.png", width=8 * cm, height=1.5 * cm)
+        temp_files.append(bar_path)
+        bar_rl = RLImage(str(bar_path), width=8 * cm, height=1.5 * cm)
         elements.append(Spacer(1, 2 * mm))
         elements.append(bar_rl)
     except Exception:
@@ -316,4 +323,9 @@ def generate_receipt_pdf(receipt_no, institution, tx_type, date_text,
 
     # Build PDF
     doc.build(elements)
+    for tf in temp_files:
+        try:
+            tf.unlink(missing_ok=True)
+        except Exception:
+            pass
     return pdf_path

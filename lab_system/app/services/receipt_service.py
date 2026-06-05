@@ -165,10 +165,21 @@ def soft_delete_receipt(receipt_id, user_id=None):
 
 def hard_delete_receipt(receipt_id, user_id=None):
     with _db.get_conn() as conn:
+        atts = conn.execute(
+            "SELECT file_path, thumbnail_path FROM attachments WHERE receipt_id=?",
+            (receipt_id,),
+        ).fetchall()
         conn.execute("DELETE FROM receipts_fts WHERE rowid=?", (receipt_id,))
         conn.execute("DELETE FROM receipt_items WHERE receipt_id=?", (receipt_id,))
         conn.execute("DELETE FROM attachments WHERE receipt_id=?", (receipt_id,))
         conn.execute("DELETE FROM receipts WHERE id=?", (receipt_id,))
+    for att in atts:
+        for p in (att.get('file_path'), att.get('thumbnail_path')):
+            if p:
+                try:
+                    Path(p).unlink(missing_ok=True)
+                except Exception:
+                    pass
     log_action(user_id, 'hard_delete', f'Receipt {receipt_id}')
 
 
@@ -331,9 +342,10 @@ def list_receipts(
                 "SELECT rowid FROM receipts_fts WHERE receipts_fts MATCH ? LIMIT ?",
                 (fts_q, page_size * 10),
             ).fetchall()
-            fts_rowids = [str(r[0]) for r in fts_rows]
+            fts_rowids = [r[0] for r in fts_rows]
             if fts_rowids:
-                where.append(f"r.id IN ({','.join(fts_rowids)})")
+                where.append(f"r.id IN ({','.join(['?'] * len(fts_rowids))})")
+                params.extend(fts_rowids)
             else:
                 where.append("(r.receipt_no LIKE ? OR so.name LIKE ? OR ro.name LIKE ?)")
                 key = f"%{q}%"

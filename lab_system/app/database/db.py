@@ -379,6 +379,7 @@ def _backup_before_migration():
 def init_db():
     _backup_before_migration()
     with sqlite3.connect(CONFIG.db_path) as conn:
+        conn.execute("PRAGMA busy_timeout = 5000;")
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA foreign_keys = ON;")
         conn.executescript(SCHEMA)
@@ -398,11 +399,15 @@ def init_db():
 def get_conn():
     conn = sqlite3.connect(CONFIG.db_path)
     conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA busy_timeout = 5000;')
     conn.execute('PRAGMA foreign_keys = ON;')
     conn.execute('PRAGMA journal_mode=WAL;')
     try:
         yield conn
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 

@@ -4,7 +4,6 @@ from lab_system.app.database import db as _db
 from lab_system.app.services.base_service import BaseService
 from lab_system.app.services.user_service import (
     authenticate,
-    get_recent_failures,
     needs_password_change,
 )
 from lab_system.app.utils.errors import AuthenticationError
@@ -17,14 +16,9 @@ class AuthService(BaseService):
         self._last_activity = None
 
     def login(self, username: str, password: str):
-        max_attempts = self._get_setting('security.max_login_attempts', '5')
-        lockout_minutes = self._get_setting('security.login_lockout_minutes', '5')
-        failures = get_recent_failures(username, int(lockout_minutes))
-        if failures >= int(max_attempts):
-            raise AuthenticationError(
-                f'تم تجاوز عدد محاولات الدخول المسموح بها. حاول بعد {lockout_minutes} دقائق',
-            )
-        user = authenticate(username, password)
+        max_attempts = int(self._get_setting('security.max_login_attempts', '5'))
+        lockout_minutes = int(self._get_setting('security.login_lockout_minutes', '5'))
+        user = authenticate(username, password, max_attempts, lockout_minutes)
         if not user:
             raise AuthenticationError('بيانات الدخول غير صحيحة')
         self._session_user = dict(user)
@@ -46,6 +40,17 @@ class AuthService(BaseService):
     def check_session(self) -> None:
         if not self._session_user:
             raise AuthenticationError('الرجاء تسجيل الدخول أولاً')
+        with _db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT status, password_changed_at FROM users WHERE id=?",
+                (self._session_user['id'],),
+            ).fetchone()
+        if not row or row['status'] != 'Active':
+            self.logout()
+            raise AuthenticationError('تم تعطيل الحساب. الرجاء التواصل مع المشرف')
+        if row['password_changed_at'] != self._session_user.get('password_changed_at', ''):
+            self.logout()
+            raise AuthenticationError('تم تغيير كلمة المرور. الرجاء تسجيل الدخول مرة أخرى')
         timeout_minutes = int(self._get_setting('session.timeout_minutes', '15'))
         if timeout_minutes > 0:
             elapsed = (datetime.now() - self._last_activity).total_seconds() / 60

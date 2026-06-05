@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from lab_system.app.auth.permissions import check_permission
 from lab_system.app.audit.logger import log_action
+from pathlib import Path
 from lab_system.app.services.report_service import (
     export_receipts_csv,
     receipt_summary,
@@ -160,7 +161,7 @@ class ReportsPage(QWidget):
             log_action(
                 self.current_user["id"],
                 "report_exported",
-                f"تصدير تقرير: {path}",
+                f"تصدير تقرير: {Path(path).name}",
             )
             QMessageBox.information(self, "نجاح", f"تم تصدير التقرير إلى {path}")
         except Exception as e:
