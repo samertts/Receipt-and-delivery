@@ -175,7 +175,7 @@ def hard_delete_receipt(receipt_id, user_id=None):
         conn.execute("DELETE FROM attachments WHERE receipt_id=?", (receipt_id,))
         conn.execute("DELETE FROM receipts WHERE id=?", (receipt_id,))
     for att in atts:
-        for p in (att.get('file_path'), att.get('thumbnail_path')):
+        for p in (att['file_path'], att['thumbnail_path'] if att['thumbnail_path'] else None):
             if p:
                 try:
                     Path(p).unlink(missing_ok=True)

@@ -1,8 +1,10 @@
 """
 Migration Upgrade Certification Test.
 
-Creates minimal schemas matching each historical version, then runs init_db()
-to upgrade to current. Verifies data preservation, schema correctness, FK, WAL.
+Tests every realistic upgrade path: v1→current, v2→current, …, v7→current.
+
+For each target version N, builds the schema as it would exist at version N
+(applying migrations v1 through vN-1), then upgrades to current and verifies.
 """
 
 import sqlite3
@@ -21,7 +23,9 @@ n_pass = 0
 n_total = 0
 start = time.time()
 
+# ---------------------------------------------------------------------------
 # v1 baseline — the CURRENT SCHEMA minus all migration-added columns/tables
+# ---------------------------------------------------------------------------
 V1 = """
 PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -55,6 +59,119 @@ def ok(cond, msg):
         errors.append(msg)
 
 
+def apply_migration(conn, sql, description):
+    """Execute a migration DDL statement."""
+    conn.executescript(sql)
+    conn.commit()
+
+
+def build_schema_for_version(version):
+    """Return the schema DDL for a specific historical version."""
+    # Start with v1 baseline
+    schema = V1
+
+    # Apply migrations that were present at this version
+    # Version N should have migrations v1 through vN applied
+    if version >= 2:
+        schema += "ALTER TABLE receipts ADD COLUMN additional_comments TEXT DEFAULT '';\n"
+    if version >= 3:
+        schema += "ALTER TABLE attachments ADD COLUMN thumbnail_path TEXT DEFAULT '';\n"
+    if version >= 5:
+        schema += """
+CREATE TABLE IF NOT EXISTS sync_queue (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ entity_type TEXT NOT NULL,
+ entity_id INTEGER NOT NULL,
+ action TEXT NOT NULL CHECK(action IN ('create','update','delete')),
+ payload TEXT DEFAULT '',
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','synced','conflict','failed')),
+ retry_count INTEGER NOT NULL DEFAULT 0,
+ created_at TEXT NOT NULL,
+ synced_at TEXT DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_sync_status ON sync_queue(status);
+CREATE INDEX IF NOT EXISTS idx_sync_entity ON sync_queue(entity_type, entity_id);
+"""
+    if version >= 6:
+        schema += """
+ALTER TABLE users ADD COLUMN password_changed_at TEXT DEFAULT '';
+CREATE TABLE IF NOT EXISTS login_attempts (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ username TEXT NOT NULL,
+ success INTEGER NOT NULL DEFAULT 0,
+ attempted_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_user ON login_attempts(username, attempted_at);
+"""
+    if version >= 7:
+        schema += """
+ALTER TABLE receipts ADD COLUMN deleted_at TEXT DEFAULT '';
+CREATE INDEX IF NOT EXISTS idx_receipts_deleted ON receipts(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_receipts_status_created ON receipts(status, created_at);
+CREATE VIRTUAL TABLE IF NOT EXISTS receipts_fts USING fts5(
+    receipt_no, sender_name, receiver_name,
+    content='receipts', content_rowid='id'
+);
+CREATE VIRTUAL TABLE IF NOT EXISTS organizations_fts USING fts5(
+    name, code,
+    content='organizations', content_rowid='id'
+);
+CREATE TRIGGER IF NOT EXISTS receipts_ai AFTER INSERT ON receipts BEGIN
+    INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name) VALUES (NEW.id, NEW.receipt_no, NEW.sender_name, NEW.receiver_name);
+END;
+CREATE TRIGGER IF NOT EXISTS receipts_ad AFTER DELETE ON receipts BEGIN
+    DELETE FROM receipts_fts WHERE rowid = OLD.id;
+END;
+CREATE TRIGGER IF NOT EXISTS receipts_au AFTER UPDATE ON receipts BEGIN
+    INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name) VALUES (NEW.id, NEW.receipt_no, NEW.sender_name, NEW.receiver_name);
+END;
+CREATE TRIGGER IF NOT EXISTS organizations_ai AFTER INSERT ON organizations BEGIN
+    INSERT INTO organizations_fts(rowid, name, code) VALUES (NEW.id, NEW.name, NEW.code);
+END;
+CREATE TRIGGER IF NOT EXISTS organizations_ad AFTER DELETE ON organizations BEGIN
+    DELETE FROM organizations_fts WHERE rowid = OLD.id;
+END;
+CREATE TRIGGER IF NOT EXISTS organizations_au AFTER UPDATE ON organizations BEGIN
+    INSERT INTO organizations_fts(rowid, name, code) VALUES (NEW.id, NEW.name, NEW.code);
+END;
+CREATE TABLE IF NOT EXISTS _new_backups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    backup_file TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    created_by INTEGER REFERENCES users(id),
+    notes TEXT DEFAULT ''
+);
+INSERT OR IGNORE INTO _new_backups SELECT * FROM backups;
+DROP TABLE backups;
+ALTER TABLE _new_backups RENAME TO backups;
+CREATE TABLE IF NOT EXISTS _new_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES users(id),
+    action TEXT NOT NULL,
+    machine_name TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    details TEXT DEFAULT ''
+);
+INSERT OR IGNORE INTO _new_audit SELECT * FROM audit_logs;
+DROP TABLE audit_logs;
+ALTER TABLE _new_audit RENAME TO audit_logs;
+"""
+    if version >= 8:
+        schema += """
+CREATE TABLE IF NOT EXISTS receipt_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    receipt_id INTEGER NOT NULL,
+    field_name TEXT NOT NULL,
+    old_value TEXT DEFAULT '',
+    new_value TEXT DEFAULT '',
+    changed_by INTEGER REFERENCES users(id),
+    changed_at TEXT NOT NULL,
+    FOREIGN KEY(receipt_id) REFERENCES receipts(id) ON DELETE CASCADE
+);
+"""
+    return schema
+
+
 print("=" * 72)
 print("MIGRATION UPGRADE CERTIFICATION REPORT")
 print("=" * 72)
@@ -70,24 +187,35 @@ for target in range(1, _db.SCHEMA_VERSION):
         conn = sqlite3.connect(db_path)
         conn.execute("PRAGMA foreign_keys = ON;")
         conn.execute("PRAGMA journal_mode=WAL;")
-        conn.executescript(V1)
+        conn.executescript(build_schema_for_version(target))
 
         # Insert test data
         conn.execute("INSERT INTO organizations(name, code, status) VALUES('Test Org', 'TST-001', 'Active')")
-        conn.execute("INSERT INTO users(full_name, username, password_hash, role, institution_id, status) VALUES('Test User', 'testuser', '$2b$12$LJ3m4ys3Lk0TSwHnbfOMiOXPm1Q5GzD0qK5q0l0e0l0e0l0e0l0e0', 'User', 1, 'Active')")
+        conn.execute("INSERT INTO users(full_name, username, password_hash, role, institution_id, status) VALUES('Test User', 'testuser', 'hash', 'User', 1, 'Active')")
         conn.execute("INSERT INTO transaction_types(name) VALUES('Test Type')")
         conn.execute("INSERT INTO sample_types(name, status) VALUES('Test Sample', 'Active')")
         conn.execute("INSERT INTO receipts(receipt_no, tx_type_id, sender_org_id, receiver_org_id, sender_name, receiver_name, created_at, status, created_by) VALUES('TEST-001',1,1,1,'Sender','Receiver','2024-01-01T00:00:00','Draft',1)")
         conn.execute("INSERT INTO receipt_items(receipt_id, sample_type_id, total_count, valid_count, damaged_count, rejected_count, non_conforming_count) VALUES(1,1,100,90,5,3,2)")
         conn.execute("INSERT INTO attachments(receipt_id, file_path, file_type, file_hash, file_size, category, created_at) VALUES(1,'/tmp/test.pdf','pdf','hash123',1000,'document','2024-01-01T00:00:00')")
 
-        # Set target version and init migration tracking
+        if target >= 2:
+            conn.execute("UPDATE receipts SET additional_comments = 'v2_test' WHERE id=1")
+        if target >= 3:
+            conn.execute("UPDATE attachments SET thumbnail_path = '/tmp/thumb.jpg' WHERE id=1")
+        if target >= 5:
+            conn.execute("INSERT INTO sync_queue(entity_type, entity_id, action, created_at) VALUES('receipt',1,'create','2024-01-01T00:00:00')")
+        if target >= 6:
+            conn.execute("INSERT INTO login_attempts(username, success, attempted_at) VALUES('testuser',1,'2024-01-01T00:00:00')")
+        if target >= 8:
+            conn.execute("INSERT INTO receipt_history(receipt_id, field_name, old_value, new_value, changed_by, changed_at) VALUES(1,'status','Draft','Approved',1,'2024-01-01T00:00:00')")
+
+        # Set version metadata to target
         conn.execute("INSERT INTO meta(key,value) VALUES('schema_version',?)", (str(target),))
         conn.execute("INSERT INTO schema_version(id,version,app_version,updated_at) VALUES(1,?,?,'2024-01-01T00:00:00')", (target, '0.0.0'))
         conn.commit()
         conn.close()
 
-        # Run init_db to upgrade
+        # Run init_db to upgrade to current
         orig_path = _db.CONFIG.db_path
         object.__setattr__(_db.CONFIG, 'db_path', Path(db_path))
         try:
@@ -100,10 +228,11 @@ for target in range(1, _db.SCHEMA_VERSION):
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON;")
 
-        sv = conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
-        ok(sv and int(sv[0]) == _db.SCHEMA_VERSION, f"{label}: schema_version = {_db.SCHEMA_VERSION}")
+        schema_ver = conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
+        ok(schema_ver and int(schema_ver[0]) == _db.SCHEMA_VERSION, f"{label}: schema_version = {_db.SCHEMA_VERSION}")
 
-        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' AND name NOT LIKE '_new'").fetchall()}
+        tables = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' AND name NOT LIKE '_new%'").fetchall()}
         want = {'meta','organizations','users','transaction_types','sample_types','templates','receipts','receipt_items','attachments','settings','schema_version','migration_history','migration_lock','backups','audit_logs','login_attempts','sync_queue','receipt_history'}
         for t in want:
             ok(t in tables, f"{label}: table '{t}'")
@@ -135,6 +264,10 @@ for target in range(1, _db.SCHEMA_VERSION):
         item = conn.execute("SELECT total_count FROM receipt_items WHERE receipt_id=1").fetchone()
         ok(item and item['total_count'] == 100, f"{label}: item data preserved")
 
+        if target >= 2:
+            comments = conn.execute("SELECT additional_comments FROM receipts WHERE id=1").fetchone()
+            ok(comments and comments[0] == 'v2_test', f"{label}: additional_comments data preserved")
+
         jm = conn.execute("PRAGMA journal_mode").fetchone()
         ok(jm and jm[0] in ('wal', 'delete'), f"{label}: WAL mode")
 
@@ -145,7 +278,6 @@ for target in range(1, _db.SCHEMA_VERSION):
         ok(lock and lock['is_locked'] == 0, f"{label}: migration lock released")
 
         conn.close()
-
         Path(db_path).unlink(missing_ok=True)
         for s in ('-wal', '-shm'):
             Path(db_path + s).unlink(missing_ok=True)
@@ -157,7 +289,7 @@ for target in range(1, _db.SCHEMA_VERSION):
 
 elapsed = time.time() - start
 print(f"\n{'=' * 72}")
-print(f"RESULTS")
+print(f"MIGRATION UPGRADE CERTIFICATION REPORT")
 print(f"{'=' * 72}")
 print(f"Paths tested:  v1→v8, v2→v8, v3→v8, v4→v8, v5→v8, v6→v8, v7→v8")
 print(f"Total checks:  {n_total}")

@@ -99,7 +99,21 @@ jobs:
       - name: Run Tests with Coverage
         shell: cmd
         run: |
-          python -m pytest tests/ --cov=lab_system --cov-config=.coveragerc --cov-report=xml:coverage.xml --cov-report=html:coverage_html --cov-report=term --junitxml=test-results.xml || echo Tests failed (non-blocking for build validation)
+          python -m pytest tests/ --cov=lab_system --cov-config=.coveragerc --cov-report=xml:coverage.xml --cov-report=html:coverage_html --cov-report=term --junitxml=test-results.xml > pytest_out.txt 2>&1
+          echo === FIRST 50 LINES OF TEST OUTPUT ===
+          type pytest_out.txt 2>nul
+          python -c "
+import re, sys
+with open('pytest_out.txt', encoding='utf-8', errors='replace') as f:
+    txt = f.read()
+for m in re.finditer(r'FAILED ([^ ]+)', txt):
+    print(f'::error::FAILED: {m.group(1)}')
+    break
+for m in re.finditer(r'ERROR.*::', txt):
+    print(f'::error::{m.group(0)[:200]}')
+    break
+" 2>nul
+          echo Tests completed (non-blocking for build validation)
 
       - name: Upload Coverage Report
         if: always()
@@ -186,7 +200,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-diagnostics
-          path: dist\LabReceiptSystem\
+          path: build/
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')

@@ -251,8 +251,9 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         _record_migration(conn, 'v5_sync_queue', statement)
 
     if current < 6:
+        if 'password_changed_at' not in _table_columns(conn, 'users'):
+            conn.execute("ALTER TABLE users ADD COLUMN password_changed_at TEXT DEFAULT '';")
         conn.executescript("""
-            ALTER TABLE users ADD COLUMN password_changed_at TEXT DEFAULT '';
             CREATE TABLE IF NOT EXISTS login_attempts (
              id INTEGER PRIMARY KEY AUTOINCREMENT,
              username TEXT NOT NULL,
