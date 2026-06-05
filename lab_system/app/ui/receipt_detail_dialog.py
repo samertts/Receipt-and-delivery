@@ -1,4 +1,3 @@
-import subprocess
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -18,6 +17,19 @@ from PySide6.QtWidgets import (
 from lab_system.app.attachments.manager import save_attachment
 from lab_system.app.audit.logger import log_action
 from lab_system.app.printing.receipt_pdf import generate_receipt_pdf
+
+
+def _open_file_safe(path):
+    try:
+        from sys import platform as _p
+        if _p == "win32":
+            import os
+            os.startfile(str(path))
+        else:
+            import subprocess
+            subprocess.Popen(["xdg-open", str(path)])
+    except Exception:
+        pass
 from lab_system.app.services.receipt_service import get_receipt
 
 STATUS_STYLES = {
@@ -220,7 +232,7 @@ class ReceiptDetailDialog(QDialog):
                 "receipt_printed",
                 f"طباعة الإيصال: {receipt['receipt_no']}",
             )
-            subprocess.Popen([str(path)], shell=False)
+            _open_file_safe(path)
         except Exception as e:
             QMessageBox.warning(self, "خطأ", f"فشل الطباعة: {e}")
 
@@ -250,6 +262,6 @@ class ReceiptDetailDialog(QDialog):
     @staticmethod
     def _open_file(file_path):
         try:
-            subprocess.Popen([str(file_path)], shell=False)
+            _open_file_safe(file_path)
         except Exception:
             QMessageBox.warning(None, "خطأ", "تعذر فتح الملف")

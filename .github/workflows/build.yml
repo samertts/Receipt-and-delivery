@@ -1,11 +1,8 @@
 name: Build Windows Application
 
 on:
-  push:
-    tags:
-      - 'v*'
-    paths-ignore:
-      - '.github/**'
+  release:
+    types: [published]
   workflow_dispatch:
 
 env:

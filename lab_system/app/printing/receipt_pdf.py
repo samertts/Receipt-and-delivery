@@ -47,6 +47,7 @@ _ARABIC_FONTS = {
 
 def _find_arabic_fonts():
     """Look for common Arabic TTF fonts on the system."""
+    from sys import platform as _sys_platform
     candidates = [
         "/usr/share/fonts/truetype/amiri/Amiri-Regular.ttf",
         "/usr/share/fonts/truetype/amiri/Amiri-Bold.ttf",
@@ -55,6 +56,16 @@ def _find_arabic_fonts():
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     ]
+    if _sys_platform == "win32":
+        win_dir = Path("C:/Windows/Fonts")
+        candidates += [
+            str(win_dir / "amiri" / "amiri-regular.ttf"),
+            str(win_dir / "amiri" / "amiri-bold.ttf"),
+            str(win_dir / "NotoNaskhArabic" / "NotoNaskhArabic-Regular.ttf"),
+            str(win_dir / "NotoNaskhArabic" / "NotoNaskhArabic-Bold.ttf"),
+            str(win_dir / "DejaVuSans.ttf"),
+            str(win_dir / "DejaVuSans-Bold.ttf"),
+        ]
     for path in candidates:
         p = Path(path)
         if p.exists():
