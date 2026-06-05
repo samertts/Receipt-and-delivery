@@ -49,8 +49,8 @@ jobs:
         shell: cmd
         run: |
           if not exist VERSION (
-            echo 1.0.0 > VERSION
-            echo WARNING: VERSION file was missing, created with default 1.0.0
+            echo 0.0.0 > VERSION
+            echo WARNING: VERSION file was missing, created with default 0.0.0
           )
           echo App version:
           type VERSION
@@ -104,11 +104,23 @@ jobs:
           type pytest_output.txt
           echo EXIT_CODE=%errorlevel%
 
-      - name: Check Test Results
+      - name: Report Test Failures
         shell: cmd
         run: |
-          type pytest_output.txt
-          python -c "import xml.etree.ElementTree as ET; r=ET.parse('test-results.xml').getroot(); f=r.findall('.//testcase[failure]'); print(f'Failures: {len(f)}'); [print(t.attrib.get(\"name\",\"?\"), t.findtext(\"failure/message\",\"\")[:200]) for t in f]" 2>nul
+          python -c "
+import xml.etree.ElementTree as ET
+import pathlib
+r = ET.parse('test-results.xml').getroot()
+failures = r.findall('.//testcase[failure]')
+print(f'::notice::Total failures: {len(failures)}')
+for t in failures[:10]:
+    name = t.attrib.get('name', '?')
+    msg = t.findtext('failure/message', 'no message')[:200]
+    print(f'::error file={t.attrib.get(\"file\",\"tests/\")},line={t.attrib.get(\"line\",\"1\")}::{name}: {msg}')
+    print(f'FAILED_TEST: {name} -> {msg}')
+" 2>nul
+          findstr /R "FAILED.*::" pytest_output.txt > failed_tests.txt 2>nul
+          if exist failed_tests.txt (type failed_tests.txt) else (echo No FAILED lines found in output)
           findstr /C:"FAILED" pytest_output.txt >nul && (exit /b 1) || echo All tests passed.
 
       - name: Upload Pytest Output
@@ -183,6 +195,8 @@ jobs:
       - name: Build Installer
         shell: cmd
         run: |
+          for /f %%i in (VERSION) do set APP_VER=%%i
+          powershell -Command "(Get-Content installer/setup.iss) -replace '#define MyAppVersion \"1.0.0\"', ('#define MyAppVersion \"' + $env:APP_VER + '\"') | Set-Content installer/setup.iss"
           ISCC installer/setup.iss
 
       - name: Upload EXE

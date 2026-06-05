@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from lab_system.app.settings.config import CONFIG
 from lab_system.app.audit.logger import log_action
 from lab_system.app.auth.permissions import check_permission
 from lab_system.app.database.db import init_db
@@ -132,7 +133,7 @@ class DashboardPage(QWidget):
 
         role_ar = {'Admin': 'مدير النظام', 'Supervisor': 'مشرف', 'User': 'مستخدم', 'Auditor': 'مدقق'}
         layout.addWidget(QLabel(f"الصلاحية: {role_ar.get(user['role'], user['role'])}"))
-        layout.addWidget(QLabel("نظام إدارة الاستلام المختبري - الإصدار 1.0.0"))
+        layout.addWidget(QLabel(f"نظام إدارة الاستلام المختبري - الإصدار {CONFIG.app_version}"))
 
         diag = run_all_checks()
         status = QLabel()

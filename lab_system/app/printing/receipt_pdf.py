@@ -35,7 +35,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from lab_system.app.settings.config import STORAGE_DIR
+from lab_system.app.settings.config import CONFIG, STORAGE_DIR
 
 # ---------------------------------------------------------------------------
 # Font helpers — try to register Arabic TTF fonts; fall back to Helvetica
@@ -316,7 +316,7 @@ def generate_receipt_pdf(receipt_no, institution, tx_type, date_text,
     elements.append(Spacer(1, 8 * mm))
     elements.append(
         Paragraph(
-            f"نظام إدارة الاستلام المختبري — الإصدار 1.0.0 — {datetime.now().year}",
+            f"نظام إدارة الاستلام المختبري — الإصدار {CONFIG.app_version} — {datetime.now().year}",
             s["footer"],
         ),
     )
