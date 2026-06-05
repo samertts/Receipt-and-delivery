@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+    paths-ignore:
+      - '.github/**'
   workflow_dispatch:
 
 env:
@@ -197,6 +199,7 @@ for m in re.finditer(r'ERROR.*::', txt):
           path: installer/Output/LabReceiptSetup.exe
 
       - name: Upload Build Diagnostics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-diagnostics
