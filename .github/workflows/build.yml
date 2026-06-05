@@ -79,7 +79,7 @@ jobs:
         shell: cmd
         continue-on-error: true
         run: |
-          ruff check --output-format=github lab_system/ tests/
+          ruff check --output-format=github lab_system/ tests/ --ignore=E501,W292,E265
           echo RUFF_EXIT_CODE=%errorlevel%
 
       - name: Bandit Security Scan

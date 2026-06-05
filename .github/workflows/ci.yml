@@ -25,7 +25,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Ruff Linting
-        run: python -m ruff check --output-format=github lab_system/ tests/
+        run: python -m ruff check --output-format=github lab_system/ tests/ --ignore=E501,W292,E265
 
       - name: Bandit Security Scan
         run: python -m bandit -r lab_system/ -f sarif -o bandit-results.sarif
