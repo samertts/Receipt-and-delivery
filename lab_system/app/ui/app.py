@@ -185,7 +185,6 @@ class MainWindow(QMainWindow):
                 pass
 
         self.pages = QStackedWidget()
-        page_index = 0
         page_map = {
             "dashboard": DashboardPage(user, auth_service),
             "receipts": ReceiptsPage(user),
@@ -242,7 +241,7 @@ QHeaderView::section {{ background-color: {THEME['panel']}; padding: 8px; border
 
 
 def run() -> None:
-    repairs = self_repair()
+    self_repair()
     diag = run_all_checks()
     if not diag["all_ok"]:
         print(diagnose_and_report())

@@ -72,15 +72,19 @@ class TestReceiptServiceFull:
              "auth_doc_no": "A-001", "auth_date": "2026-05-27",
              "notes": "", "transport_info": "Cold", "additional_comments": "",
              "status": "Draft"}
-        if overrides: d.update(overrides)
+        if overrides:
+            d.update(overrides)
         return d
+
+
 
     @staticmethod
     def _item(overrides=None):
         i = {"sample_type_id": 1, "total_count": 100, "valid_count": 95,
              "damaged_count": 3, "rejected_count": 1, "non_conforming_count": 1,
              "transport_condition": "Good", "notes": ""}
-        if overrides: i.update(overrides)
+        if overrides:
+            i.update(overrides)
         return i
 
     def test_1_create_receipt(self):

@@ -21,13 +21,6 @@ def _where_clause(date_from="", date_to=""):
 
 def receipt_summary(date_from="", date_to="", group_by="day"):
     clauses, params = _where_clause(date_from, date_to)
-    if group_by == "month":
-        date_col = "SUBSTR(r.created_at,1,7)"
-    elif group_by == "type":
-        date_col = "t.name"
-    else:
-        date_col = "DATE(r.created_at)"
-
     with _db.get_conn() as conn:
         by_status = conn.execute(
             f"SELECT r.status, COUNT(*) cnt FROM receipts r WHERE {clauses} GROUP BY r.status",
