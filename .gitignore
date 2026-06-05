@@ -17,3 +17,6 @@ build/
 !lab_system.spec
 installer/Output/
 *.log
+.coverage
+coverage.xml
+htmlcov/
