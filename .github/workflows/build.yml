@@ -1,8 +1,9 @@
 name: Build Windows Application
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 env:
