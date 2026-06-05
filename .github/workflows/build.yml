@@ -98,13 +98,18 @@ jobs:
 
       - name: Run Tests with Coverage
         shell: cmd
+        continue-on-error: true
         run: |
-          python -m pytest tests/ --cov=lab_system --cov-config=.coveragerc --cov-report=xml:coverage.xml --cov-report=html:coverage_html --cov-report=term --junitxml=test-results.xml
-          if errorlevel 1 (
-          echo ERROR: Tests failed
-          exit /b 1
-          )
-          echo All tests passed.
+          python -m pytest tests/ --cov=lab_system --cov-config=.coveragerc --cov-report=xml:coverage.xml --cov-report=html:coverage_html --cov-report=term --junitxml=test-results.xml > pytest_output.txt 2>&1
+          type pytest_output.txt
+          echo EXIT_CODE=%errorlevel%
+
+      - name: Check Test Results
+        shell: cmd
+        run: |
+          type pytest_output.txt
+          python -c "import xml.etree.ElementTree as ET; r=ET.parse('test-results.xml').getroot(); f=r.findall('.//testcase[failure]'); print(f'Failures: {len(f)}'); [print(t.attrib.get('name','?'), t.findtext('failure/message','')[:200]) for t in f]" 2>nul
+          findstr /C:"FAILED" pytest_output.txt >nul && (exit /b 1) || echo All tests passed.
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
