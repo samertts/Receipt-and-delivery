@@ -4,6 +4,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from lab_system.app.settings.config import CONFIG
+
 
 class StructuredFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
@@ -38,4 +40,4 @@ def setup_file_logging(log_dir: Path, level: str = "INFO") -> logging.Logger:
     return logger
 
 
-desktop_logger = setup_file_logging(Path("storage/logs"))
+desktop_logger = setup_file_logging(CONFIG.storage_dir / "logs")
