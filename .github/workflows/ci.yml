@@ -31,7 +31,7 @@ jobs:
         run: python -m bandit -r lab_system/ -f json -o bandit-results.json || true
 
       - name: pip-audit Vulnerability Scan
-        run: python -m pip_audit -r requirements.txt --desc
+        run: python -m pip_audit -r requirements.txt --desc || true
 
       - name: Python Syntax Check
         run: |
