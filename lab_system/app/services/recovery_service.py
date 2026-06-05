@@ -5,7 +5,6 @@ Provides tools to verify backup integrity, detect database corruption,
 attempt recovery from WAL or backup files, and manage backup retention.
 """
 
-import os
 import shutil
 import sqlite3
 from datetime import datetime
