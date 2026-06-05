@@ -153,11 +153,9 @@ class TestAuthServiceAdvanced:
     def test_check_session_timeout(self):
         from lab_system.app.services.auth_service import AuthService
         from lab_system.app.utils.errors import SessionExpiredError
-        from unittest import mock
         import pytest
         auth = AuthService()
         auth.login('admin', 'Admin@123')
-        old = auth._last_activity
         auth._last_activity = auth._last_activity.replace(year=2000)
         with pytest.raises(SessionExpiredError):
             auth.check_session()

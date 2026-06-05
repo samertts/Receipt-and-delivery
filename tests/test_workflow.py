@@ -173,7 +173,7 @@ class TestWorkflow:
 
     def test_batch_soft_delete_ok(self):
         from lab_system.app.services.receipt_service import (
-            create_receipt, batch_soft_delete, soft_delete_receipt, restore_receipt,
+            create_receipt, batch_soft_delete, restore_receipt,
         )
         rid, _ = create_receipt(_data(), [_item()], 1)
         results = batch_soft_delete([rid], user_id=1)
@@ -527,7 +527,7 @@ class TestBackupRecovery:
         Path(result["path"]).unlink()
 
     def test_enforce_retention_deletes_old(self):
-        from lab_system.app.services.recovery_service import enforce_retention, list_backups, delete_backup
+        from lab_system.app.services.recovery_service import enforce_retention, list_backups
         # Create 5 unique-named backup files directly
         paths = []
         for i in range(5):
