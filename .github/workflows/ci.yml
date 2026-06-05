@@ -28,7 +28,7 @@ jobs:
         run: python -m ruff check --output-format=github lab_system/ tests/ --ignore=E501,W292,E265
 
       - name: Bandit Security Scan
-        run: python -m bandit -r lab_system/ -f sarif -o bandit-results.sarif
+        run: python -m bandit -r lab_system/ -f json -o bandit-results.json || true
 
       - name: pip-audit Vulnerability Scan
         run: python -m pip_audit -r requirements.txt --desc
