@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1 import auth, audit, organizations, transactions, users
+from app.api.v1 import audit, auth, organizations, transactions, users
 from app.core.config import settings
 from app.core.exceptions import AppException
 from app.core.logging import logger, setup_logging
@@ -12,7 +12,7 @@ from app.core.security import rate_limit_middleware
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     setup_logging(level=settings.log_level)
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
     yield

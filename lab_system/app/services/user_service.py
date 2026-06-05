@@ -1,20 +1,32 @@
+import secrets
+import string
 from datetime import datetime, timedelta
-from lab_system.app.database import db as _db
+
 from lab_system.app.auth.security import hash_password, verify_password
+from lab_system.app.database import db as _db
 from lab_system.app.utils.errors import AuthenticationError
+
+
+def _generate_admin_password() -> str:
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    return ''.join(secrets.choice(alphabet) for _ in range(16))
 
 
 def seed_default_users():
     created = False
+    admin_password = ''
     with _db.get_conn() as conn:
         if conn.execute('SELECT COUNT(*) c FROM users').fetchone()['c'] == 0:
             now = datetime.now().isoformat(timespec='seconds')
+            admin_password = _generate_admin_password()
             conn.execute('INSERT INTO users(full_name,username,password_hash,role,status,password_changed_at) VALUES(?,?,?,?,?,?)',
-                         ('System Admin', 'admin', hash_password('Admin@123'), 'Admin', 'Active', now))
+                         ('System Admin', 'admin', hash_password(admin_password), 'Admin', 'Active', ''))
             created = True
     if created:
         from lab_system.app.audit.logger import log_action
         log_action(None, 'admin_seeded', 'Default admin account created on first startup')
+        import sys
+        print(f'\n{"="*50}\n  تم إنشاء حساب المشرف الافتراضي\n  اسم المستخدم: admin\n  كلمة المرور: {admin_password}\n  يرجى تغيير كلمة المرور عند تسجيل الدخول\n{"="*50}\n', file=sys.stderr)
     return created
 
 
@@ -41,6 +53,8 @@ def authenticate(username, password):
         record_login_attempt(username, True)
         return row
     record_login_attempt(username, False)
+    from lab_system.app.audit.logger import log_action
+    log_action(None, 'login_failed', f'فشل تسجيل الدخول للمستخدم: {username}')
     return None
 
 
@@ -72,6 +86,10 @@ def create_user(full_name, username, password, role, institution_id=None, phone=
 def disable_user(user_id):
     with _db.get_conn() as conn:
         conn.execute("UPDATE users SET status='Inactive' WHERE id=?", (user_id,))
+
+def enable_user(user_id):
+    with _db.get_conn() as conn:
+        conn.execute("UPDATE users SET status='Active' WHERE id=?", (user_id,))
 
 
 def reset_password(user_id, new_password):

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_permission
+from app.api.deps import require_permission
 from app.core.audit import log_audit
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.core.security import validate_password_strength

@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from lab_system.app.auth.permissions import check_permission
 from lab_system.app.audit.logger import log_action
 from lab_system.app.database.db import DEFAULT_SETTINGS, get_conn
 
@@ -55,6 +56,7 @@ class SettingsPage(QWidget):
             return row["value"] if row else default
 
     def _save(self):
+        check_permission(self.current_user, 'settings.update')
         with get_conn() as conn:
             for key, inp in self.fields.items():
                 conn.execute("INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)", (key, inp.text()))

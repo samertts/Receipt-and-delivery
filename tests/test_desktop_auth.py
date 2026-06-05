@@ -4,8 +4,8 @@ Tests for the desktop app authentication and security modules.
 Run with: python -m pytest tests/test_desktop_auth.py -v
 """
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -84,8 +84,9 @@ class TestDesktopPermissions:
         require_permission("Admin", "users.create")
 
     def test_require_permission_invalid(self):
+        import pytest
+
         from lab_system.app.auth.permissions import require_permission
         from lab_system.app.utils.errors import AuthorizationError
-        import pytest
         with pytest.raises(AuthorizationError):
             require_permission("User", "users.create")

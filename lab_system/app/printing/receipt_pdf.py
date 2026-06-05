@@ -11,27 +11,31 @@ Supports:
 - A4 and thermal-friendly layout
 """
 
-from pathlib import Path
 from datetime import datetime
-
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm, cm
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    Image as RLImage,
-)
-from reportlab.lib import colors
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+from pathlib import Path
 
 import qrcode
 from barcode import Code128
 from barcode.writer import ImageWriter
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.units import cm, mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import (
+    Image as RLImage,
+)
+from reportlab.platypus import (
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from lab_system.app.settings.config import STORAGE_DIR
-
 
 # ---------------------------------------------------------------------------
 # Font helpers — try to register Arabic TTF fonts; fall back to Helvetica
@@ -79,7 +83,7 @@ def _register_fonts():
 _register_fonts()
 
 
-def _font_name(bold=False):
+def _font_name(*, bold=False):
     if bold and "ArabicBold" in pdfmetrics.getRegisteredFontNames():
         return "ArabicBold"
     if "Arabic" in pdfmetrics.getRegisteredFontNames():
@@ -307,7 +311,7 @@ def generate_receipt_pdf(receipt_no, institution, tx_type, date_text,
         Paragraph(
             f"نظام إدارة الاستلام المختبري — الإصدار 1.0.0 — {datetime.now().year}",
             s["footer"],
-        )
+        ),
     )
 
     # Build PDF

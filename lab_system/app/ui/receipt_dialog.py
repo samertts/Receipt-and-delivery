@@ -101,10 +101,10 @@ class ReceiptDialog(QDialog):
                 "حالة النقل",
                 "ملاحظات",
                 "حذف",
-            ]
+            ],
         )
         self.items_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.Stretch
+            QHeaderView.Stretch,
         )
         main.addWidget(self.items_table)
 
@@ -152,7 +152,7 @@ class ReceiptDialog(QDialog):
             from datetime import datetime
 
             self.auth_date.setDate(
-                datetime.strptime(receipt["auth_date"], "%Y-%m-%d").date()
+                datetime.strptime(receipt["auth_date"], "%Y-%m-%d").date(),
             )
         idx = self.status_combo.findText(receipt["status"])
         if idx >= 0:
@@ -231,13 +231,13 @@ class ReceiptDialog(QDialog):
                     "damaged_count": self.items_table.cellWidget(row, 3).value(),
                     "rejected_count": self.items_table.cellWidget(row, 4).value(),
                     "non_conforming_count": self.items_table.cellWidget(
-                        row, 5
+                        row, 5,
                     ).value(),
                     "transport_condition": self.items_table.cellWidget(
-                        row, 6
+                        row, 6,
                     ).text(),
                     "notes": self.items_table.cellWidget(row, 7).text(),
-                }
+                },
             )
         return items
 
@@ -278,7 +278,7 @@ class ReceiptDialog(QDialog):
                 non_conf = i["non_conforming_count"]
                 if total != valid + damaged + rejected + non_conf:
                     raise ValueError(
-                        "المجموع يجب أن يساوي مجموع الصالح + التالف + المرفوض + غير المطابق"
+                        "المجموع يجب أن يساوي مجموع الصالح + التالف + المرفوض + غير المطابق",
                     )
             if self.editing:
                 update_receipt(self.receipt_id, data, items)

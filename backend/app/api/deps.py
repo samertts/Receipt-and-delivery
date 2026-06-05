@@ -44,7 +44,7 @@ def get_current_user(
         raise UnauthorizedError("لم يتم تسجيل الدخول")
     try:
         payload = jwt.decode(
-            token, settings.effective_secret_key, algorithms=[settings.algorithm]
+            token, settings.effective_secret_key, algorithms=[settings.algorithm],
         )
         username: str = payload.get("sub", "")
         if not username:
@@ -62,7 +62,7 @@ def require_permission(permission: str):
     def permission_checker(current_user: User = Depends(get_current_user)) -> User:
         allowed_roles = PERMISSION_ROLES.get(permission, [])
         if current_user.role not in allowed_roles:
-            raise ForbiddenError()
+            raise ForbiddenError
         return current_user
 
     return permission_checker

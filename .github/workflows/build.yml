@@ -86,7 +86,7 @@ jobs:
         shell: cmd
         continue-on-error: true
         run: |
-          bandit -r lab_system/ -f sarif -o bandit-results.sarif || echo Bandit found issues
+          bandit -r lab_system/ -f json -o bandit-results.json || echo Bandit found issues
           echo BANDIT_EXIT_CODE=%errorlevel%
 
       - name: pip-audit Vulnerability Scan
@@ -122,7 +122,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bandit-results
-          path: bandit-results.sarif
+          path: bandit-results.json
 
       - name: Build Diagnostics
         shell: cmd

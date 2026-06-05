@@ -19,11 +19,16 @@ from PySide6.QtWidgets import (
 from lab_system.app.audit.logger import log_action
 from lab_system.app.auth.permissions import check_permission
 from lab_system.app.database.db import init_db
-from lab_system.app.diagnostics.startup import diagnose_and_report, run_all_checks, self_repair
+from lab_system.app.utils.validators import validate_password as _validate_password
+from lab_system.app.diagnostics.startup import (
+    diagnose_and_report,
+    run_all_checks,
+    self_repair,
+)
 from lab_system.app.services.auth_service import AuthService
+from lab_system.app.services.catalog_service import seed_defaults
 from lab_system.app.services.seed_service import seed_organizations
 from lab_system.app.services.user_service import seed_default_users
-from lab_system.app.services.catalog_service import seed_defaults
 from lab_system.app.ui.audit_page import AuditPage
 from lab_system.app.ui.backup_page import BackupPage
 from lab_system.app.ui.org_page import OrgPage
@@ -33,7 +38,6 @@ from lab_system.app.ui.settings_page import SettingsPage
 from lab_system.app.ui.users_page import UsersPage
 from lab_system.app.utils.constants import APP_NAME, DEFAULT_WINDOW_SIZE, THEME
 from lab_system.app.utils.errors import AuthenticationError, SessionExpiredError
-
 
 SESSION_CHECK_INTERVAL = 30000
 
@@ -63,8 +67,9 @@ class ChangePasswordDialog(QDialog):
         if self.new_password.text() != self.confirm_password.text():
             QMessageBox.warning(self, "خطأ", "كلمتا المرور غير متطابقتين")
             return
-        if len(self.new_password.text()) < 8:
-            QMessageBox.warning(self, "خطأ", "كلمة المرور يجب أن تكون 8 محارف على الأقل")
+        pwd_error = _validate_password(self.new_password.text())
+        if pwd_error:
+            QMessageBox.warning(self, "خطأ", pwd_error)
             return
         try:
             self.auth.change_password(self.old_password.text(), self.new_password.text())
@@ -104,7 +109,7 @@ class LoginWindow(QDialog):
     def _login(self) -> None:
         try:
             self.user = self.auth.login(
-                self.username.text().strip(), self.password.text()
+                self.username.text().strip(), self.password.text(),
             )
             log_action(self.user["id"], "login_success", "desktop_login")
             self.accept()

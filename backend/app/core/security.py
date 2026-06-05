@@ -4,11 +4,10 @@ import time
 from collections import defaultdict
 from typing import Optional
 
-from fastapi import Request
-from fastapi.responses import JSONResponse
-
 from app.core.config import settings
 from app.core.logging import logger
+from fastapi import Request
+from fastapi.responses import JSONResponse
 
 PASSWORD_MIN_LENGTH = 8
 PASSWORD_MAX_LENGTH = 128
@@ -60,7 +59,7 @@ async def rate_limit_middleware(request: Request, call_next):
     if "/auth/login" in request.url.path:
         if login_rate_limiter.is_rate_limited(client_ip):
             logger.warning(
-                "Rate limit exceeded", extra={"ip_address": client_ip, "path": request.url.path}
+                "Rate limit exceeded", extra={"ip_address": client_ip, "path": request.url.path},
             )
             return JSONResponse(
                 status_code=429,
@@ -69,15 +68,14 @@ async def rate_limit_middleware(request: Request, call_next):
                     "error_code": "RATE_LIMIT",
                 },
             )
-    else:
-        if api_rate_limiter.is_rate_limited(client_ip):
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "detail": "طلبات كثيرة - الرجاء المحاولة لاحقاً",
-                    "error_code": "RATE_LIMIT",
-                },
-            )
+    elif api_rate_limiter.is_rate_limited(client_ip):
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": "طلبات كثيرة - الرجاء المحاولة لاحقاً",
+                "error_code": "RATE_LIMIT",
+            },
+        )
 
     response = await call_next(request)
     return response

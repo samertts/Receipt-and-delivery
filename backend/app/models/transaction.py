@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import List
 
 from sqlalchemy import ForeignKey, String, Text
@@ -13,10 +15,10 @@ class Transaction(UUIDMixin, TimestampMixin, Base):
     transaction_no: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     transaction_type: Mapped[str] = mapped_column(String(60), index=True)
     sender_organization_id: Mapped[str] = mapped_column(
-        ForeignKey("organizations.id"), index=True
+        ForeignKey("organizations.id"), index=True,
     )
     receiver_organization_id: Mapped[str] = mapped_column(
-        ForeignKey("organizations.id"), index=True
+        ForeignKey("organizations.id"), index=True,
     )
     sender_name: Mapped[str] = mapped_column(String(180))
     receiver_name: Mapped[str] = mapped_column(String(180))
@@ -28,17 +30,14 @@ class Transaction(UUIDMixin, TimestampMixin, Base):
     notes: Mapped[str] = mapped_column(Text, default="")
     transport_info: Mapped[str] = mapped_column(String(255), default="")
     status: Mapped[str] = mapped_column(
-        String(30), index=True, default="draft"
+        String(30), index=True, default="draft",
     )
     created_by: Mapped[str] = mapped_column(String(36), default="")
 
-    items: Mapped[List["TransactionItem"]] = relationship(
-        "TransactionItem", back_populates="transaction", cascade="all, delete-orphan"
+    items: Mapped[List["TransactionItem"]] = relationship(  # noqa: F821
+        "TransactionItem", back_populates="transaction", cascade="all, delete-orphan",
     )
-    attachments: Mapped[List["Attachment"]] = relationship(
-        "Attachment", back_populates="transaction", cascade="all, delete-orphan"
+    attachments: Mapped[List["Attachment"]] = relationship(  # noqa: F821
+        "Attachment", back_populates="transaction", cascade="all, delete-orphan",
     )
 
-
-from app.models.attachment import Attachment
-from app.models.transaction_item import TransactionItem

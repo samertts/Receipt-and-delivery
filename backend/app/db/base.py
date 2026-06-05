@@ -6,4 +6,4 @@ from app.models.transaction import Transaction
 from app.models.transaction_item import TransactionItem
 from app.models.user import User
 
-__all__ = ["Base", "Attachment", "AuditLog", "Organization", "Transaction", "TransactionItem", "User"]
+__all__ = ["Attachment", "AuditLog", "Base", "Organization", "Transaction", "TransactionItem", "User"]

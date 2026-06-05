@@ -1,12 +1,10 @@
-from datetime import datetime, timezone
 from typing import Optional
-
-from fastapi import Request
-from sqlalchemy.orm import Session
 
 from app.core.logging import logger
 from app.db.session import SessionLocal
 from app.models.audit_log import AuditLog
+from fastapi import Request
+from sqlalchemy.orm import Session
 
 
 def log_audit(

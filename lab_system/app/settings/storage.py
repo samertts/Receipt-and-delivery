@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from lab_system.app.settings.config import CONFIG
 
 

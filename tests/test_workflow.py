@@ -1,11 +1,11 @@
 """Tests for receipt workflow (Phase 3), reporting (Phase 4), and recovery (Phase 5)."""
 
-import sys
 import os
 import sqlite3
+import sys
 import tempfile
-from pathlib import Path
 from contextlib import contextmanager
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -70,7 +70,9 @@ class TestWorkflow:
 
     def test_valid_transitions(self):
         from lab_system.app.services.receipt_service import (
-            create_receipt, change_receipt_status, get_receipt,
+            change_receipt_status,
+            create_receipt,
+            get_receipt,
         )
         rid, _ = create_receipt(_data(), [_item()], 1)
         change_receipt_status(rid, "Approved", 1)
@@ -82,7 +84,8 @@ class TestWorkflow:
 
     def test_invalid_transitions(self):
         from lab_system.app.services.receipt_service import (
-            create_receipt, change_receipt_status,
+            change_receipt_status,
+            create_receipt,
         )
         rid, _ = create_receipt(_data(), [_item()], 1)
         change_receipt_status(rid, "Approved", 1)
@@ -92,7 +95,9 @@ class TestWorkflow:
 
     def test_receipt_history(self):
         from lab_system.app.services.receipt_service import (
-            create_receipt, change_receipt_status, get_receipt_history,
+            change_receipt_status,
+            create_receipt,
+            get_receipt_history,
         )
         rid, _ = create_receipt(_data(), [_item()], 1)
         change_receipt_status(rid, "Approved", 1)
@@ -105,7 +110,9 @@ class TestWorkflow:
 
     def test_batch_update_status(self):
         from lab_system.app.services.receipt_service import (
-            create_receipt, batch_update_status, get_receipt,
+            batch_update_status,
+            create_receipt,
+            get_receipt,
         )
         r1, _ = create_receipt(_data(), [_item()], 1)
         r2, _ = create_receipt(_data(), [_item()], 1)
@@ -115,14 +122,17 @@ class TestWorkflow:
         assert get_receipt(r2)[0]["status"] == "Approved"
 
     def test_change_status_not_found(self):
-        from lab_system.app.services.receipt_service import change_receipt_status
         import pytest
+
+        from lab_system.app.services.receipt_service import change_receipt_status
         with pytest.raises(ValueError, match="not found"):
             change_receipt_status(99999, "Approved", 1)
 
     def test_change_status_same_status(self):
         from lab_system.app.services.receipt_service import (
-            create_receipt, change_receipt_status, get_receipt,
+            change_receipt_status,
+            create_receipt,
+            get_receipt,
         )
         rid, _ = create_receipt(_data(), [_item()], 1)
         result = change_receipt_status(rid, "Draft", 1)
@@ -130,14 +140,17 @@ class TestWorkflow:
         assert get_receipt(rid)[0]["status"] == "Draft"
 
     def test_set_status_not_found(self):
-        from lab_system.app.services.receipt_service import set_receipt_status
         import pytest
+
+        from lab_system.app.services.receipt_service import set_receipt_status
         with pytest.raises(ValueError, match="not found"):
             set_receipt_status(99999, "Approved", 1)
 
     def test_set_status_same_status(self):
         from lab_system.app.services.receipt_service import (
-            create_receipt, set_receipt_status, get_receipt,
+            create_receipt,
+            get_receipt,
+            set_receipt_status,
         )
         rid, _ = create_receipt(_data(), [_item()], 1)
         result = set_receipt_status(rid, "Draft", 1)
@@ -145,13 +158,19 @@ class TestWorkflow:
         assert get_receipt(rid)[0]["status"] == "Draft"
 
     def test_list_receipts_date_filter(self):
-        from lab_system.app.services.receipt_service import create_receipt, list_receipts
+        from lab_system.app.services.receipt_service import (
+            create_receipt,
+            list_receipts,
+        )
         create_receipt(_data(), [_item()], 1)
         result = list_receipts(date_from="2026-01-01", date_to="2026-12-31")
         assert len(result) >= 1
 
     def test_list_receipts_tx_type_filter(self):
-        from lab_system.app.services.receipt_service import create_receipt, list_receipts
+        from lab_system.app.services.receipt_service import (
+            create_receipt,
+            list_receipts,
+        )
         create_receipt(_data(), [_item()], 1)
         rows, count = list_receipts(tx_type_id=1)
         assert count >= 1
@@ -164,8 +183,9 @@ class TestWorkflow:
         assert all(r[1] == "error" for r in results)
 
     def test_batch_soft_delete_error(self):
-        from lab_system.app.services import receipt_service
         from unittest import mock
+
+        from lab_system.app.services import receipt_service
         with mock.patch.object(receipt_service, 'soft_delete_receipt', side_effect=RuntimeError("DB failure")):
             results = receipt_service.batch_soft_delete([1], user_id=1)
             assert results[0][1] == "error"
@@ -173,7 +193,9 @@ class TestWorkflow:
 
     def test_batch_soft_delete_ok(self):
         from lab_system.app.services.receipt_service import (
-            create_receipt, batch_soft_delete, restore_receipt,
+            batch_soft_delete,
+            create_receipt,
+            restore_receipt,
         )
         rid, _ = create_receipt(_data(), [_item()], 1)
         results = batch_soft_delete([rid], user_id=1)
@@ -181,8 +203,12 @@ class TestWorkflow:
         restore_receipt(rid, 1)
 
     def test_invalid_item_totals(self):
-        from lab_system.app.services.receipt_service import create_receipt, update_receipt
         import pytest
+
+        from lab_system.app.services.receipt_service import (
+            create_receipt,
+            update_receipt,
+        )
         bad_item = _item()
         bad_item["total_count"] = 10
         bad_item["valid_count"] = 100
@@ -194,8 +220,11 @@ class TestWorkflow:
 
     def test_status_wrappers(self):
         from lab_system.app.services.receipt_service import (
-            create_receipt, approve_receipt, reject_receipt, cancel_receipt,
+            approve_receipt,
+            cancel_receipt,
+            create_receipt,
             get_receipt,
+            reject_receipt,
         )
         rid, _ = create_receipt(_data(), [_item()], 1)
         approve_receipt(rid, 1)
@@ -208,7 +237,10 @@ class TestWorkflow:
 
     def test_soft_delete_and_list(self):
         from lab_system.app.services.receipt_service import (
-            create_receipt, soft_delete_receipt, restore_receipt, list_receipts,
+            create_receipt,
+            list_receipts,
+            restore_receipt,
+            soft_delete_receipt,
         )
         rid, _ = create_receipt(_data(), [_item()], 1)
         soft_delete_receipt(rid, 1)
@@ -222,8 +254,11 @@ class TestWorkflow:
 
     def test_archive_workflow(self):
         from lab_system.app.services.receipt_service import (
-            create_receipt, archive_receipt, unarchive_receipt, get_receipt,
+            archive_receipt,
             change_receipt_status,
+            create_receipt,
+            get_receipt,
+            unarchive_receipt,
         )
         rid, _ = create_receipt(_data(), [_item()], 1)
         # Must approve before archive
@@ -235,7 +270,9 @@ class TestWorkflow:
 
     def test_hard_delete(self):
         from lab_system.app.services.receipt_service import (
-            create_receipt, hard_delete_receipt, get_receipt,
+            create_receipt,
+            get_receipt,
+            hard_delete_receipt,
         )
         rid, _ = create_receipt(_data(), [_item()], 1)
         hard_delete_receipt(rid, 1)
@@ -346,7 +383,7 @@ class TestMigration:
     def test_fts_triggers_exist(self):
         conn = sqlite3.connect(str(self.db_path))
         triggers = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='trigger'"
+            "SELECT name FROM sqlite_master WHERE type='trigger'",
         ).fetchall()
         trigger_names = {t[0] for t in triggers}
         expected = {"receipts_ai", "receipts_ad", "receipts_au",
@@ -363,7 +400,7 @@ class TestMigration:
     def test_receipt_history_table(self):
         conn = sqlite3.connect(str(self.db_path))
         tables = [row[0] for row in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
+            "SELECT name FROM sqlite_master WHERE type='table'",
         ).fetchall()]
         assert "receipt_history" in tables
         conn.close()
@@ -371,7 +408,7 @@ class TestMigration:
     def test_check_constraints(self):
         conn = sqlite3.connect(str(self.db_path))
         create_sql = conn.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='receipt_items'"
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='receipt_items'",
         ).fetchone()[0]
         assert "CHECK(total_count >= 0)" in create_sql
         assert "CHECK(damaged_count >= 0)" in create_sql
@@ -470,8 +507,8 @@ class TestBackupRecovery:
         assert result["error"] == "File not found"
 
     def test_verify_backup_empty_file(self):
-        from lab_system.app.services.recovery_service import verify_backup
         from lab_system.app.services.backup_service import create_backup
+        from lab_system.app.services.recovery_service import verify_backup
         path = create_backup(user_id=1, notes="empty_test")
         Path(path).write_bytes(b"")
         result = verify_backup(path)
@@ -517,7 +554,10 @@ class TestBackupRecovery:
         bad_path.unlink()
 
     def test_list_snapshots_with_files(self):
-        from lab_system.app.services.recovery_service import create_recovery_snapshot, list_snapshots
+        from lab_system.app.services.recovery_service import (
+            create_recovery_snapshot,
+            list_snapshots,
+        )
         result = create_recovery_snapshot("test_list")
         assert result["success"] is True
         snaps = list_snapshots()
@@ -527,7 +567,10 @@ class TestBackupRecovery:
         Path(result["path"]).unlink()
 
     def test_enforce_retention_deletes_old(self):
-        from lab_system.app.services.recovery_service import enforce_retention, list_backups
+        from lab_system.app.services.recovery_service import (
+            enforce_retention,
+            list_backups,
+        )
         # Create 5 unique-named backup files directly
         paths = []
         for i in range(5):
@@ -554,8 +597,8 @@ class TestBackupRecovery:
         bad_path.unlink()
 
     def test_detect_corruption_on_bad_db(self):
-        from lab_system.app.services.recovery_service import detect_corruption
         import lab_system.app.services.recovery_service as _rs
+        from lab_system.app.services.recovery_service import detect_corruption
         old = _rs.DB_PATH
         bad_path = self.backup_dir / "corrupt.db"
         bad_path.write_bytes(b"\x00" * 512)
@@ -567,9 +610,10 @@ class TestBackupRecovery:
 
     def test_attempt_recovery_no_backup(self):
         """attempt_recovery falls back gracefully with no backup available."""
+        import shutil
+
         import lab_system.app.services.recovery_service as _rs
         from lab_system.app.services.recovery_service import attempt_recovery
-        import shutil
         old_backup_dir = _rs.BACKUP_DIR
         empty_dir = self.db_path.parent / "empty_backups"
         empty_dir.mkdir(exist_ok=True)

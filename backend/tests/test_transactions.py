@@ -21,7 +21,7 @@ class TestTransactionCRUD:
                     "nonconforming_count": 0,
                     "transport_condition": "Cooler box",
                     "notes": "Handle with care",
-                }
+                },
             ],
         }
         response = client.post(
@@ -53,7 +53,7 @@ class TestTransactionCRUD:
                     "rejected_count": 0,
                     "nonconforming_count": 0,
                     "transport_condition": "Good",
-                }
+                },
             ],
         }
         response = client.post(

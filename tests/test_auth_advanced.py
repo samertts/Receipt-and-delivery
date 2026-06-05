@@ -1,18 +1,18 @@
 """Advanced tests for auth service, user service, and permissions."""
 
-import sys
 import os
 import sqlite3
+import sys
 import tempfile
-from pathlib import Path
 from contextlib import contextmanager
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 def _make_db():
-    from lab_system.app.database.db import SCHEMA
     from lab_system.app.auth.security import hash_password
+    from lab_system.app.database.db import SCHEMA
     db_path = Path(tempfile.mkdtemp(prefix="lab_auth_")) / "test.db"
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
@@ -67,22 +67,26 @@ class TestAuthServiceAdvanced:
         assert user is None
 
     def test_needs_password_change_new_user(self):
-        from lab_system.app.services.user_service import authenticate, needs_password_change
+        from lab_system.app.services.user_service import (
+            authenticate,
+            needs_password_change,
+        )
         user = authenticate('admin', 'Admin@123')
         result = needs_password_change(dict(user))
         assert result is True
 
     def test_change_password(self):
-        from lab_system.app.services.user_service import change_password, authenticate
+        from lab_system.app.services.user_service import authenticate, change_password
         change_password(1, 'Admin@123', 'NewPass456!')
         user = authenticate('admin', 'NewPass456!')
         assert user is not None
         change_password(1, 'NewPass456!', 'Admin@123')
 
     def test_change_password_wrong_old(self):
+        import pytest
+
         from lab_system.app.services.user_service import change_password
         from lab_system.app.utils.errors import AuthenticationError
-        import pytest
         with pytest.raises(AuthenticationError, match='كلمة المرور الحالية غير صحيحة'):
             change_password(1, 'wrong_password', 'NewPass456!')
 
@@ -99,9 +103,10 @@ class TestAuthServiceAdvanced:
         check_permission({'role': 'Admin'}, 'dashboard.view')
 
     def test_check_permission_invalid(self):
+        import pytest
+
         from lab_system.app.auth.permissions import check_permission
         from lab_system.app.utils.errors import AuthorizationError
-        import pytest
         with pytest.raises(AuthorizationError):
             check_permission({'role': 'User'}, 'users.create')
 
@@ -110,9 +115,10 @@ class TestAuthServiceAdvanced:
         require_permission('Admin', 'receipts.delete')
 
     def test_require_permission_invalid(self):
+        import pytest
+
         from lab_system.app.auth.permissions import require_permission
         from lab_system.app.utils.errors import AuthorizationError
-        import pytest
         with pytest.raises(AuthorizationError):
             require_permission('User', 'receipts.delete')
 
@@ -143,17 +149,19 @@ class TestAuthServiceAdvanced:
         assert auth._last_activity >= old
 
     def test_check_session_no_user(self):
+        import pytest
+
         from lab_system.app.services.auth_service import AuthService
         from lab_system.app.utils.errors import AuthenticationError
-        import pytest
         auth = AuthService()
         with pytest.raises(AuthenticationError):
             auth.check_session()
 
     def test_check_session_timeout(self):
+        import pytest
+
         from lab_system.app.services.auth_service import AuthService
         from lab_system.app.utils.errors import SessionExpiredError
-        import pytest
         auth = AuthService()
         auth.login('admin', 'Admin@123')
         auth._last_activity = auth._last_activity.replace(year=2000)
@@ -166,26 +174,29 @@ class TestAuthServiceAdvanced:
         assert auth.needs_password_change() is False
 
     def test_change_password_no_user(self):
+        import pytest
+
         from lab_system.app.services.auth_service import AuthService
         from lab_system.app.utils.errors import AuthenticationError
-        import pytest
         auth = AuthService()
         with pytest.raises(AuthenticationError):
             auth.change_password('old', 'new')
 
     def test_auth_login_failure(self):
+        import pytest
+
         from lab_system.app.services.auth_service import AuthService
         from lab_system.app.utils.errors import AuthenticationError
-        import pytest
         auth = AuthService()
         with pytest.raises(AuthenticationError):
             auth.login('admin', 'wrong_password')
 
     def test_auth_lockout(self):
+        import pytest
+
+        from lab_system.app.database import db as _db
         from lab_system.app.services.auth_service import AuthService
         from lab_system.app.utils.errors import AuthenticationError
-        from lab_system.app.database import db as _db
-        import pytest
         auth = AuthService()
         for _ in range(5):
             try:
@@ -203,7 +214,13 @@ class TestAuthServiceAdvanced:
         assert result is False
 
     def test_disable_and_reset_user(self):
-        from lab_system.app.services.user_service import disable_user, reset_password, authenticate, list_users, create_user
+        from lab_system.app.services.user_service import (
+            authenticate,
+            create_user,
+            disable_user,
+            list_users,
+            reset_password,
+        )
         create_user('Temp', 'temp', 'Temp@123', 'User', 1)
         reset_password(1, 'NewPass789!')
         user = authenticate('admin', 'NewPass789!')
@@ -245,7 +262,10 @@ class TestSeedDefaultUsers:
         _db_mod.get_conn = test_conn
 
     def test_seed_users_creates_admin(self):
-        from lab_system.app.services.user_service import seed_default_users, authenticate
+        from lab_system.app.services.user_service import (
+            authenticate,
+            seed_default_users,
+        )
         result = seed_default_users()
         assert result is True
         user = authenticate('admin', 'Admin@123')

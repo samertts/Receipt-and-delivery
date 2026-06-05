@@ -1,6 +1,8 @@
-from datetime import datetime
 import platform
+from datetime import datetime
+
 from lab_system.app.database import db as _db
+
 
 def log_action(user_id, action, details=''):
     with _db.get_conn() as conn:

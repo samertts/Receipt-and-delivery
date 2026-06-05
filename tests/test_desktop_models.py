@@ -4,9 +4,9 @@ Tests for the desktop app services and database operations.
 Uses an in-memory SQLite database for testing.
 """
 
-import sys
 import os
 import sqlite3
+import sys
 from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -64,12 +64,13 @@ class TestReceiptService:
 
     def test_create_receipt_validation(self):
         # Verify the function exists and validates bad item totals
-        from lab_system.app.services.receipt_service import create_receipt
         import pytest
+
+        from lab_system.app.services.receipt_service import create_receipt
         bad = [
             {"sample_type_id": 1, "total_count": 10, "valid_count": 8,
              "damaged_count": 1, "rejected_count": 0, "non_conforming_count": 0,
-             "transport_condition": "Good", "notes": ""}
+             "transport_condition": "Good", "notes": ""},
         ]
         with pytest.raises(ValueError, match="Invalid item totals"):
             create_receipt({}, bad, 1)
@@ -77,7 +78,10 @@ class TestReceiptService:
 
 class TestOrganizationService:
     def test_upsert_organization(self):
-        from lab_system.app.services.org_service import list_organizations, upsert_organization
+        from lab_system.app.services.org_service import (
+            list_organizations,
+            upsert_organization,
+        )
         # Test won't fully execute due to DB dependency
         # but we can verify the functions exist
         assert callable(list_organizations)

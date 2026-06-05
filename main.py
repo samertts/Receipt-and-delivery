@@ -6,8 +6,8 @@ Entry point for the desktop application (PySide6).
 For the web API backend, run: uvicorn app.main:app --reload
 """
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 

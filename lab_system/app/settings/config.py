@@ -1,6 +1,7 @@
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 from pathlib import Path
+
 from lab_system.app.utils.constants import APP_NAME
 
 

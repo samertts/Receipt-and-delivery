@@ -10,13 +10,14 @@ resolution stubs ready for future implementation.
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
 from lab_system.app.database import db as _db
 from lab_system.app.sync.api_client import APIClient, SyncPayload
-from lab_system.app.sync.device import get_device_id, get_branch_id
+from lab_system.app.sync.device import get_branch_id, get_device_id
 
 
 def _utcnow() -> str:
@@ -128,7 +129,7 @@ class SyncService:
             rows = conn.execute(
                 f"""SELECT status, COUNT(*) as cnt
                     FROM {SYNC_QUEUE_TABLE}
-                    GROUP BY status"""
+                    GROUP BY status""",
             ).fetchall()
         stats: dict[str, int] = {}
         for r in rows:
@@ -137,9 +138,9 @@ class SyncService:
 
     def resolve_conflict(
         self,
-        entry: SyncQueueEntry,
+        _entry: SyncQueueEntry,
         remote_data: dict[str, Any],
-        local_data: dict[str, Any],
+        _local_data: dict[str, Any],
     ) -> ConflictResolution:
         """
         Conflict resolution stub.

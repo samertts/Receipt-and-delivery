@@ -22,7 +22,7 @@ class AuthService(BaseService):
         failures = get_recent_failures(username, int(lockout_minutes))
         if failures >= int(max_attempts):
             raise AuthenticationError(
-                f'تم تجاوز عدد محاولات الدخول المسموح بها. حاول بعد {lockout_minutes} دقائق'
+                f'تم تجاوز عدد محاولات الدخول المسموح بها. حاول بعد {lockout_minutes} دقائق',
             )
         user = authenticate(username, password)
         if not user:
@@ -66,7 +66,9 @@ class AuthService(BaseService):
         return needs_password_change(self._session_user)
 
     def change_password(self, old_password: str, new_password: str) -> None:
-        from lab_system.app.services.user_service import change_password as _change_password
+        from lab_system.app.services.user_service import (
+            change_password as _change_password,
+        )
         if not self._session_user:
             raise AuthenticationError('الرجاء تسجيل الدخول أولاً')
         _change_password(self._session_user['id'], old_password, new_password)

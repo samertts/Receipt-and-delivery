@@ -14,10 +14,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from lab_system.app.auth.permissions import check_permission
 from lab_system.app.audit.logger import log_action
 from lab_system.app.services.catalog_service import list_transaction_types
 from lab_system.app.services.receipt_service import (
-    delete_receipt,
+    hard_delete_receipt,
     list_receipts,
     set_receipt_status,
 )
@@ -104,7 +105,7 @@ class ReceiptsPage(QWidget):
                 "الحالة",
                 "المرسل",
                 "إجراءات",
-            ]
+            ],
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -184,14 +185,14 @@ class ReceiptsPage(QWidget):
             view_btn = QPushButton("عرض")
             view_btn.setStyleSheet("font-size:10pt;padding:4px;")
             view_btn.clicked.connect(
-                lambda checked, rid=r["id"]: self._view_receipt(rid)
+                lambda _checked, rid=r["id"]: self._view_receipt(rid),
             )
             actions_layout.addWidget(view_btn)
 
             edit_btn = QPushButton("تعديل")
             edit_btn.setStyleSheet("font-size:10pt;padding:4px;")
             edit_btn.clicked.connect(
-                lambda checked, rid=r["id"]: self._edit_receipt(rid)
+                lambda _checked, rid=r["id"]: self._edit_receipt(rid),
             )
             actions_layout.addWidget(edit_btn)
 
@@ -199,9 +200,9 @@ class ReceiptsPage(QWidget):
                 approve_btn = QPushButton("اعتماد")
                 approve_btn.setStyleSheet("font-size:10pt;padding:4px;")
                 approve_btn.clicked.connect(
-                    lambda checked, rid=r["id"]: self._change_status(
-                        rid, "Approved"
-                    )
+                    lambda _checked, rid=r["id"]: self._change_status(
+                        rid, "Approved",
+                    ),
                 )
                 actions_layout.addWidget(approve_btn)
 
@@ -209,45 +210,46 @@ class ReceiptsPage(QWidget):
                 archive_btn = QPushButton("أرشفة")
                 archive_btn.setStyleSheet("font-size:10pt;padding:4px;")
                 archive_btn.clicked.connect(
-                    lambda checked, rid=r["id"]: self._change_status(
-                        rid, "Archived"
-                    )
+                    lambda _checked, rid=r["id"]: self._change_status(
+                        rid, "Archived",
+                    ),
                 )
                 actions_layout.addWidget(archive_btn)
 
                 cancel_btn = QPushButton("إلغاء")
                 cancel_btn.setStyleSheet(
-                    "font-size:10pt;padding:4px;color:#DC2626;"
+                    "font-size:10pt;padding:4px;color:#DC2626;",
                 )
                 cancel_btn.clicked.connect(
-                    lambda checked, rid=r["id"]: self._change_status(
-                        rid, "Cancelled"
-                    )
+                    lambda _checked, rid=r["id"]: self._change_status(
+                        rid, "Cancelled",
+                    ),
                 )
                 actions_layout.addWidget(cancel_btn)
 
             if r["status"] == "Archived":
                 del_btn = QPushButton("حذف")
                 del_btn.setStyleSheet(
-                    "font-size:10pt;padding:4px;color:#DC2626;"
+                    "font-size:10pt;padding:4px;color:#DC2626;",
                 )
                 del_btn.clicked.connect(
-                    lambda checked, rid=r["id"]: self._delete_receipt(rid)
+                    lambda _checked, rid=r["id"]: self._delete_receipt(rid),
                 )
                 actions_layout.addWidget(del_btn)
 
             self.table.setCellWidget(i, 7, actions_widget)
 
         total_pages = max(
-            1, (self.total_count + PAGE_SIZE - 1) // PAGE_SIZE
+            1, (self.total_count + PAGE_SIZE - 1) // PAGE_SIZE,
         )
         self.page_label.setText(
-            f"الصفحة {self.current_page} من {total_pages} ({self.total_count})"
+            f"الصفحة {self.current_page} من {total_pages} ({self.total_count})",
         )
         self.prev_btn.setEnabled(self.current_page > 1)
         self.next_btn.setEnabled(self.current_page * PAGE_SIZE < self.total_count)
 
     def _new_receipt(self):
+        check_permission(self.current_user, 'receipts.create')
         dlg = ReceiptDialog(self.current_user)
         if dlg.exec():
             log_action(
@@ -262,6 +264,7 @@ class ReceiptsPage(QWidget):
         dlg.exec()
 
     def _edit_receipt(self, receipt_id):
+        check_permission(self.current_user, 'receipts.update')
         dlg = ReceiptDialog(self.current_user, receipt_id=receipt_id)
         if dlg.exec():
             log_action(
@@ -272,6 +275,7 @@ class ReceiptsPage(QWidget):
             self._load()
 
     def _change_status(self, receipt_id, new_status):
+        check_permission(self.current_user, f'receipts.{new_status.lower()}')
         status_ar = STATUS_STYLES.get(new_status, ("", new_status))[1]
         reply = QMessageBox.question(
             self,
@@ -289,6 +293,7 @@ class ReceiptsPage(QWidget):
             self._load()
 
     def _delete_receipt(self, receipt_id):
+        check_permission(self.current_user, 'receipts.delete')
         reply = QMessageBox.question(
             self,
             "تأكيد الحذف",
@@ -296,7 +301,7 @@ class ReceiptsPage(QWidget):
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
-            delete_receipt(receipt_id)
+            hard_delete_receipt(receipt_id)
             log_action(
                 self.current_user["id"],
                 "receipt_deleted",

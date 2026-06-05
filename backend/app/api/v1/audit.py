@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_permission
+from app.api.deps import require_permission
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
 from app.models.user import User

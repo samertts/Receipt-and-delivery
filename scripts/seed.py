@@ -90,10 +90,9 @@ def seed_admin(db):
 
 def seed_desktop():
     """Seed the desktop app SQLite database."""
-    from lab_system.app.database.db import get_conn
+    from lab_system.app.services.catalog_service import seed_defaults
     from lab_system.app.services.seed_service import seed_organizations as seed_orgs
     from lab_system.app.services.user_service import seed_default_users
-    from lab_system.app.services.catalog_service import seed_defaults
 
     seed_default_users()
     seed_orgs()

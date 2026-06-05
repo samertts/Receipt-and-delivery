@@ -3,9 +3,11 @@ import re
 import shutil
 from datetime import datetime
 from pathlib import Path
+
 from PIL import Image
-from lab_system.app.settings.config import STORAGE_DIR
+
 from lab_system.app.database import db as _db
+from lab_system.app.settings.config import STORAGE_DIR
 
 ALLOWED_EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png'}
 

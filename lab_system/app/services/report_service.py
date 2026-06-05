@@ -33,7 +33,7 @@ def receipt_summary(date_from="", date_to="", group_by="day"):
             params,
         ).fetchall()
         total = conn.execute(
-            f"SELECT COUNT(*) c FROM receipts r WHERE {clauses}", params
+            f"SELECT COUNT(*) c FROM receipts r WHERE {clauses}", params,
         ).fetchone()["c"]
     return {
         "total": total,
@@ -156,7 +156,7 @@ def sample_summary(date_from="", date_to=""):
 def export_receipts_csv(file_path, q="", status="", date_from="", date_to=""):
     from lab_system.app.services.receipt_service import list_receipts
     rows, _ = list_receipts(
-        q=q, status=status, date_from=date_from, date_to=date_to, page=1, page_size=999999
+        q=q, status=status, date_from=date_from, date_to=date_to, page=1, page_size=999999,
     )
     path = Path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -178,7 +178,7 @@ def export_receipts_csv(file_path, q="", status="", date_from="", date_to=""):
 
 def export_xlsx(file_path, data_rows, headers):
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment
+    from openpyxl.styles import Alignment, Font
 
     wb = Workbook()
     ws = wb.active
@@ -201,10 +201,16 @@ def export_xlsx(file_path, data_rows, headers):
 
 
 def export_pdf(file_path, title, headers, data_rows):
-    from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.platypus import (
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
 
     path = Path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)

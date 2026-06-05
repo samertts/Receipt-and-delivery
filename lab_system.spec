@@ -54,7 +54,11 @@ a = Analysis(
         'lab_system.app.utils.constants',
         'lab_system.app.utils.errors',
         'lab_system.app.utils.logging',
-        'lab_system.app.utils.permissions',
+        'lab_system.app.utils.validators',
+        'lab_system.app.auth.permissions',
+        'lab_system.app.auth.security',
+        'lab_system.app.database.connection',
+        'lab_system.app.services.base_service',
         'sqlite3',
         'bcrypt',
         'reportlab',
@@ -108,13 +112,4 @@ exe = EXE(
     icon='assets/icons/app.ico',
 )
 
-# Also build a one-folder variant for debugging
-COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='LabReceiptSystem',
-)
+

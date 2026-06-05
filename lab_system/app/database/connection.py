@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+
 from lab_system.app.database import db as _db
 
 

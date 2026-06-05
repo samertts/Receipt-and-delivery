@@ -1,13 +1,17 @@
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_permission
+from app.api.deps import require_permission
 from app.core.audit import log_audit
 from app.core.exceptions import ConflictError, NotFoundError
 from app.db.session import get_db
 from app.models.organization import Organization
 from app.models.user import User
-from app.schemas.transaction import OrganizationCreate, OrganizationResponse, OrganizationUpdate
+from app.schemas.transaction import (
+    OrganizationCreate,
+    OrganizationResponse,
+    OrganizationUpdate,
+)
 
 router = APIRouter(prefix="/organizations", tags=["المؤسسات"])
 
@@ -16,7 +20,7 @@ router = APIRouter(prefix="/organizations", tags=["المؤسسات"])
 def list_organizations(
     page: int = Query(1, ge=1),
     limit: int = Query(20, le=100),
-    active_only: bool = Query(False),
+    _active_only: bool = Query(False),
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("view_organizations")),
 ):
@@ -86,7 +90,7 @@ def update_organization(
         org.name = payload.name
     if payload.code is not None:
         existing = db.query(Organization).filter(
-            Organization.code == payload.code, Organization.id != org_id
+            Organization.code == payload.code, Organization.id != org_id,
         ).first()
         if existing:
             raise ConflictError(f"رمز المؤسسة {payload.code} موجود مسبقاً")

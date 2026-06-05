@@ -4,13 +4,13 @@ Comprehensive tests for desktop app services.
 Uses a temporary SQLite file for isolated testing (fixes :memory: isolation issue).
 """
 
-import sys
 import os
-import sqlite3
-import tempfile
 import shutil
-from pathlib import Path
+import sqlite3
+import sys
+import tempfile
 from contextlib import contextmanager
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -102,7 +102,11 @@ class TestReceiptServiceFull:
         assert len(items) == 2
 
     def test_3_update_receipt(self):
-        from lab_system.app.services.receipt_service import create_receipt, get_receipt, update_receipt
+        from lab_system.app.services.receipt_service import (
+            create_receipt,
+            get_receipt,
+            update_receipt,
+        )
         rid, _ = create_receipt(self._data(), [self._item()], 1)
         d = self._data({"status": "Approved", "additional_comments": "OK"})
         items = [self._item({"valid_count": 96, "damaged_count": 2})]
@@ -112,14 +116,22 @@ class TestReceiptServiceFull:
         assert ri[0]["valid_count"] == 96
 
     def test_4_status_transitions(self):
-        from lab_system.app.services.receipt_service import create_receipt, get_receipt, set_receipt_status
+        from lab_system.app.services.receipt_service import (
+            create_receipt,
+            get_receipt,
+            set_receipt_status,
+        )
         rid, _ = create_receipt(self._data(), [self._item()], 1)
         for st in ["Approved", "Rejected", "Archived"]:
             set_receipt_status(rid, st)
             assert get_receipt(rid)[0]["status"] == st
 
     def test_5_list_receipts(self):
-        from lab_system.app.services.receipt_service import create_receipt, list_receipts, set_receipt_status
+        from lab_system.app.services.receipt_service import (
+            create_receipt,
+            list_receipts,
+            set_receipt_status,
+        )
         r1, _ = create_receipt(self._data(), [self._item()], 1)
         r2, _ = create_receipt(self._data(), [self._item()], 1)
         set_receipt_status(r2, "Approved")
@@ -131,7 +143,10 @@ class TestReceiptServiceFull:
         assert total >= 1
 
     def test_6_search_receipts(self):
-        from lab_system.app.services.receipt_service import create_receipt, search_receipts
+        from lab_system.app.services.receipt_service import (
+            create_receipt,
+            search_receipts,
+        )
         create_receipt(self._data(), [self._item()], 1)
         r = search_receipts(q="Org A")
         assert len(r) >= 1
@@ -139,14 +154,19 @@ class TestReceiptServiceFull:
         assert len(r) == 0
 
     def test_7_delete_receipt(self):
-        from lab_system.app.services.receipt_service import create_receipt, get_receipt, hard_delete_receipt
+        from lab_system.app.services.receipt_service import (
+            create_receipt,
+            get_receipt,
+            hard_delete_receipt,
+        )
         rid, _ = create_receipt(self._data(), [self._item()], 1)
         hard_delete_receipt(rid)
         assert get_receipt(rid)[0] is None
 
     def test_8_validation(self):
-        from lab_system.app.services.receipt_service import create_receipt
         import pytest
+
+        from lab_system.app.services.receipt_service import create_receipt
         bad = [{"sample_type_id": 1, "total_count": 100, "valid_count": 50,
                 "damaged_count": 10, "rejected_count": 5, "non_conforming_count": 5,
                 "transport_condition": "", "notes": ""}]
@@ -156,7 +176,10 @@ class TestReceiptServiceFull:
 
 class TestOrganizationService:
     def test_list_and_upsert(self):
-        from lab_system.app.services.org_service import list_organizations, upsert_organization
+        from lab_system.app.services.org_service import (
+            list_organizations,
+            upsert_organization,
+        )
         orgs = list_organizations()
         assert len(orgs) >= 2
         upsert_organization({"name": "Org C", "code": "OC-001", "org_type": "Lab",
@@ -212,7 +235,10 @@ class TestSettings:
 
 class TestCatalogService:
     def test_catalog_functions(self):
-        from lab_system.app.services.catalog_service import list_transaction_types, list_sample_types
+        from lab_system.app.services.catalog_service import (
+            list_sample_types,
+            list_transaction_types,
+        )
         tx = list_transaction_types()
         assert len(tx) >= 1
         sm = list_sample_types()
@@ -221,7 +247,7 @@ class TestCatalogService:
 
 class TestUserService:
     def test_list_users(self):
-        from lab_system.app.services.user_service import list_users, create_user
+        from lab_system.app.services.user_service import create_user, list_users
         users = list_users()
         assert len(users) >= 1
         create_user("New User", "newuser", "Pass@123", "User", institution_id=1)
@@ -232,7 +258,12 @@ class TestUserService:
 
 class TestConstants:
     def test_constants(self):
-        from lab_system.app.utils.constants import APP_NAME, ROLES, THEME, DEFAULT_WINDOW_SIZE
+        from lab_system.app.utils.constants import (
+            APP_NAME,
+            DEFAULT_WINDOW_SIZE,
+            ROLES,
+            THEME,
+        )
         assert APP_NAME == "نظام إدارة الاستلام المختبري"
         assert "Admin" in ROLES
         assert "User" in ROLES

@@ -1,9 +1,10 @@
-import sqlite3
+import hashlib
 import shutil
+import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
-import hashlib
 from pathlib import Path
+
 from lab_system.app.settings.config import CONFIG
 
 SCHEMA_VERSION = 8
@@ -227,7 +228,7 @@ def migrate_db(conn: sqlite3.Connection) -> None:
             _record_migration(conn, 'v3_attachments_thumbnail_path', statement)
 
     if current < 4:
-        conn.execute("INSERT OR IGNORE INTO schema_version(id, version, app_version, updated_at) VALUES(1, ?, ?, ?)", (SCHEMA_VERSION, CONFIG.app_version, datetime.now().isoformat(timespec='seconds'),))
+        conn.execute("INSERT OR IGNORE INTO schema_version(id, version, app_version, updated_at) VALUES(1, ?, ?, ?)", (SCHEMA_VERSION, CONFIG.app_version, datetime.now().isoformat(timespec='seconds')))
         _record_migration(conn, 'v4_lifecycle_metadata', 'schema_version + migration_history initialization')
 
     if current < 5:

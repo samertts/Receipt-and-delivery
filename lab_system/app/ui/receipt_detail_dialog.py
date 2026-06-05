@@ -97,10 +97,10 @@ class ReceiptDetailDialog(QDialog):
                 "غير مطابق",
                 "حالة النقل",
                 "ملاحظات",
-            ]
+            ],
         )
         self.items_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.Stretch
+            QHeaderView.Stretch,
         )
         main.addWidget(self.items_table)
 
@@ -111,10 +111,10 @@ class ReceiptDetailDialog(QDialog):
         self.attachments_table = QTableWidget()
         self.attachments_table.setColumnCount(3)
         self.attachments_table.setHorizontalHeaderLabels(
-            ["الملف", "النوع", "فتح"]
+            ["الملف", "النوع", "فتح"],
         )
         self.attachments_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.Stretch
+            QHeaderView.Stretch,
         )
         main.addWidget(self.attachments_table)
 
@@ -143,7 +143,7 @@ class ReceiptDetailDialog(QDialog):
         self.title_label.setText(f"إيصال رقم: {receipt['receipt_no']}")
         self.status_label.setText(f"الحالة: {receipt['status']}")
         self.status_label.setStyleSheet(
-            STATUS_STYLES.get(receipt["status"], "font-weight:bold;")
+            STATUS_STYLES.get(receipt["status"], "font-weight:bold;"),
         )
 
         self.tx_type_label.setText(receipt["tx_type"])
@@ -164,42 +164,42 @@ class ReceiptDetailDialog(QDialog):
         for i, item in enumerate(items):
             id = dict(item)
             self.items_table.setItem(
-                i, 0, QTableWidgetItem(id.get("sample_name", ""))
+                i, 0, QTableWidgetItem(id.get("sample_name", "")),
             )
             self.items_table.setItem(
-                i, 1, QTableWidgetItem(str(id["total_count"]))
+                i, 1, QTableWidgetItem(str(id["total_count"])),
             )
             self.items_table.setItem(
-                i, 2, QTableWidgetItem(str(id["valid_count"]))
+                i, 2, QTableWidgetItem(str(id["valid_count"])),
             )
             self.items_table.setItem(
-                i, 3, QTableWidgetItem(str(id["damaged_count"]))
+                i, 3, QTableWidgetItem(str(id["damaged_count"])),
             )
             self.items_table.setItem(
-                i, 4, QTableWidgetItem(str(id["rejected_count"]))
+                i, 4, QTableWidgetItem(str(id["rejected_count"])),
             )
             self.items_table.setItem(
-                i, 5, QTableWidgetItem(str(id["non_conforming_count"]))
+                i, 5, QTableWidgetItem(str(id["non_conforming_count"])),
             )
             self.items_table.setItem(
-                i, 6, QTableWidgetItem(id.get("transport_condition", ""))
+                i, 6, QTableWidgetItem(id.get("transport_condition", "")),
             )
             self.items_table.setItem(
-                i, 7, QTableWidgetItem(id.get("notes", ""))
+                i, 7, QTableWidgetItem(id.get("notes", "")),
             )
 
         self.attachments_table.setRowCount(len(atts))
         for i, att in enumerate(atts):
             self.attachments_table.setItem(
-                i, 0, QTableWidgetItem(Path(att["file_path"]).name)
+                i, 0, QTableWidgetItem(Path(att["file_path"]).name),
             )
             self.attachments_table.setItem(
-                i, 1, QTableWidgetItem(att["file_type"])
+                i, 1, QTableWidgetItem(att["file_type"]),
             )
             open_btn = QPushButton("فتح")
             file_path = att["file_path"]
             open_btn.clicked.connect(
-                lambda checked, fp=file_path: self._open_file(fp)
+                lambda _checked, fp=file_path: self._open_file(fp),
             )
             self.attachments_table.setCellWidget(i, 2, open_btn)
 

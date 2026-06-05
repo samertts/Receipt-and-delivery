@@ -2,8 +2,8 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime
-from sqlalchemy.types import Uuid
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import Uuid
 
 
 def _utcnow() -> datetime:

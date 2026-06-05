@@ -1,4 +1,7 @@
 
+import shutil
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -12,9 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-import shutil
-from pathlib import Path
-
+from lab_system.app.auth.permissions import check_permission
 from lab_system.app.audit.logger import log_action
 from lab_system.app.database import db as _db
 from lab_system.app.services.backup_service import create_backup
@@ -42,7 +43,7 @@ class BackupPage(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(
-            ["الملف", "التاريخ", "ملاحظات", "إجراءات"]
+            ["الملف", "التاريخ", "ملاحظات", "إجراءات"],
         )
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -55,6 +56,7 @@ class BackupPage(QWidget):
         self.refresh()
 
     def _do_backup(self):
+        check_permission(self.current_user, 'backup.create')
         try:
             path = create_backup(user_id=self.current_user.get("id"))
             log_action(
@@ -66,13 +68,13 @@ class BackupPage(QWidget):
             self.refresh()
         except Exception as e:
             QMessageBox.warning(
-                self, "خطأ", f"فشل إنشاء النسخة الاحتياطية: {e}"
+                self, "خطأ", f"فشل إنشاء النسخة الاحتياطية: {e}",
             )
 
     def refresh(self):
         with _db.get_conn() as conn:
             rows = conn.execute(
-                "SELECT * FROM backups ORDER BY id DESC"
+                "SELECT * FROM backups ORDER BY id DESC",
             ).fetchall()
         self.table.setRowCount(len(rows))
         for i, r in enumerate(rows):
@@ -87,14 +89,14 @@ class BackupPage(QWidget):
             verify_btn = QPushButton("تحقق")
             verify_btn.setStyleSheet("font-size:10pt;padding:4px;")
             verify_btn.clicked.connect(
-                lambda checked, fp=r["backup_file"]: self._verify(fp)
+                lambda _checked, fp=r["backup_file"]: self._verify(fp),
             )
             actions_layout.addWidget(verify_btn)
 
             restore_btn = QPushButton("استعادة")
             restore_btn.setStyleSheet("font-size:10pt;padding:4px;")
             restore_btn.clicked.connect(
-                lambda checked, fp=r["backup_file"]: self._restore(fp)
+                lambda _checked, fp=r["backup_file"]: self._restore(fp),
             )
             actions_layout.addWidget(restore_btn)
 
@@ -104,14 +106,15 @@ class BackupPage(QWidget):
         result = verify_backup(backup_path)
         if result["valid"]:
             QMessageBox.information(
-                self, "تحقق", f"النسخة سليمة ({result['size']} بايت)"
+                self, "تحقق", f"النسخة سليمة ({result['size']} بايت)",
             )
         else:
             QMessageBox.warning(
-                self, "تحقق", f"النسخة تالفة: {result.get('error', 'خطأ غير معروف')}"
+                self, "تحقق", f"النسخة تالفة: {result.get('error', 'خطأ غير معروف')}",
             )
 
     def _restore(self, backup_path):
+        check_permission(self.current_user, 'backup.restore')
         reply = QMessageBox.question(
             self,
             "تأكيد الاستعادة",
@@ -124,6 +127,9 @@ class BackupPage(QWidget):
             src = Path(backup_path)
             if not src.exists():
                 raise FileNotFoundError(f"ملف النسخة غير موجود: {backup_path}")
+            result = verify_backup(backup_path)
+            if not result.get("valid"):
+                raise ValueError(f"النسخة تالفة: {result.get('error', 'خطأ غير معروف')}")
             shutil.copy2(src, DB_PATH)
             log_action(
                 self.current_user["id"],
@@ -131,11 +137,11 @@ class BackupPage(QWidget):
                 f"استعادة من: {backup_path}",
             )
             QMessageBox.information(
-                self, "نجاح", "تمت استعادة قاعدة البيانات. يرجى إعادة تشغيل التطبيق."
+                self, "نجاح", "تمت استعادة قاعدة البيانات. يرجى إعادة تشغيل التطبيق.",
             )
         except Exception as e:
             QMessageBox.warning(
-                self, "خطأ", f"فشلت الاستعادة: {e}"
+                self, "خطأ", f"فشلت الاستعادة: {e}",
             )
 
     def _verify_all(self):

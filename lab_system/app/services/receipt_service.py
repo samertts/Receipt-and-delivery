@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from lab_system.app.audit.logger import log_action
 from lab_system.app.database import db as _db
 
@@ -96,7 +97,7 @@ def get_receipt(receipt_id):
             (receipt_id,),
         ).fetchall()
         atts = conn.execute(
-            "SELECT * FROM attachments WHERE receipt_id=?", (receipt_id,)
+            "SELECT * FROM attachments WHERE receipt_id=?", (receipt_id,),
         ).fetchall()
     return dict(r), [dict(i) for i in items], [dict(a) for a in atts]
 
@@ -200,7 +201,7 @@ def validate_status_transition(from_status, to_status):
     if to_status not in allowed:
         raise ValueError(
             f'Cannot transition from "{from_status}" to "{to_status}". '
-            f'Allowed: {", ".join(allowed) if allowed else "none"}'
+            f'Allowed: {", ".join(allowed) if allowed else "none"}',
         )
 
 
@@ -216,7 +217,7 @@ def _record_receipt_history(conn, receipt_id, field_name, old_value, new_value, 
 def change_receipt_status(receipt_id, new_status, user_id=None):
     with _db.get_conn() as conn:
         row = conn.execute(
-            "SELECT status, receipt_no FROM receipts WHERE id=?", (receipt_id,)
+            "SELECT status, receipt_no FROM receipts WHERE id=?", (receipt_id,),
         ).fetchone()
         if not row:
             raise ValueError(f'Receipt {receipt_id} not found')
@@ -226,7 +227,7 @@ def change_receipt_status(receipt_id, new_status, user_id=None):
         validate_status_transition(old_status, new_status)
         conn.execute("UPDATE receipts SET status=? WHERE id=?", (new_status, receipt_id))
         _record_receipt_history(
-            conn, receipt_id, 'status', old_status, new_status, user_id
+            conn, receipt_id, 'status', old_status, new_status, user_id,
         )
     log_action(user_id, 'status_change',
                f'Receipt {receipt_id}: {old_status} → {new_status}')
@@ -291,7 +292,7 @@ def set_receipt_status(receipt_id, new_status, user_id=None):
     """Direct status update (skips transition validation)."""
     with _db.get_conn() as conn:
         row = conn.execute(
-            "SELECT status FROM receipts WHERE id=?", (receipt_id,)
+            "SELECT status FROM receipts WHERE id=?", (receipt_id,),
         ).fetchone()
         if not row:
             raise ValueError(f'Receipt {receipt_id} not found')
@@ -300,7 +301,7 @@ def set_receipt_status(receipt_id, new_status, user_id=None):
             return
         conn.execute("UPDATE receipts SET status=? WHERE id=?", (new_status, receipt_id))
         _record_receipt_history(
-            conn, receipt_id, 'status', old_status, new_status, user_id
+            conn, receipt_id, 'status', old_status, new_status, user_id,
         )
     log_action(user_id, 'status_change',
                f'Receipt {receipt_id}: {old_status} → {new_status}')
@@ -314,6 +315,7 @@ def list_receipts(
     date_to="",
     page=1,
     page_size=20,
+    *,
     include_deleted=False,
 ):
     off = (page - 1) * page_size
@@ -364,7 +366,7 @@ def list_receipts(
                 JOIN transaction_types t ON t.id=r.tx_type_id
                 WHERE {clauses}
                 ORDER BY r.id DESC LIMIT ? OFFSET ?""",
-            params + [page_size, off],
+            [*params, page_size, off],
         ).fetchall()
     return [dict(r) for r in rows], total
 

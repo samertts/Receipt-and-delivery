@@ -10,6 +10,7 @@ in SyncService.
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -64,7 +65,7 @@ class APIClient:
             return SyncResponse(success=False, message='API client disabled')
         return self._send('GET', '/sync/status', {})
 
-    def _send(self, method: str, path: str, data: Any) -> SyncResponse:
+    def _send(self, _method: str, _path: str, _data: Any) -> SyncResponse:
         """
         Override this method to implement actual HTTP transport.
         Default returns a placeholder indicating the client is not activated.

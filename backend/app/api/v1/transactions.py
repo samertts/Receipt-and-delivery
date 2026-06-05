@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_permission
+from app.api.deps import require_permission
 from app.core.audit import log_audit
 from app.core.exceptions import NotFoundError, ValidationError
 from app.db.session import get_db
@@ -36,7 +36,7 @@ def _validate_item_counts(items: list) -> None:
                 f"مجاميع العينة غير متطابقة في البند {i + 1}: "
                 f"المجموع ({item.total_count}) != "
                 f"صالح ({item.valid_count}) + تالف ({item.damaged_count}) + "
-                f"مرفوض ({item.rejected_count}) + غير مطابق ({item.nonconforming_count})"
+                f"مرفوض ({item.rejected_count}) + غير مطابق ({item.nonconforming_count})",
             )
 
 

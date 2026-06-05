@@ -1,7 +1,7 @@
 from lab_system.app.database import db as _db
 
 
-def list_organizations(active_only=False):
+def list_organizations(*, active_only=False):
     with _db.get_conn() as conn:
         if active_only:
             return conn.execute("SELECT * FROM organizations WHERE status='Active' ORDER BY name").fetchall()

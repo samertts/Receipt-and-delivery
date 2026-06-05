@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from lab_system.app.auth.permissions import check_permission
 from lab_system.app.audit.logger import log_action
 from lab_system.app.services.report_service import (
     export_receipts_csv,
@@ -93,10 +94,10 @@ class ReportsPage(QWidget):
                 "تالف",
                 "مرفوض",
                 "غير مطابق",
-            ]
+            ],
         )
         self.samples_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.Stretch
+            QHeaderView.Stretch,
         )
         self.layout().addWidget(self.samples_table)
 
@@ -122,25 +123,26 @@ class ReportsPage(QWidget):
         self.samples_table.setRowCount(len(samples))
         for i, s in enumerate(samples):
             self.samples_table.setItem(
-                i, 0, QTableWidgetItem(s["sample_name"])
+                i, 0, QTableWidgetItem(s["sample_name"]),
             )
             self.samples_table.setItem(
-                i, 1, QTableWidgetItem(str(s["total"]))
+                i, 1, QTableWidgetItem(str(s["total"])),
             )
             self.samples_table.setItem(
-                i, 2, QTableWidgetItem(str(s["valid"]))
+                i, 2, QTableWidgetItem(str(s["valid"])),
             )
             self.samples_table.setItem(
-                i, 3, QTableWidgetItem(str(s["damaged"]))
+                i, 3, QTableWidgetItem(str(s["damaged"])),
             )
             self.samples_table.setItem(
-                i, 4, QTableWidgetItem(str(s["rejected"]))
+                i, 4, QTableWidgetItem(str(s["rejected"])),
             )
             self.samples_table.setItem(
-                i, 5, QTableWidgetItem(str(s["non_conf"]))
+                i, 5, QTableWidgetItem(str(s["non_conf"])),
             )
 
     def _export_csv(self):
+        check_permission(self.current_user, 'reports.export')
         path, _ = QFileDialog.getSaveFileName(
             self,
             "حفظ التقرير",

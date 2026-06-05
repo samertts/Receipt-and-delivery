@@ -9,20 +9,18 @@ os.environ["LOG_LEVEL"] = "CRITICAL"
 from typing import Generator
 
 import pytest
+from app.db.session import Base, get_db
+from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.db.session import Base
-from app.db.session import get_db
-from app.main import app
-
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False},
 )
 TestingSessionLocal = sessionmaker(
-    bind=engine, autoflush=False, autocommit=False
+    bind=engine, autoflush=False, autocommit=False,
 )
 
 

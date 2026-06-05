@@ -15,8 +15,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from lab_system.app.auth.permissions import check_permission
 from lab_system.app.audit.logger import log_action
-from lab_system.app.database import db as _db
 from lab_system.app.services.org_service import list_organizations, upsert_organization
 
 ORG_TYPES = [
@@ -186,7 +186,7 @@ class OrgPage(QWidget):
                 "الحالة",
                 "ملاحظات",
                 "إجراءات",
-            ]
+            ],
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.layout().addWidget(self.table)
@@ -226,7 +226,7 @@ class OrgPage(QWidget):
             edit_btn = QPushButton("تعديل")
             edit_btn.setStyleSheet("font-size:10pt;padding:4px;")
             edit_btn.clicked.connect(
-                lambda checked, od=dict(o): self._edit(od)
+                lambda _checked, od=dict(o): self._edit(od),
             )
             actions_layout.addWidget(edit_btn)
 
@@ -234,15 +234,16 @@ class OrgPage(QWidget):
             toggle_btn = QPushButton(toggle_label)
             toggle_btn.setStyleSheet("font-size:10pt;padding:4px;")
             toggle_btn.clicked.connect(
-                lambda checked, oid=o["id"], s=o["status"]: self._toggle_status(
-                    oid, s
-                )
+                lambda _checked, oid=o["id"], s=o["status"]: self._toggle_status(
+                    oid, s,
+                ),
             )
             actions_layout.addWidget(toggle_btn)
 
             self.table.setCellWidget(i, 8, actions_widget)
 
     def _add(self):
+        check_permission(self.current_user, 'organizations.create')
         dlg = OrgDialog()
         if dlg.exec():
             log_action(
@@ -253,6 +254,7 @@ class OrgPage(QWidget):
             self._load()
 
     def _edit(self, org_data):
+        check_permission(self.current_user, 'organizations.update')
         dlg = OrgDialog(org_data=org_data)
         if dlg.exec():
             log_action(
@@ -264,11 +266,8 @@ class OrgPage(QWidget):
 
     def _toggle_status(self, org_id, current_status):
         new_status = "Inactive" if current_status == "Active" else "Active"
-        with _db.get_conn() as conn:
-            conn.execute(
-                "UPDATE organizations SET status=? WHERE id=?",
-                (new_status, org_id),
-            )
+        check_permission(self.current_user, 'organizations.update')
+        upsert_organization({"id": org_id, "status": new_status})
         log_action(
             self.current_user["id"],
             "org_status_toggled",

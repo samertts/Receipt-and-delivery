@@ -11,9 +11,9 @@ from datetime import datetime
 from pathlib import Path
 
 from lab_system.app.database import db as _db
+from lab_system.app.database.db import rebuild_fts
 from lab_system.app.settings.config import DB_PATH, STORAGE_DIR
 from lab_system.app.utils.logging import setup_file_logging
-from lab_system.app.database.db import rebuild_fts
 
 logger = setup_file_logging(STORAGE_DIR / "logs", "INFO")
 
@@ -66,7 +66,7 @@ def list_backups() -> list[dict]:
 def _get_backup_record(path: str) -> dict | None:
     with _db.get_conn() as conn:
         row = conn.execute(
-            "SELECT * FROM backups WHERE backup_file = ?", (path,)
+            "SELECT * FROM backups WHERE backup_file = ?", (path,),
         ).fetchone()
     return dict(row) if row else None
 
@@ -187,7 +187,7 @@ def validate_recovery(backup_path: Path | str) -> dict:
     try:
         conn = sqlite3.connect(str(backup_path))
         tables = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '\\_%' ESCAPE '\\'"
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '\\_%' ESCAPE '\\'",
         ).fetchall()
         table_count = len(tables)
         result["checks"].append({"name": "tables", "passed": table_count > 0, "detail": f"{table_count} tables"})

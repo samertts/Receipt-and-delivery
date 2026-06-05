@@ -1,10 +1,11 @@
-import sys
 import os
-import sqlite3
-import tempfile
 import shutil
-from pathlib import Path
+import sqlite3
+import sys
+import tempfile
 from contextlib import contextmanager
+from pathlib import Path
+
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -81,7 +82,7 @@ class TestSyncQueue:
             svc.enqueue('receipts', 1, 'invalid_action', '')
 
     def test_get_pending_returns_queued(self):
-        from lab_system.app.sync.service import SyncService, SYNC_STATUS_PENDING
+        from lab_system.app.sync.service import SYNC_STATUS_PENDING, SyncService
         svc = SyncService()
         svc.enqueue('receipts', 1, 'create', '{}')
         svc.enqueue('receipts', 2, 'update', '{}')
@@ -123,7 +124,11 @@ class TestSyncQueue:
         assert cleared == 0
 
     def test_get_stats(self):
-        from lab_system.app.sync.service import SyncService, SYNC_STATUS_SYNCED, SYNC_STATUS_PENDING
+        from lab_system.app.sync.service import (
+            SYNC_STATUS_PENDING,
+            SYNC_STATUS_SYNCED,
+            SyncService,
+        )
         svc = SyncService()
         eid = svc.enqueue('receipts', 1, 'create', '{}')
         svc.enqueue('organizations', 2, 'update', '{}')
@@ -148,7 +153,7 @@ class TestSyncQueue:
         assert result.get('synced', 0) == 0
 
     def test_push_entity_pending(self):
-        from lab_system.app.sync.service import SyncService, SYNC_STATUS_PENDING
+        from lab_system.app.sync.service import SYNC_STATUS_PENDING, SyncService
         svc = SyncService()
         result = svc.push_entity('receipts', 1, 'create', '{"x": 1}')
         assert result['entry_id'] > 0
@@ -177,7 +182,7 @@ class TestDevice:
         assert did1 == did2
 
     def test_set_branch_id(self):
-        from lab_system.app.sync.device import set_branch_id, get_branch_id
+        from lab_system.app.sync.device import get_branch_id, set_branch_id
         set_branch_id('BAGHDAD-LAB-01')
         assert get_branch_id() == 'BAGHDAD-LAB-01'
 
@@ -224,7 +229,7 @@ class TestAPIClient:
 
 class TestConflictResolution:
     def test_server_wins_default(self):
-        from lab_system.app.sync.service import SyncService, SyncQueueEntry
+        from lab_system.app.sync.service import SyncQueueEntry, SyncService
         svc = SyncService()
         entry = SyncQueueEntry(id=1, entity_type='receipts', entity_id=1, action='update')
         remote = {'name': 'server-data'}
