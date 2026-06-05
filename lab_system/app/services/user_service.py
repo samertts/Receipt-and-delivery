@@ -20,7 +20,7 @@ def seed_default_users():
             now = datetime.now().isoformat(timespec='seconds')
             admin_password = _generate_admin_password()
             conn.execute('INSERT INTO users(full_name,username,password_hash,role,status,password_changed_at) VALUES(?,?,?,?,?,?)',
-                         ('System Admin', 'admin', hash_password(admin_password), 'Admin', 'Active', ''))
+                         ('System Admin', 'admin', hash_password(admin_password), 'Admin', 'Active', now))
             created = True
     if created:
         from lab_system.app.audit.logger import log_action

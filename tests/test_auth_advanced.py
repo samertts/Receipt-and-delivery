@@ -263,11 +263,14 @@ class TestSeedDefaultUsers:
 
     def test_seed_users_creates_admin(self):
         from lab_system.app.services.user_service import (
-            authenticate,
             seed_default_users,
         )
+        from lab_system.app.database import db as _db
         result = seed_default_users()
         assert result is True
-        user = authenticate('admin', 'Admin@123')
-        assert user is not None
-        assert user['role'] == 'Admin'
+        with _db.get_conn() as conn:
+            row = conn.execute("SELECT * FROM users WHERE username='admin'").fetchone()
+            assert row is not None
+            assert row['role'] == 'Admin'
+            assert row['status'] == 'Active'
+            assert row['password_changed_at'] != ''
