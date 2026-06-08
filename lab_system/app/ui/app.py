@@ -103,6 +103,7 @@ class LoginWindow(QDialog):
         self.password.setEchoMode(QLineEdit.Password)
         submit = QPushButton("دخول")
         submit.setDefault(True)
+        submit.setToolTip("دخول (Enter)")
         submit.clicked.connect(self._login)
         self.password.returnPressed.connect(self._login)
         self.username.returnPressed.connect(lambda: self.password.setFocus())

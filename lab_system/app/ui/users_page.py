@@ -1,3 +1,4 @@
+from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
@@ -160,7 +161,11 @@ class UsersPage(QWidget):
             self.table.setItem(
                 i, 3, QTableWidgetItem(ud.get("institution_name") or "-"),
             )
-            self.table.setItem(i, 4, QTableWidgetItem(STATUS_MAP.get(ud["status"], ud["status"])))
+            status_item = QTableWidgetItem(STATUS_MAP.get(ud["status"], ud["status"]))
+            status_color = QColor("#059669" if ud["status"] == "Active" else "#6B7280")
+            status_item.setForeground(status_color)
+            status_item.setBackground(QColor(status_color.red(), status_color.green(), status_color.blue(), 30))
+            self.table.setItem(i, 4, status_item)
 
             actions_widget = QWidget()
             actions_layout = QHBoxLayout(actions_widget)

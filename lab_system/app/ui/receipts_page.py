@@ -1,3 +1,4 @@
+from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
@@ -53,7 +54,7 @@ class ReceiptsPage(QWidget):
         header = PageHeader("إدارة الإيصالات", "عرض وإضافة وتعديل إيصالات الاستلام والتسليم")
         self.layout().addWidget(header)
 
-        header.add_action("إيصال جديد", self._new_receipt)
+        header.add_action("إيصال جديد", self._new_receipt, tooltip="إيصال جديد (Ctrl+N)")
 
         filter_row = QHBoxLayout()
         filter_row.setSpacing(8)
@@ -174,10 +175,11 @@ class ReceiptsPage(QWidget):
             self.table.setItem(i, 3, QTableWidgetItem(rd["receiver_org"] or ""))
             self.table.setItem(i, 4, QTableWidgetItem(rd["created_at"] or ""))
             status_code = rd["status"]
-            _, status_ar = STATUS_STYLES.get(status_code, ("", status_code))
+            status_color, status_ar = STATUS_STYLES.get(status_code, ("#6B7280", status_code))
             item = QTableWidgetItem(status_ar)
-            color, _ = STATUS_STYLES.get(status_code, ("#000", ""))
-            item.setForeground(Qt.GlobalColor(color) if color.startswith("#") else None)
+            sc = QColor(status_color)
+            item.setForeground(sc)
+            item.setBackground(QColor(sc.red(), sc.green(), sc.blue(), 30))
             self.table.setItem(i, 5, item)
             self.table.setItem(i, 6, QTableWidgetItem(rd.get("sender_name", "")))
 

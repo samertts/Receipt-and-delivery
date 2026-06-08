@@ -1,3 +1,4 @@
+from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
@@ -292,7 +293,11 @@ class OrgPage(QWidget):
             self.table.setItem(i, 3, QTableWidgetItem(ar_gov))
             self.table.setItem(i, 4, QTableWidgetItem(od.get("phone", "")))
             self.table.setItem(i, 5, QTableWidgetItem(od.get("email", "")))
-            self.table.setItem(i, 6, QTableWidgetItem(ar_status))
+            status_item = QTableWidgetItem(ar_status)
+            status_color = QColor("#059669" if eng_status == "Active" else "#6B7280")
+            status_item.setForeground(status_color)
+            status_item.setBackground(QColor(status_color.red(), status_color.green(), status_color.blue(), 30))
+            self.table.setItem(i, 6, status_item)
             self.table.setItem(i, 7, QTableWidgetItem(od.get("notes", "")))
 
             actions_widget = QWidget()

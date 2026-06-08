@@ -21,7 +21,7 @@ class AuditPage(QWidget):
         header = PageHeader("سجل التدقيق", "جميع عمليات النظام المسجلة")
         self.layout().addWidget(header)
 
-        refresh_btn = header.add_action("تحديث", self.refresh, variant="secondary")
+        refresh_btn = header.add_action("تحديث", self.refresh, variant="secondary", tooltip="تحديث (F5)")
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)

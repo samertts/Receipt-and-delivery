@@ -39,8 +39,10 @@ class PageHeader(QWidget):
 
         layout.addLayout(top)
 
-    def add_action(self, text, callback=None, icon=None, variant="primary"):
+    def add_action(self, text, callback=None, icon=None, variant="primary", tooltip=None):
         btn = QPushButton(text)
+        if tooltip:
+            btn.setToolTip(tooltip)
         if variant == "secondary":
             btn.setStyleSheet("""
                 QPushButton {
@@ -66,7 +68,8 @@ class PageHeader(QWidget):
 
     def add_search(self, placeholder="بحث..."):
         search = QLineEdit()
-        search.setPlaceholderText(placeholder)
+        search.setPlaceholderText(f"🔍 {placeholder}")
+        search.setToolTip("بحث (Ctrl+F)")
         search.setStyleSheet("""
             QLineEdit {
                 background: #F8FAFC; border: 1px solid #CBD5E1;
