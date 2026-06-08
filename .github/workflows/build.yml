@@ -170,8 +170,8 @@ jobs:
         shell: cmd
         run: |
           for /f %%i in (VERSION) do set APP_VER=%%i
-          powershell -Command "(Get-Content installer/setup.iss) -replace '#define MyAppVersion \"1.0.0\"', ('#define MyAppVersion \"' + $env:APP_VER + '\"') | Set-Content installer/setup.iss"
-          ISCC installer/setup.iss
+          powershell -Command "(Get-Content lab_system/installer/LabReceipt.iss) -replace 'AppVersion=1.0.0', ('AppVersion=' + $env:APP_VER) | Set-Content lab_system/installer/LabReceipt.iss"
+          ISCC lab_system/installer/LabReceipt.iss
 
       - name: Upload EXE
         uses: actions/upload-artifact@v4

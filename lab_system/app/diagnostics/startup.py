@@ -16,6 +16,9 @@ logger = setup_file_logging(STORAGE_DIR / "logs", "INFO")
 EXPECTED_INDEXES = {
     "idx_receipts_no", "idx_receipts_created", "idx_org_code",
     "idx_items_sample", "idx_users_username",
+    "idx_receipts_deleted", "idx_receipts_status_created",
+    "idx_sync_status", "idx_sync_entity",
+    "idx_login_attempts_user",
 }
 
 

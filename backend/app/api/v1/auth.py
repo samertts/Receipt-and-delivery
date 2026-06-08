@@ -29,6 +29,16 @@ def login(
         )
         raise UnauthorizedError("اسم المستخدم أو كلمة المرور غير صحيحة")
 
+    if user.status != "active":
+        log_audit(
+            user_id=str(user.id),
+            action_type="login_blocked",
+            request=request,
+            details=f"محاولة دخول من حساب غير نشط: {user.username}",
+            db=db,
+        )
+        raise UnauthorizedError("الحساب غير نشط")
+
     token = create_access_token(sub=user.username, role=user.role)
     log_audit(
         user_id=str(user.id),

@@ -39,7 +39,7 @@ PERMISSION_ROLES = {
 def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
-) -> Optional[User]:
+) -> User:
     if token is None:
         raise UnauthorizedError("لم يتم تسجيل الدخول")
     try:
@@ -55,6 +55,8 @@ def get_current_user(
     user = db.query(User).filter(User.username == username).first()
     if not user:
         raise UnauthorizedError("المستخدم غير موجود")
+    if user.status != "active":
+        raise ForbiddenError("الحساب غير نشط")
     return user
 
 
@@ -62,7 +64,7 @@ def require_permission(permission: str):
     def permission_checker(current_user: User = Depends(get_current_user)) -> User:
         allowed_roles = PERMISSION_ROLES.get(permission, [])
         if current_user.role not in allowed_roles:
-            raise ForbiddenError
+            raise ForbiddenError()
         return current_user
 
     return permission_checker

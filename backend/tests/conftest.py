@@ -9,6 +9,7 @@ os.environ["LOG_LEVEL"] = "CRITICAL"
 from typing import Generator
 
 import pytest
+from app.db import base  # noqa: F401 - register models with Base before metadata operations
 from app.db.session import Base, get_db
 from app.main import app
 from fastapi.testclient import TestClient

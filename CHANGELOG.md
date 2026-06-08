@@ -1,5 +1,27 @@
 # Changelog - نظام إدارة الاستلام المختبري
 
+## [1.1.0] - 2026-06-08
+
+### Fixed
+- FTS triggers: no-op on DELETE for SQLite<3.9 content-sync compatibility
+- FTS search: handle hyphens in search terms (prevent FTS syntax errors)
+- Hard delete: cascade to receipt_history before deleting receipt
+- Soft delete: preserve FTS entry so search still works after soft delete
+- Restore: rely on AFTER UPDATE trigger to rebuild FTS (remove manual INSERT)
+- Backup: use sqlite3.Connection.backup() with WAL checkpoint for consistent copies
+- Recovery: fix unclosed connection and unguarded wal_checkpoint
+- Attachments: SHA-256 duplicate detection prevents double-storing identical files
+- Startup diagnostics: check all 10 production indexes (was 5)
+- CI build: fix installer path (installer/setup.iss → lab_system/installer/LabReceipt.iss)
+- Auth: block inactive users at login and on protected endpoints
+- Permissions: fix ForbiddenError instantiation (was raising class instead of instance)
+- Remove unused ROLE_HIERARCHY from deps
+- Model registration: import app.db.base in test conftest to register all models with SQLAlchemy Base
+
+### Changed
+- Backend app_version now reads from VERSION file (single source of truth)
+- All version references synchronized to 1.1.0
+
 ## [1.0.0] - 2026-05-27
 
 ### Added
