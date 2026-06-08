@@ -88,6 +88,29 @@ class DashboardPage(QWidget):
 
         self._build_health_status()
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        grid = None
+        for i in range(self.layout().count()):
+            item = self.layout().itemAt(i)
+            if item and isinstance(item, QGridLayout):
+                grid = item
+                break
+        if grid:
+            cols = max(2, min(4, event.size().width() // 280))
+            current_cols = grid.columnCount()
+            if current_cols != cols:
+                widgets = []
+                for r in range(grid.rowCount()):
+                    for c in range(grid.columnCount()):
+                        w = grid.itemAtPosition(r, c)
+                        if w and w.widget():
+                            widgets.append(w.widget())
+                for i, w in enumerate(widgets):
+                    grid.addWidget(w, i // cols, i % cols)
+                for c in range(cols):
+                    grid.setColumnStretch(c, 1)
+
     def _build_stats_grid(self):
         today = datetime.now().strftime("%Y-%m-%d")
         week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -127,9 +150,12 @@ class DashboardPage(QWidget):
             ("المستخدمون", user_count, "#DC2626", "👥"),
         ]
 
+        cols = 4
         for i, (label, value, color, icon) in enumerate(cards):
             card = StatCard(label, value, color, icon)
-            grid.addWidget(card, i // 4, i % 4)
+            grid.addWidget(card, i // cols, i % cols)
+        for c in range(cols):
+            grid.setColumnStretch(c, 1)
 
         self.layout().addLayout(grid)
 

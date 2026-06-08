@@ -23,6 +23,7 @@ from lab_system.app.services.user_service import (
     list_users,
     reset_password,
 )
+from lab_system.app.ui.notifications import toast
 from lab_system.app.utils.validators import validate_password, validate_username
 
 ROLE_MAP = {
@@ -137,7 +138,7 @@ class UsersPage(QWidget):
                 "user_created",
                 f"إنشاء مستخدم: {username}",
             )
-            QMessageBox.information(self, "نجاح", f"تم إنشاء المستخدم {username}")
+            toast(self, f"تم إنشاء المستخدم {username}", "success")
             self.refresh()
         except Exception as e:
             QMessageBox.warning(self, "خطأ", str(e))
@@ -235,4 +236,4 @@ class UsersPage(QWidget):
                 "password_reset",
                 f"إعادة تعيين كلمة المرور للمستخدم: {user_id}",
             )
-            QMessageBox.information(self, "نجاح", "تم إعادة تعيين كلمة المرور")
+            toast(self, "تم إعادة تعيين كلمة المرور", "success")

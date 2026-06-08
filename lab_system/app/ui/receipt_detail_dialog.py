@@ -31,6 +31,7 @@ def _open_file_safe(path):
     except Exception:
         pass
 from lab_system.app.services.receipt_service import get_receipt
+from lab_system.app.ui.notifications import toast
 
 STATUS_TRANSLATION = {
     "Draft": "مسودة",
@@ -271,7 +272,7 @@ class ReceiptDetailDialog(QDialog):
                 "attachment_added",
                 f"إرفاق ملف: {Path(path).name}",
             )
-            QMessageBox.information(self, "نجاح", "تم إرفاق الملف")
+            toast(self, "تم إرفاق الملف", "success")
             self._load()
         except Exception as e:
             QMessageBox.warning(self, "خطأ", f"فشل الإرفاق: {e}")

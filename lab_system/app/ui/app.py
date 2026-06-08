@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -31,6 +32,7 @@ from lab_system.app.services.user_service import seed_default_users
 from lab_system.app.ui.audit_page import AuditPage
 from lab_system.app.ui.backup_page import BackupPage
 from lab_system.app.ui.dashboard_page import DashboardPage
+from lab_system.app.ui.notifications import toast
 from lab_system.app.ui.org_page import OrgPage
 from lab_system.app.ui.receipts_page import ReceiptsPage
 from lab_system.app.ui.reports_page import ReportsPage
@@ -74,7 +76,7 @@ class ChangePasswordDialog(QDialog):
             return
         try:
             self.auth.change_password(self.old_password.text(), self.new_password.text())
-            QMessageBox.information(self, "نجاح", "تم تغيير كلمة المرور بنجاح")
+            toast(self, "تم تغيير كلمة المرور بنجاح", "success")
             self.accept()
         except AuthenticationError as e:
             QMessageBox.warning(self, "خطأ", str(e))
@@ -137,6 +139,7 @@ class MainWindow(QMainWindow):
         self.auth = auth_service or AuthService()
         self.setWindowTitle(APP_NAME)
         self.resize(*DEFAULT_WINDOW_SIZE)
+        self.setMinimumSize(1024, 600)
         self.setLayoutDirection(Qt.RightToLeft)
 
         root = QWidget()
@@ -166,14 +169,20 @@ class MainWindow(QMainWindow):
             if key in page_map:
                 self.pages.addWidget(page_map[key])
 
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+
         panel = QFrame()
         panel.setObjectName("ContentPanel")
         panel_layout = QVBoxLayout(panel)
         panel_layout.setContentsMargins(24, 24, 24, 24)
         panel_layout.addWidget(self.pages)
+        scroll_area.setWidget(panel)
 
         shell.addWidget(self.sidebar)
-        shell.addWidget(panel, 1)
+        shell.addWidget(scroll_area, 1)
         self.setCentralWidget(root)
 
         if self.page_keys:

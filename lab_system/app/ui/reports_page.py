@@ -27,6 +27,7 @@ from lab_system.app.services.report_service import (
     receipt_summary,
     sample_summary,
 )
+from lab_system.app.ui.notifications import toast
 from lab_system.app.ui.page_header import PageHeader
 
 
@@ -188,6 +189,6 @@ class ReportsPage(QWidget):
                 "report_exported",
                 f"تصدير تقرير: {Path(path).name}",
             )
-            QMessageBox.information(self, "نجاح", f"تم تصدير التقرير إلى {path}")
+            toast(self, f"تم تصدير التقرير إلى {path}", "success")
         except Exception as e:
             QMessageBox.warning(self, "خطأ", f"فشل التصدير: {e}")

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 from lab_system.app.auth.permissions import check_permission
 from lab_system.app.audit.logger import log_action
 from lab_system.app.database.db import DEFAULT_SETTINGS, get_conn
+from lab_system.app.ui.notifications import toast
 from lab_system.app.ui.page_header import PageHeader
 
 
@@ -64,4 +65,4 @@ class SettingsPage(QWidget):
             for key, inp in self.fields.items():
                 conn.execute("INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)", (key, inp.text()))
         log_action(self.current_user["id"], "settings_updated", "تحديث إعدادات النظام")
-        QMessageBox.information(self, "نجاح", "تم حفظ الإعدادات")
+        toast(self, "تم حفظ الإعدادات", "success")
