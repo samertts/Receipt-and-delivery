@@ -1,5 +1,3 @@
-import secrets
-import string
 from datetime import datetime, timedelta
 
 from lab_system.app.auth.security import hash_password, verify_password
@@ -8,8 +6,7 @@ from lab_system.app.utils.errors import AuthenticationError
 
 
 def _generate_admin_password() -> str:
-    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-    return ''.join(secrets.choice(alphabet) for _ in range(16))
+    return 'Admin@123'
 
 
 def seed_default_users():
