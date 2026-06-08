@@ -113,7 +113,7 @@ def icon_chevron_left(color=MUTED):
         p.setBrush(Qt.NoBrush)
         p.drawLine(s*3//4, s//4, s//4, s//2)
         p.drawLine(s//4, s//2, s*3//4, s*3//4)
-    return _paint_icon(draw, size=s, color=color)
+    return _paint_icon(draw, color=color)
 
 
 def icon_chevron_right(color=MUTED):
@@ -121,7 +121,7 @@ def icon_chevron_right(color=MUTED):
         p.setBrush(Qt.NoBrush)
         p.drawLine(s//4, s//4, s*3//4, s//2)
         p.drawLine(s*3//4, s//2, s//4, s*3//4)
-    return _paint_icon(draw, size=s, color=color)
+    return _paint_icon(draw, color=color)
 
 
 def icon_search(color=MUTED):

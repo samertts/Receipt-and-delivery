@@ -1,7 +1,6 @@
-from PySide6.QtCore import QPropertyAnimation, QPoint, Qt, QTimer
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QWidget
+from PySide6.QtCore import QPropertyAnimation, Qt, QTimer
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
 
-from lab_system.app.utils.constants import THEME
 
 TOAST_DURATION = 3500
 

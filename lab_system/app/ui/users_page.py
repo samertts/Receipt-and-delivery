@@ -5,7 +5,6 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -25,6 +24,7 @@ from lab_system.app.services.user_service import (
     reset_password,
 )
 from lab_system.app.ui.notifications import toast
+from lab_system.app.ui.page_header import PageHeader
 from lab_system.app.utils.validators import validate_password, validate_username
 
 ROLE_MAP = {

@@ -133,7 +133,6 @@ class ReportsPage(QWidget):
         samples = sample_summary(date_from=df, date_to=dt)
         status_filter = self.filter_status_reports.currentData()
         if status_filter:
-            total = sum(summary["by_status"].values())
             filtered_total = summary["by_status"].get(status_filter, 0)
             summary = {
                 "total": filtered_total,

@@ -23,7 +23,6 @@ from lab_system.app.services.receipt_service import (
     list_receipts,
     set_receipt_status,
 )
-from lab_system.app.ui.notifications import toast
 from lab_system.app.ui.page_header import PageHeader
 from lab_system.app.ui.receipt_detail_dialog import ReceiptDetailDialog
 from lab_system.app.ui.receipt_dialog import ReceiptDialog

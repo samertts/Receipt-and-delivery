@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
 from lab_system.app.attachments.manager import save_attachment
 from lab_system.app.audit.logger import log_action
 from lab_system.app.printing.receipt_pdf import generate_receipt_pdf
+from lab_system.app.services.receipt_service import get_receipt
+from lab_system.app.ui.notifications import toast
 
 
 def _open_file_safe(path):
@@ -30,8 +32,6 @@ def _open_file_safe(path):
             subprocess.Popen(["xdg-open", str(path)])
     except Exception:
         pass
-from lab_system.app.services.receipt_service import get_receipt
-from lab_system.app.ui.notifications import toast
 
 STATUS_TRANSLATION = {
     "Draft": "مسودة",

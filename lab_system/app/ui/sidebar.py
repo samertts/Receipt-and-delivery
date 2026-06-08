@@ -1,10 +1,7 @@
-from PySide6.QtCore import QPropertyAnimation, QRect, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPen
+from PySide6.QtCore import QPropertyAnimation, Qt, Signal
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
     QScrollArea,
     QSizePolicy,
     QVBoxLayout,
@@ -14,8 +11,6 @@ from PySide6.QtWidgets import (
 from lab_system.app.ui.icons import (
     icon_audit,
     icon_backup,
-    icon_chevron_left,
-    icon_chevron_right,
     icon_dashboard,
     icon_organizations,
     icon_receipts,
@@ -308,11 +303,11 @@ class ModernSidebar(QWidget):
         scroll.setWidget(content)
         layout.addWidget(scroll)
 
-        self.setStyleSheet(f"""
-            #ModernSidebar {{
+        self.setStyleSheet("""
+            #ModernSidebar {
                 background-color: #1E293B;
                 border-right: 1px solid #334155;
-            }}
+            }
         """)
 
     def _on_item_clicked(self, key):
