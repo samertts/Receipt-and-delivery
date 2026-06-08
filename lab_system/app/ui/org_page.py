@@ -18,36 +18,75 @@ from PySide6.QtWidgets import (
 from lab_system.app.auth.permissions import check_permission
 from lab_system.app.audit.logger import log_action
 from lab_system.app.services.org_service import list_organizations, upsert_organization
+from lab_system.app.ui.page_header import PageHeader
 
 ORG_TYPES = [
-    "Public Health Laboratory",
-    "Hospital",
-    "Primary Health Care Center",
-    "Blood Bank",
-    "Research Center",
-    "Pharmacy",
-    "Other",
+    "مختبر صحة عامة",
+    "مستشفى",
+    "مركز رعاية صحية أولية",
+    "بنك دم",
+    "مركز أبحاث",
+    "صيدلية",
+    "أخرى",
 ]
+
+ORG_TYPE_MAP = {
+    "مختبر صحة عامة": "Public Health Laboratory",
+    "مستشفى": "Hospital",
+    "مركز رعاية صحية أولية": "Primary Health Care Center",
+    "بنك دم": "Blood Bank",
+    "مركز أبحاث": "Research Center",
+    "صيدلية": "Pharmacy",
+    "أخرى": "Other",
+}
+
+STATUS_MAP = {
+    "Active": "نشط",
+    "Inactive": "غير نشط",
+    "Archived": "مؤرشف",
+}
+
 GOVERNORATES = [
-    "Baghdad",
-    "Basra",
-    "Nineveh",
-    "Erbil",
-    "Sulaymaniyah",
-    "Kirkuk",
-    "Duhok",
-    "Najaf",
-    "Karbala",
-    "Babil",
-    "Diyala",
-    "Anbar",
-    "Wasit",
-    "Maysan",
-    "Dhi Qar",
-    "Muthanna",
-    "Qadisiyyah",
-    "Halabja",
+    "بغداد",
+    "البصرة",
+    "نينوى",
+    "أربيل",
+    "السليمانية",
+    "كركوك",
+    "دهوك",
+    "النجف",
+    "كربلاء",
+    "بابل",
+    "ديالى",
+    "الأنبار",
+    "واسط",
+    "ميسان",
+    "ذي قار",
+    "المثنى",
+    "القادسية",
+    "حلبجة",
 ]
+
+GOV_MAP = {
+    "بغداد": "Baghdad",
+    "البصرة": "Basra",
+    "نينوى": "Nineveh",
+    "أربيل": "Erbil",
+    "السليمانية": "Sulaymaniyah",
+    "كركوك": "Kirkuk",
+    "دهوك": "Duhok",
+    "النجف": "Najaf",
+    "كربلاء": "Karbala",
+    "بابل": "Babil",
+    "ديالى": "Diyala",
+    "الأنبار": "Anbar",
+    "واسط": "Wasit",
+    "ميسان": "Maysan",
+    "ذي قار": "Dhi Qar",
+    "المثنى": "Muthanna",
+    "القادسية": "Qadisiyyah",
+    "حلبجة": "Halabja",
+}
 
 
 class OrgDialog(QDialog):
@@ -67,7 +106,7 @@ class OrgDialog(QDialog):
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("اسم الجهة")
         self.code_input = QLineEdit()
-        self.code_input.setPlaceholderText("رمز الجهة (مثل IQH-001)")
+        self.code_input.setPlaceholderText("رمز الجهة (مثل مخ-001)")
         self.type_combo = QComboBox()
         self.type_combo.addItems(ORG_TYPES)
         self.gov_combo = QComboBox()
@@ -81,7 +120,7 @@ class OrgDialog(QDialog):
         self.notes_input = QLineEdit()
         self.notes_input.setPlaceholderText("ملاحظات")
         self.status_combo = QComboBox()
-        self.status_combo.addItems(["Active", "Inactive", "Archived"])
+        self.status_combo.addItems(["نشط", "غير نشط", "مؤرشف"])
 
         form.addRow("الاسم:", self.name_input)
         form.addRow("الرمز:", self.code_input)
@@ -106,17 +145,23 @@ class OrgDialog(QDialog):
         d = self.org_data
         self.name_input.setText(d.get("name", ""))
         self.code_input.setText(d.get("code", ""))
-        idx = self.type_combo.findText(d.get("org_type", ""))
+        eng_type = d.get("org_type", "")
+        ar_type = next((k for k, v in ORG_TYPE_MAP.items() if v == eng_type), "")
+        idx = self.type_combo.findText(ar_type or eng_type)
         if idx >= 0:
             self.type_combo.setCurrentIndex(idx)
-        idx = self.gov_combo.findText(d.get("governorate", ""))
+        eng_gov = d.get("governorate", "")
+        ar_gov = next((k for k, v in GOV_MAP.items() if v == eng_gov), "")
+        idx = self.gov_combo.findText(ar_gov or eng_gov)
         if idx >= 0:
             self.gov_combo.setCurrentIndex(idx)
         self.address_input.setText(d.get("address", ""))
         self.phone_input.setText(d.get("phone", ""))
         self.email_input.setText(d.get("email", ""))
         self.notes_input.setText(d.get("notes", ""))
-        idx = self.status_combo.findText(d.get("status", "Active"))
+        eng_status = d.get("status", "Active")
+        ar_status = STATUS_MAP.get(eng_status, eng_status)
+        idx = self.status_combo.findText(ar_status)
         if idx >= 0:
             self.status_combo.setCurrentIndex(idx)
 
@@ -131,13 +176,13 @@ class OrgDialog(QDialog):
             "id": self.org_data["id"] if self.editing else None,
             "name": self.name_input.text().strip(),
             "code": self.code_input.text().strip(),
-            "org_type": self.type_combo.currentText(),
-            "governorate": self.gov_combo.currentText(),
+            "org_type": ORG_TYPE_MAP.get(self.type_combo.currentText(), self.type_combo.currentText()),
+            "governorate": GOV_MAP.get(self.gov_combo.currentText(), self.gov_combo.currentText()),
             "address": self.address_input.text().strip(),
             "phone": self.phone_input.text().strip(),
             "email": self.email_input.text().strip(),
             "notes": self.notes_input.text().strip(),
-            "status": self.status_combo.currentText(),
+            "status": next((k for k, v in STATUS_MAP.items() if v == self.status_combo.currentText()), self.status_combo.currentText()),
             "logo_path": "",
         }
         try:
@@ -157,21 +202,35 @@ class OrgPage(QWidget):
         self._load()
 
     def _build_ui(self):
-        title = QLabel("إدارة الجهات والمؤسسات")
-        title.setStyleSheet("font-size:16px;font-weight:700;margin-bottom:10px;")
-        self.layout().addWidget(title)
+        header = PageHeader("إدارة الجهات والمؤسسات", "إضافة وتعديل وإدارة المؤسسات والجهات")
+        self.layout().addWidget(header)
 
-        toolbar = QHBoxLayout()
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("بحث باسم الجهة أو الرمز...")
+        self.search_input = header.add_search("بحث باسم الجهة أو الرمز...")
         self.search_input.textChanged.connect(self._load)
-        toolbar.addWidget(self.search_input)
 
-        add_btn = QPushButton("إضافة جهة")
-        add_btn.clicked.connect(self._add)
-        toolbar.addWidget(add_btn)
+        header.add_action("إضافة جهة", self._add)
 
-        self.layout().addLayout(toolbar)
+        from lab_system.app.ui.org_page import ORG_TYPES, STATUS_MAP
+        filter_row = QHBoxLayout()
+        filter_row.setSpacing(8)
+
+        self.filter_type = QComboBox()
+        self.filter_type.addItem("جميع الأنواع", "")
+        for t in ORG_TYPES:
+            self.filter_type.addItem(t, t)
+        self.filter_type.currentIndexChanged.connect(self._load)
+        filter_row.addWidget(QLabel("النوع:"))
+        filter_row.addWidget(self.filter_type)
+
+        self.filter_status_org = QComboBox()
+        self.filter_status_org.addItem("جميع الحالات", "")
+        for ar, eng in STATUS_MAP.items():
+            self.filter_status_org.addItem(ar, eng)
+        self.filter_status_org.currentIndexChanged.connect(self._load)
+        filter_row.addWidget(QLabel("الحالة:"))
+        filter_row.addWidget(self.filter_status_org)
+
+        self.layout().addLayout(filter_row)
 
         self.table = QTableWidget()
         self.table.setColumnCount(9)
@@ -189,6 +248,10 @@ class OrgPage(QWidget):
             ],
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setAlternatingRowColors(True)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSortingEnabled(True)
         self.layout().addWidget(self.table)
 
     def _filter_text(self):
@@ -197,6 +260,13 @@ class OrgPage(QWidget):
     def _load(self):
         q = self._filter_text()
         all_orgs = list_organizations()
+        type_filter = self.filter_type.currentData()
+        status_filter = self.filter_status_org.currentData()
+        if type_filter:
+            eng_type = ORG_TYPE_MAP.get(type_filter, type_filter)
+            all_orgs = [o for o in all_orgs if o.get("org_type") == eng_type]
+        if status_filter:
+            all_orgs = [o for o in all_orgs if o.get("status") == status_filter]
         if q:
             ql = q.lower()
             filtered = [
@@ -210,13 +280,19 @@ class OrgPage(QWidget):
         self.table.setRowCount(len(filtered))
         for i, o in enumerate(filtered):
             od = dict(o)
+            eng_type = od.get("org_type", "")
+            ar_type = next((k for k, v in ORG_TYPE_MAP.items() if v == eng_type), eng_type)
+            eng_gov = od.get("governorate", "")
+            ar_gov = next((k for k, v in GOV_MAP.items() if v == eng_gov), eng_gov)
+            eng_status = od.get("status", "")
+            ar_status = STATUS_MAP.get(eng_status, eng_status)
             self.table.setItem(i, 0, QTableWidgetItem(od["name"]))
             self.table.setItem(i, 1, QTableWidgetItem(od["code"]))
-            self.table.setItem(i, 2, QTableWidgetItem(od.get("org_type", "")))
-            self.table.setItem(i, 3, QTableWidgetItem(od.get("governorate", "")))
+            self.table.setItem(i, 2, QTableWidgetItem(ar_type))
+            self.table.setItem(i, 3, QTableWidgetItem(ar_gov))
             self.table.setItem(i, 4, QTableWidgetItem(od.get("phone", "")))
             self.table.setItem(i, 5, QTableWidgetItem(od.get("email", "")))
-            self.table.setItem(i, 6, QTableWidgetItem(od.get("status", "")))
+            self.table.setItem(i, 6, QTableWidgetItem(ar_status))
             self.table.setItem(i, 7, QTableWidgetItem(od.get("notes", "")))
 
             actions_widget = QWidget()

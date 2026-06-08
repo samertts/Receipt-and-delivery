@@ -11,8 +11,10 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QTabWidget,
     QTableWidget,
     QVBoxLayout,
+    QWidget,
 )
 
 from lab_system.app.services.catalog_service import (
@@ -25,8 +27,17 @@ from lab_system.app.services.receipt_service import (
     get_receipt,
     update_receipt,
 )
+from lab_system.app.utils.constants import THEME
 
-RECEIPT_STATUSES = ["Draft", "Approved", "Rejected", "Archived", "Cancelled"]
+RECEIPT_STATUSES = ["مسودة", "معتمد", "مرفوض", "مؤرشف", "ملغي"]
+
+STATUS_MAP = {
+    "مسودة": "Draft",
+    "معتمد": "Approved",
+    "مرفوض": "Rejected",
+    "مؤرشف": "Archived",
+    "ملغي": "Cancelled",
+}
 
 
 class ReceiptDialog(QDialog):
@@ -35,7 +46,7 @@ class ReceiptDialog(QDialog):
         self.current_user = current_user
         self.receipt_id = receipt_id
         self.editing = receipt_id is not None
-        self.setWindowTitle("تعديل الإيصال" if self.editing else "إيصال استلام جديد")
+        self.setWindowTitle("تعديل الاستلام" if self.editing else "استلام جديد")
         self.setMinimumWidth(900)
         self.setMinimumHeight(700)
         self.setLayoutDirection(Qt.RightToLeft)
@@ -47,16 +58,88 @@ class ReceiptDialog(QDialog):
 
     def _build_form(self):
         main = QVBoxLayout(self)
+        main.setContentsMargins(16, 16, 16, 16)
 
-        form = QFormLayout()
+        self.tabs = QTabWidget()
+        self.tabs.setStyleSheet(f"""
+            QTabWidget::pane {{
+                border: 1px solid {THEME['border']};
+                border-radius: 8px;
+                background: {THEME['panel']};
+                padding: 16px;
+            }}
+            QTabBar::tab {{
+                padding: 10px 24px;
+                font-size: 12pt;
+                font-weight: 600;
+                border: none;
+                border-bottom: 3px solid transparent;
+                color: #64748B;
+            }}
+            QTabBar::tab:selected {{
+                color: {THEME['primary']};
+                border-bottom: 3px solid {THEME['primary']};
+            }}
+            QTabBar::tab:hover {{
+                color: {THEME['primary']};
+            }}
+        """)
+        main.addWidget(self.tabs)
+
+        self.tabs.addTab(self._build_info_tab(), "المعلومات الأساسية")
+        self.tabs.addTab(self._build_samples_tab(), "العينات")
+        self.tabs.addTab(self._build_review_tab(), "المراجعة النهائية")
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+        btn_row.addStretch()
+
+        save_btn = QPushButton("حفظ")
+        save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {THEME['primary']}; color: white;
+                border: none; border-radius: 6px;
+                padding: 10px 32px; min-height: 40px;
+                font-size: 13pt; font-weight: 600;
+            }}
+            QPushButton:hover {{ background-color: #0B3D6B; }}
+        """)
+        save_btn.clicked.connect(self._save)
+        btn_row.addWidget(save_btn)
+
+        cancel_btn = QPushButton("إلغاء")
+        cancel_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {THEME['panel']}; color: #334155;
+                border: 1px solid {THEME['border']}; border-radius: 6px;
+                padding: 10px 32px; min-height: 40px; font-size: 13pt;
+            }}
+            QPushButton:hover {{ background-color: #F1F5F9; }}
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        btn_row.addWidget(cancel_btn)
+
+        main.addLayout(btn_row)
+
+    def _build_info_tab(self):
+        tab = QWidget()
+        form = QFormLayout(tab)
+        form.setSpacing(12)
+        form.setContentsMargins(8, 8, 8, 8)
+
         self.tx_type = QComboBox()
         self.sender_org = QComboBox()
         self.receiver_org = QComboBox()
         self.sender_name = QLineEdit()
+        self.sender_name.setPlaceholderText("اسم المرسل *")
         self.receiver_name = QLineEdit()
+        self.receiver_name.setPlaceholderText("اسم المستلم *")
         self.sender_job = QLineEdit()
+        self.sender_job.setPlaceholderText("مسمى وظيفة المرسل")
         self.receiver_job = QLineEdit()
+        self.receiver_job.setPlaceholderText("مسمى وظيفة المستلم")
         self.auth_doc = QLineEdit()
+        self.auth_doc.setPlaceholderText("رقم الوثيقة")
         self.auth_date = QDateEdit()
         self.auth_date.setCalendarPopup(True)
         self.auth_date.setDate(self.auth_date.date().currentDate())
@@ -65,28 +148,22 @@ class ReceiptDialog(QDialog):
         self.status_combo = QComboBox()
         self.status_combo.addItems(RECEIPT_STATUSES)
 
-        self.notes = QLineEdit()
-        self.transport_info = QLineEdit()
-        self.additional_comments = QLineEdit()
-
-        form.addRow("نوع المعاملة:", self.tx_type)
+        form.addRow("نوع المعاملة *:", self.tx_type)
         form.addRow("الجهة المرسلة:", self.sender_org)
         form.addRow("الجهة المستقبلة:", self.receiver_org)
-        form.addRow("اسم المرسل:", self.sender_name)
-        form.addRow("اسم المستلم:", self.receiver_name)
+        form.addRow("اسم المرسل *:", self.sender_name)
+        form.addRow("اسم المستلم *:", self.receiver_name)
         form.addRow("مسمى وظيفة المرسل:", self.sender_job)
         form.addRow("مسمى وظيفة المستلم:", self.receiver_job)
         form.addRow("رقم الوثيقة:", self.auth_doc)
         form.addRow("تاريخ الوثيقة:", self.auth_date)
         form.addRow("الحالة:", self.status_combo)
-        form.addRow("ملاحظات:", self.notes)
-        form.addRow("معلومات النقل:", self.transport_info)
-        form.addRow("تعليقات إضافية:", self.additional_comments)
-        main.addLayout(form)
+        return tab
 
-        items_label = QLabel("العينات:")
-        items_label.setStyleSheet("font-weight:700;margin-top:10px;")
-        main.addWidget(items_label)
+    def _build_samples_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(8, 8, 8, 8)
 
         self.items_table = QTableWidget()
         self.items_table.setColumnCount(9)
@@ -103,25 +180,46 @@ class ReceiptDialog(QDialog):
                 "حذف",
             ],
         )
-        self.items_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.Stretch,
-        )
-        main.addWidget(self.items_table)
+        self.items_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.items_table.setAlternatingRowColors(True)
+        self.items_table.setSortingEnabled(True)
+        self.items_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.items_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        layout.addWidget(self.items_table)
 
-        btn_row = QHBoxLayout()
-        add_item_btn = QPushButton("+ إضافة عينة")
-        add_item_btn.clicked.connect(self._add_item_row)
-        btn_row.addWidget(add_item_btn)
+        add_btn = QPushButton("+ إضافة عينة")
+        add_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {THEME['panel']}; color: {THEME['primary']};
+                border: 2px dashed {THEME['primary']}; border-radius: 8px;
+                padding: 12px; font-size: 12pt; font-weight: 600;
+                min-height: 44px;
+            }}
+            QPushButton:hover {{
+                background: #EFF6FF; border-color: #0B3D6B;
+            }}
+        """)
+        add_btn.clicked.connect(self._add_item_row)
+        layout.addWidget(add_btn)
+        return tab
 
-        save_btn = QPushButton("حفظ")
-        save_btn.clicked.connect(self._save)
-        btn_row.addWidget(save_btn)
+    def _build_review_tab(self):
+        tab = QWidget()
+        form = QFormLayout(tab)
+        form.setSpacing(12)
+        form.setContentsMargins(8, 8, 8, 8)
 
-        cancel_btn = QPushButton("إلغاء")
-        cancel_btn.clicked.connect(self.reject)
-        btn_row.addWidget(cancel_btn)
+        self.notes = QLineEdit()
+        self.notes.setPlaceholderText("ملاحظات عامة")
+        self.transport_info = QLineEdit()
+        self.transport_info.setPlaceholderText("معلومات النقل")
+        self.additional_comments = QLineEdit()
+        self.additional_comments.setPlaceholderText("تعليقات إضافية")
 
-        main.addLayout(btn_row)
+        form.addRow("ملاحظات:", self.notes)
+        form.addRow("معلومات النقل:", self.transport_info)
+        form.addRow("تعليقات إضافية:", self.additional_comments)
+        return tab
 
     def _load_catalogs(self):
         for t in list_transaction_types():
@@ -154,7 +252,9 @@ class ReceiptDialog(QDialog):
             self.auth_date.setDate(
                 datetime.strptime(receipt["auth_date"], "%Y-%m-%d").date(),
             )
-        idx = self.status_combo.findText(receipt["status"])
+        eng_status = receipt["status"]
+        ar_status = next((k for k, v in STATUS_MAP.items() if v == eng_status), eng_status)
+        idx = self.status_combo.findText(ar_status)
         if idx >= 0:
             self.status_combo.setCurrentIndex(idx)
         self.notes.setText(receipt["notes"] or "")
@@ -244,12 +344,15 @@ class ReceiptDialog(QDialog):
     def _save(self):
         if self.items_table.rowCount() == 0:
             QMessageBox.warning(self, "خطأ", "يجب إضافة عينة واحدة على الأقل")
+            self.tabs.setCurrentIndex(1)
             return
         if not self.sender_name.text().strip():
             QMessageBox.warning(self, "خطأ", "يرجى إدخال اسم المرسل")
+            self.tabs.setCurrentIndex(0)
             return
         if not self.receiver_name.text().strip():
             QMessageBox.warning(self, "خطأ", "يرجى إدخال اسم المستلم")
+            self.tabs.setCurrentIndex(0)
             return
 
         data = {
@@ -265,7 +368,7 @@ class ReceiptDialog(QDialog):
             "notes": self.notes.text().strip(),
             "transport_info": self.transport_info.text().strip(),
             "additional_comments": self.additional_comments.text().strip(),
-            "status": self.status_combo.currentText(),
+            "status": STATUS_MAP.get(self.status_combo.currentText(), self.status_combo.currentText()),
         }
         items = self._collect_item_data()
 

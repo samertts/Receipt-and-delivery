@@ -1,7 +1,6 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHeaderView,
-    QLabel,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -9,6 +8,7 @@ from PySide6.QtWidgets import (
 )
 
 from lab_system.app.database import db as _db
+from lab_system.app.ui.page_header import PageHeader
 
 
 class AuditPage(QWidget):
@@ -18,15 +18,20 @@ class AuditPage(QWidget):
         self.setLayout(QVBoxLayout(self))
         self.setLayoutDirection(Qt.RightToLeft)
 
-        title = QLabel("سجل التدقيق")
-        title.setStyleSheet("font-size:16px;font-weight:700;margin-bottom:10px;")
-        self.layout().addWidget(title)
+        header = PageHeader("سجل التدقيق", "جميع عمليات النظام المسجلة")
+        self.layout().addWidget(header)
+
+        refresh_btn = header.add_action("تحديث", self.refresh, variant="secondary")
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["الوقت", "المستخدم", "الإجراء", "الجهاز", "التفاصيل"])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setAlternatingRowColors(True)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSortingEnabled(True)
         self.layout().addWidget(self.table)
 
         self.refresh()

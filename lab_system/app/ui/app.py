@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -7,7 +8,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QListWidget,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -16,9 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from lab_system.app.settings.config import CONFIG
 from lab_system.app.audit.logger import log_action
-from lab_system.app.auth.permissions import check_permission
 from lab_system.app.database.db import init_db
 from lab_system.app.utils.validators import validate_password as _validate_password
 from lab_system.app.diagnostics.startup import (
@@ -32,10 +30,12 @@ from lab_system.app.services.seed_service import seed_organizations
 from lab_system.app.services.user_service import seed_default_users
 from lab_system.app.ui.audit_page import AuditPage
 from lab_system.app.ui.backup_page import BackupPage
+from lab_system.app.ui.dashboard_page import DashboardPage
 from lab_system.app.ui.org_page import OrgPage
 from lab_system.app.ui.receipts_page import ReceiptsPage
 from lab_system.app.ui.reports_page import ReportsPage
 from lab_system.app.ui.settings_page import SettingsPage
+from lab_system.app.ui.sidebar import ModernSidebar
 from lab_system.app.ui.users_page import UsersPage
 from lab_system.app.utils.constants import APP_NAME, DEFAULT_WINDOW_SIZE, THEME
 from lab_system.app.utils.errors import AuthenticationError, SessionExpiredError
@@ -100,12 +100,21 @@ class LoginWindow(QDialog):
         self.password.setPlaceholderText("كلمة المرور")
         self.password.setEchoMode(QLineEdit.Password)
         submit = QPushButton("دخول")
+        submit.setDefault(True)
         submit.clicked.connect(self._login)
+        self.password.returnPressed.connect(self._login)
+        self.username.returnPressed.connect(lambda: self.password.setFocus())
 
         layout.addWidget(title)
         layout.addWidget(self.username)
         layout.addWidget(self.password)
         layout.addWidget(submit)
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            self._login()
+        else:
+            super().keyPressEvent(event)
 
     def _login(self) -> None:
         try:
@@ -121,36 +130,6 @@ class LoginWindow(QDialog):
             QMessageBox.warning(self, "خطأ", f"حدث خطأ غير متوقع: {exc}")
 
 
-class DashboardPage(QWidget):
-    def __init__(self, user, auth_service=None) -> None:
-        super().__init__()
-        self._auth = auth_service
-        layout = QVBoxLayout(self)
-
-        header = QLabel(f"مرحباً {user['full_name']}")
-        header.setStyleSheet("font-size:18px;font-weight:700;")
-        layout.addWidget(header)
-
-        role_ar = {'Admin': 'مدير النظام', 'Supervisor': 'مشرف', 'User': 'مستخدم', 'Auditor': 'مدقق'}
-        layout.addWidget(QLabel(f"الصلاحية: {role_ar.get(user['role'], user['role'])}"))
-        layout.addWidget(QLabel(f"نظام إدارة الاستلام المختبري - الإصدار {CONFIG.app_version}"))
-
-        diag = run_all_checks()
-        status = QLabel()
-        if diag["all_ok"]:
-            status.setText("✓ جميع الأنظمة تعمل بشكل طبيعي")
-            status.setStyleSheet("color: green; font-weight: bold;")
-        else:
-            status.setText("⚠ توجد مشكلات في النظام — راجع سجل التشخيص")
-            status.setStyleSheet("color: orange; font-weight: bold;")
-        layout.addWidget(status)
-
-        if self._auth and self._auth.needs_password_change():
-            warn = QLabel("⚠ يرجى تغيير كلمة المرور الافتراضية")
-            warn.setStyleSheet("color: red; font-weight: bold; font-size: 14px;")
-            layout.addWidget(warn)
-
-
 class MainWindow(QMainWindow):
     def __init__(self, user, auth_service=None) -> None:
         super().__init__()
@@ -162,66 +141,92 @@ class MainWindow(QMainWindow):
 
         root = QWidget()
         shell = QHBoxLayout(root)
+        shell.setContentsMargins(0, 0, 0, 0)
+        shell.setSpacing(0)
 
-        sidebar = QListWidget()
-        sidebar.setFixedWidth(240)
+        self.sidebar = ModernSidebar(user)
+        self.sidebar.page_changed.connect(self._on_page_change)
 
-        PAGE_DEFS = [
-            ("dashboard", "لوحة التحكم", "dashboard.view"),
-            ("receipts", "الإيصالات", "receipts.read"),
-            ("orgs", "الجهات والمؤسسات", "organizations.read"),
-            ("auth", "المستخدمون والصلاحيات", "users.read"),
-            ("reports", "التقارير", "reports.read"),
-            ("settings", "الإعدادات", "settings.read"),
-            ("audit", "سجل التدقيق", "audit.read"),
-            ("backup", "النسخ الاحتياطي", "backup.create"),
-        ]
-
-        self.page_keys = []
-        self.sidebar_page_indices = {}
-        sidebar_idx = 0
-        for key, label, perm in PAGE_DEFS:
-            try:
-                check_permission(user, perm)
-                sidebar.addItem(label)
-                self.page_keys.append(key)
-                self.sidebar_page_indices[key] = sidebar_idx
-                sidebar_idx += 1
-            except Exception:
-                pass
-
-        self.pages = QStackedWidget()
         page_map = {
-            "dashboard": DashboardPage(user, auth_service),
+            "dashboard": DashboardPage(user, auth_service=auth_service),
             "receipts": ReceiptsPage(user),
             "orgs": OrgPage(user),
-            "auth": UsersPage(user),
+            "samples": ReceiptsPage(user),
+            "users": UsersPage(user),
             "reports": ReportsPage(user),
-            "settings": SettingsPage(user),
+            "statistics": ReportsPage(user),
             "audit": AuditPage(user),
             "backup": BackupPage(user),
+            "settings": SettingsPage(user),
         }
-        for key in self.page_keys:
-            self.pages.addWidget(page_map[key])
 
-        sidebar.currentRowChanged.connect(self._on_page_change)
-        if self.page_keys:
-            sidebar.setCurrentRow(0)
+        self.pages = QStackedWidget()
+        self.page_keys = self.sidebar.items
+        for key in self.page_keys:
+            if key in page_map:
+                self.pages.addWidget(page_map[key])
 
         panel = QFrame()
+        panel.setObjectName("ContentPanel")
         panel_layout = QVBoxLayout(panel)
+        panel_layout.setContentsMargins(24, 24, 24, 24)
         panel_layout.addWidget(self.pages)
 
-        shell.addWidget(panel)
-        shell.addWidget(sidebar)
+        shell.addWidget(self.sidebar)
+        shell.addWidget(panel, 1)
         self.setCentralWidget(root)
+
+        if self.page_keys:
+            self.sidebar.set_active(self.page_keys[0])
+            self.pages.setCurrentIndex(0)
 
         self._session_timer = QTimer()
         self._session_timer.timeout.connect(self._check_session)
         self._session_timer.start(SESSION_CHECK_INTERVAL)
 
-    def _on_page_change(self, index):
-        self.pages.setCurrentIndex(index)
+        self._setup_shortcuts()
+
+    def _setup_shortcuts(self):
+        refresh_action = QAction("تحديث", self)
+        refresh_action.setShortcut(QKeySequence.Refresh)
+        refresh_action.triggered.connect(self._refresh_current)
+        self.addAction(refresh_action)
+
+        search_action = QAction("بحث", self)
+        search_action.setShortcut(QKeySequence.Find)
+        search_action.triggered.connect(self._focus_search)
+        self.addAction(search_action)
+
+        new_action = QAction("جديد", self)
+        new_action.setShortcut(QKeySequence.New)
+        new_action.triggered.connect(self._new_item)
+        self.addAction(new_action)
+
+    def _refresh_current(self):
+        page = self.pages.currentWidget()
+        if hasattr(page, "refresh"):
+            page.refresh()
+        elif hasattr(page, "_load"):
+            page._load()
+
+    def _focus_search(self):
+        page = self.pages.currentWidget()
+        for attr in ("search_input", "search"):
+            inp = getattr(page, attr, None)
+            if inp:
+                inp.setFocus()
+                break
+
+    def _new_item(self):
+        page = self.pages.currentWidget()
+        if hasattr(page, "_new_receipt"):
+            page._new_receipt()
+        elif hasattr(page, "_add"):
+            page._add()
+
+    def _on_page_change(self, key):
+        idx = self.page_keys.index(key) if key in self.page_keys else 0
+        self.pages.setCurrentIndex(idx)
         if self.auth:
             self.auth.touch_activity()
 
@@ -236,13 +241,44 @@ class MainWindow(QMainWindow):
 
 
 APP_STYLESHEET = f"""
-QMainWindow, QWidget {{ background-color: {THEME['bg']}; color: {THEME['text']}; font-size: 13pt; }}
-QPushButton {{ background-color: {THEME['primary']}; color: white; border: none; padding: 8px; min-height: 34px; }}
-QPushButton:hover {{ background-color: #1a3d6e; }}
-QLineEdit {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; min-height: 34px; padding: 4px; }}
-QListWidget {{ background: {THEME['panel']}; border: 1px solid #D1D5DB; }}
-QTableWidget {{ background: {THEME['panel']}; border: 1px solid #D1D5DB; }}
-QHeaderView::section {{ background-color: {THEME['panel']}; padding: 8px; border: 1px solid #D1D5DB; }}
+QMainWindow, QWidget {{ background-color: {THEME['bg']}; color: {THEME['text']}; font-size: 13pt; font-family: 'Segoe UI', 'Tahoma', sans-serif; }}
+QMainWindow::separator {{ background: {THEME['border']}; width: 1px; }}
+
+QPushButton {{ background-color: {THEME['primary']}; color: white; border: none; border-radius: 6px; padding: 8px 20px; min-height: 38px; font-size: 12pt; font-weight: 600; }}
+QPushButton:hover {{ background-color: #0B3D6B; }}
+QPushButton:pressed {{ background-color: #092D4F; }}
+QPushButton:disabled {{ background-color: #CBD5E1; color: #94A3B8; }}
+
+QLineEdit {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; font-size: 12pt; }}
+QLineEdit:focus {{ border: 2px solid {THEME['primary']}; background: #FFFFFF; }}
+QLineEdit:disabled {{ background: #F1F5F9; color: #94A3B8; }}
+
+QComboBox {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; font-size: 12pt; }}
+QComboBox:focus {{ border: 2px solid {THEME['primary']}; }}
+QComboBox::drop-down {{ border: none; width: 30px; }}
+QComboBox::down-arrow {{ image: none; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #64748B; margin-right: 8px; }}
+
+QTableWidget {{ background: {THEME['panel']}; border: 1px solid {THEME['border']}; border-radius: 8px; gridline-color: #F1F5F9; font-size: 11pt; alternate-background-color: {THEME['table_alt']}; }}
+QTableWidget::item {{ padding: 10px 8px; border-bottom: 1px solid #F1F5F9; }}
+QTableWidget::item:selected {{ background: #DBEAFE; color: #1E40AF; font-weight: 600; }}
+QTableWidget::item:hover {{ background: #F1F5F9; }}
+QTableWidget::item:selected:hover {{ background: #BFDBFE; }}
+QHeaderView::section {{ background-color: {THEME['header_bg']}; padding: 12px 8px; border: none; border-bottom: 2px solid {THEME['border']}; font-size: 10pt; font-weight: bold; color: #475569; }}
+
+QScrollArea {{ border: none; background: transparent; }}
+QScrollBar:vertical {{ background: #F1F5F9; width: 8px; border-radius: 4px; }}
+QScrollBar::handle:vertical {{ background: #CBD5E1; border-radius: 4px; min-height: 30px; }}
+QScrollBar::handle:vertical:hover {{ background: #94A3B8; }}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+
+QDateEdit {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; }}
+QDateEdit:focus {{ border: 2px solid {THEME['primary']}; }}
+
+QGroupBox {{ font-weight: bold; border: 1px solid {THEME['border']}; border-radius: 8px; margin-top: 12px; padding-top: 16px; }}
+QGroupBox::title {{ subcontrol-origin: margin; left: 12px; padding: 0 6px; }}
+
+#ContentPanel {{ background: {THEME['bg']}; border: none; }}
+#StatCard {{ background: {THEME['panel']}; border: 1px solid {THEME['border']}; border-radius: 12px; padding: 16px; }}
 """
 
 

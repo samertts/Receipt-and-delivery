@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 from lab_system.app.auth.permissions import check_permission
 from lab_system.app.audit.logger import log_action
 from lab_system.app.database.db import DEFAULT_SETTINGS, get_conn
+from lab_system.app.ui.page_header import PageHeader
 
 
 class SettingsPage(QWidget):
@@ -21,9 +22,10 @@ class SettingsPage(QWidget):
         self.setLayout(QVBoxLayout(self))
         self.setLayoutDirection(Qt.RightToLeft)
 
-        title = QLabel("إعدادات النظام")
-        title.setStyleSheet("font-size:16px;font-weight:700;margin-bottom:10px;")
-        self.layout().addWidget(title)
+        header = PageHeader("إعدادات النظام", "تخصيص إعدادات التطبيق")
+        self.layout().addWidget(header)
+
+        header.add_action("حفظ الإعدادات", self._save)
 
         self.fields = {}
         form = QFormLayout()
@@ -34,10 +36,6 @@ class SettingsPage(QWidget):
             form.addRow(self._label_for(key), inp)
         self.layout().addLayout(form)
 
-        save_btn = QPushButton("حفظ الإعدادات")
-        save_btn.clicked.connect(self._save)
-        self.layout().addWidget(save_btn)
-
     def _label_for(self, key: str) -> str:
         labels = {
             "receipt.numbering_prefix": "بادئة الترقيم",
@@ -47,6 +45,11 @@ class SettingsPage(QWidget):
             "printer.mode": "وضع الطباعة",
             "backup.auto_enabled": "نسخ احتياطي تلقائي",
             "backup.path": "مسار النسخ الاحتياطي",
+            "backup.retention_max": "الحد الأقصى للنسخ",
+            "session.timeout_minutes": "مهلة الجلسة (دقيقة)",
+            "security.max_login_attempts": "محاولات تسجيل الدخول القصوى",
+            "security.login_lockout_minutes": "مدة القفل (دقيقة)",
+            "security.force_password_change_days": "إجبار تغيير كلمة المرور (يوم)",
         }
         return labels.get(key, key)
 
