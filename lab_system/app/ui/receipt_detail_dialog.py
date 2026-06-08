@@ -31,6 +31,15 @@ def _open_file_safe(path):
     except Exception:
         pass
 from lab_system.app.services.receipt_service import get_receipt
+from lab_system.app.ui.notifications import toast
+
+STATUS_TRANSLATION = {
+    "Draft": "مسودة",
+    "Approved": "معتمد",
+    "Rejected": "مرفوض",
+    "Archived": "مؤرشف",
+    "Cancelled": "ملغي",
+}
 
 STATUS_STYLES = {
     "Draft": "color:#6B7280;font-weight:bold;",
@@ -114,6 +123,10 @@ class ReceiptDetailDialog(QDialog):
         self.items_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.Stretch,
         )
+        self.items_table.setAlternatingRowColors(True)
+        self.items_table.setSortingEnabled(True)
+        self.items_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.items_table.setEditTriggers(QTableWidget.NoEditTriggers)
         main.addWidget(self.items_table)
 
         atts_title = QLabel("المرفقات:")
@@ -128,10 +141,14 @@ class ReceiptDetailDialog(QDialog):
         self.attachments_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.Stretch,
         )
+        self.attachments_table.setAlternatingRowColors(True)
+        self.attachments_table.setSortingEnabled(True)
+        self.attachments_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.attachments_table.setEditTriggers(QTableWidget.NoEditTriggers)
         main.addWidget(self.attachments_table)
 
         btn_row = QHBoxLayout()
-        print_btn = QPushButton("طباعة PDF")
+        print_btn = QPushButton("طباعة")
         print_btn.clicked.connect(self._print_pdf)
         btn_row.addWidget(print_btn)
 
@@ -153,7 +170,8 @@ class ReceiptDetailDialog(QDialog):
             return
 
         self.title_label.setText(f"إيصال رقم: {receipt['receipt_no']}")
-        self.status_label.setText(f"الحالة: {receipt['status']}")
+        ar_status = STATUS_TRANSLATION.get(receipt["status"], receipt["status"])
+        self.status_label.setText(f"الحالة: {ar_status}")
         self.status_label.setStyleSheet(
             STATUS_STYLES.get(receipt["status"], "font-weight:bold;"),
         )
@@ -243,7 +261,7 @@ class ReceiptDetailDialog(QDialog):
             self,
             "اختر ملفاً",
             "",
-            "PDF (*.pdf);;Images (*.jpg *.jpeg *.png);;All (*)",
+            "بي دي إف (*.pdf);;صور (*.jpg *.jpeg *.png);;الكل (*)",
         )
         if not path:
             return
@@ -254,7 +272,7 @@ class ReceiptDetailDialog(QDialog):
                 "attachment_added",
                 f"إرفاق ملف: {Path(path).name}",
             )
-            QMessageBox.information(self, "نجاح", "تم إرفاق الملف")
+            toast(self, "تم إرفاق الملف", "success")
             self._load()
         except Exception as e:
             QMessageBox.warning(self, "خطأ", f"فشل الإرفاق: {e}")

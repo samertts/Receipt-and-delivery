@@ -1,3 +1,4 @@
+from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
@@ -23,7 +24,21 @@ from lab_system.app.services.user_service import (
     list_users,
     reset_password,
 )
+from lab_system.app.ui.notifications import toast
 from lab_system.app.utils.validators import validate_password, validate_username
+
+ROLE_MAP = {
+    "مدير": "Admin",
+    "مشرف": "Supervisor",
+    "مستخدم": "User",
+    "مدقق": "Auditor",
+}
+ROLE_DISPLAY = {v: k for k, v in ROLE_MAP.items()}
+
+STATUS_MAP = {
+    "Active": "نشط",
+    "Inactive": "غير نشط",
+}
 
 
 class UsersPage(QWidget):
@@ -33,9 +48,27 @@ class UsersPage(QWidget):
         self.setLayout(QVBoxLayout(self))
         self.setLayoutDirection(Qt.RightToLeft)
 
-        title = QLabel("إدارة المستخدمين والصلاحيات")
-        title.setStyleSheet("font-size:16px;font-weight:700;margin-bottom:10px;")
-        self.layout().addWidget(title)
+        header = PageHeader("إدارة المستخدمين والصلاحيات", "إضافة وتعديل وإدارة المستخدمين")
+        self.layout().addWidget(header)
+
+        filter_row = QHBoxLayout()
+        filter_row.setSpacing(8)
+
+        self.filter_role = QComboBox()
+        self.filter_role.addItem("جميع الصلاحيات", "")
+        for ar_role in ROLE_MAP:
+            self.filter_role.addItem(ar_role, ROLE_MAP[ar_role])
+        self.filter_role.currentIndexChanged.connect(self.refresh)
+        filter_row.addWidget(self.filter_role)
+
+        self.filter_status = QComboBox()
+        self.filter_status.addItem("جميع الحالات", "")
+        self.filter_status.addItem("نشط", "Active")
+        self.filter_status.addItem("غير نشط", "Inactive")
+        self.filter_status.currentIndexChanged.connect(self.refresh)
+        filter_row.addWidget(self.filter_status)
+
+        self.layout().addLayout(filter_row)
 
         self._build_user_form()
         self._build_user_table()
@@ -51,7 +84,7 @@ class UsersPage(QWidget):
         self.password_input.setPlaceholderText("كلمة المرور")
         self.password_input.setEchoMode(QLineEdit.Password)
         self.role_combo = QComboBox()
-        self.role_combo.addItems(["Admin", "Supervisor", "User", "Auditor"])
+        self.role_combo.addItems(["مدير", "مشرف", "مستخدم", "مدقق"])
         self.institution_combo = QComboBox()
         self.institution_combo.addItem("-- بدون --", "")
         for o in list_organizations(active_only=True):
@@ -76,6 +109,10 @@ class UsersPage(QWidget):
         )
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setAlternatingRowColors(True)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSortingEnabled(True)
         self.layout().addWidget(self.table)
 
     def _add_user(self):
@@ -83,7 +120,7 @@ class UsersPage(QWidget):
         username = self.username_input.text().strip()
         full_name = self.fullname_input.text().strip()
         password = self.password_input.text()
-        role = self.role_combo.currentText()
+        role = ROLE_MAP.get(self.role_combo.currentText(), self.role_combo.currentText())
         institution_id = self.institution_combo.currentData()
 
         error = validate_username(username)
@@ -102,23 +139,33 @@ class UsersPage(QWidget):
                 "user_created",
                 f"إنشاء مستخدم: {username}",
             )
-            QMessageBox.information(self, "نجاح", f"تم إنشاء المستخدم {username}")
+            toast(self, f"تم إنشاء المستخدم {username}", "success")
             self.refresh()
         except Exception as e:
             QMessageBox.warning(self, "خطأ", str(e))
 
     def refresh(self):
         users = list_users()
+        role_filter = self.filter_role.currentData()
+        status_filter = self.filter_status.currentData()
+        if role_filter:
+            users = [u for u in users if u["role"] == role_filter]
+        if status_filter:
+            users = [u for u in users if u["status"] == status_filter]
         self.table.setRowCount(len(users))
         for i, u in enumerate(users):
             ud = dict(u)
             self.table.setItem(i, 0, QTableWidgetItem(ud["full_name"]))
             self.table.setItem(i, 1, QTableWidgetItem(ud["username"]))
-            self.table.setItem(i, 2, QTableWidgetItem(ud["role"]))
+            self.table.setItem(i, 2, QTableWidgetItem(ROLE_DISPLAY.get(ud["role"], ud["role"])))
             self.table.setItem(
                 i, 3, QTableWidgetItem(ud.get("institution_name") or "-"),
             )
-            self.table.setItem(i, 4, QTableWidgetItem(ud["status"]))
+            status_item = QTableWidgetItem(STATUS_MAP.get(ud["status"], ud["status"]))
+            status_color = QColor("#059669" if ud["status"] == "Active" else "#6B7280")
+            status_item.setForeground(status_color)
+            status_item.setBackground(QColor(status_color.red(), status_color.green(), status_color.blue(), 30))
+            self.table.setItem(i, 4, status_item)
 
             actions_widget = QWidget()
             actions_layout = QHBoxLayout(actions_widget)
@@ -194,4 +241,4 @@ class UsersPage(QWidget):
                 "password_reset",
                 f"إعادة تعيين كلمة المرور للمستخدم: {user_id}",
             )
-            QMessageBox.information(self, "نجاح", "تم إعادة تعيين كلمة المرور")
+            toast(self, "تم إعادة تعيين كلمة المرور", "success")

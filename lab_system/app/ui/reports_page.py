@@ -2,6 +2,7 @@ from datetime import datetime
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QComboBox,
     QDateEdit,
     QFileDialog,
     QFormLayout,
@@ -17,14 +18,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pathlib import Path
+
 from lab_system.app.auth.permissions import check_permission
 from lab_system.app.audit.logger import log_action
-from pathlib import Path
 from lab_system.app.services.report_service import (
     export_receipts_csv,
     receipt_summary,
     sample_summary,
 )
+from lab_system.app.ui.notifications import toast
+from lab_system.app.ui.page_header import PageHeader
 
 
 class ReportsPage(QWidget):
@@ -37,11 +41,25 @@ class ReportsPage(QWidget):
         self._load()
 
     def _build_ui(self):
-        title = QLabel("التقارير والإحصائيات")
-        title.setStyleSheet("font-size:16px;font-weight:700;margin-bottom:10px;")
-        self.layout().addWidget(title)
+        header = PageHeader("التقارير والإحصائيات", "عرض وتصدير تقارير الإيصالات")
+        self.layout().addWidget(header)
+
+        header.add_action("تصدير إكسل", self._export_csv, variant="secondary")
 
         filter_row = QHBoxLayout()
+        filter_row.setSpacing(8)
+
+        self.filter_status_reports = QComboBox()
+        self.filter_status_reports.addItem("جميع الحالات", "")
+        self.filter_status_reports.addItem("مسودة", "Draft")
+        self.filter_status_reports.addItem("معتمد", "Approved")
+        self.filter_status_reports.addItem("مرفوض", "Rejected")
+        self.filter_status_reports.addItem("مؤرشف", "Archived")
+        self.filter_status_reports.addItem("ملغي", "Cancelled")
+        self.filter_status_reports.currentIndexChanged.connect(self._load)
+        filter_row.addWidget(QLabel("الحالة:"))
+        filter_row.addWidget(self.filter_status_reports)
+
         self.date_from = QDateEdit()
         self.date_from.setCalendarPopup(True)
         self.date_from.setDisplayFormat("yyyy-MM-dd")
@@ -58,10 +76,6 @@ class ReportsPage(QWidget):
         refresh_btn = QPushButton("تحديث")
         refresh_btn.clicked.connect(self._load)
         filter_row.addWidget(refresh_btn)
-
-        export_btn = QPushButton("تصدير CSV")
-        export_btn.clicked.connect(self._export_csv)
-        filter_row.addWidget(export_btn)
 
         self.layout().addLayout(filter_row)
 
@@ -100,6 +114,10 @@ class ReportsPage(QWidget):
         self.samples_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.Stretch,
         )
+        self.samples_table.setAlternatingRowColors(True)
+        self.samples_table.setSortingEnabled(True)
+        self.samples_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.samples_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.layout().addWidget(self.samples_table)
 
     def _date_from(self):
@@ -113,6 +131,14 @@ class ReportsPage(QWidget):
         dt = self._date_to()
         summary = receipt_summary(date_from=df, date_to=dt)
         samples = sample_summary(date_from=df, date_to=dt)
+        status_filter = self.filter_status_reports.currentData()
+        if status_filter:
+            total = sum(summary["by_status"].values())
+            filtered_total = summary["by_status"].get(status_filter, 0)
+            summary = {
+                "total": filtered_total,
+                "by_status": {status_filter: filtered_total},
+            }
 
         self.total_label.setText(str(summary["total"]))
         self.draft_label.setText(str(summary["by_status"].get("Draft", 0)))
@@ -148,7 +174,7 @@ class ReportsPage(QWidget):
             self,
             "حفظ التقرير",
             f"تقرير_الإيصالات_{datetime.now().strftime('%Y%m%d')}.csv",
-            "CSV (*.csv)",
+            "إكسل (*.csv)",
         )
         if not path:
             return
@@ -163,6 +189,6 @@ class ReportsPage(QWidget):
                 "report_exported",
                 f"تصدير تقرير: {Path(path).name}",
             )
-            QMessageBox.information(self, "نجاح", f"تم تصدير التقرير إلى {path}")
+            toast(self, f"تم تصدير التقرير إلى {path}", "success")
         except Exception as e:
             QMessageBox.warning(self, "خطأ", f"فشل التصدير: {e}")

@@ -21,6 +21,8 @@ from lab_system.app.database import db as _db
 from lab_system.app.services.backup_service import create_backup
 from lab_system.app.services.recovery_service import verify_backup
 from lab_system.app.settings.config import DB_PATH
+from lab_system.app.ui.notifications import toast
+from lab_system.app.ui.page_header import PageHeader
 
 
 class BackupPage(QWidget):
@@ -30,15 +32,11 @@ class BackupPage(QWidget):
         self.setLayout(QVBoxLayout(self))
         self.setLayoutDirection(Qt.RightToLeft)
 
-        title = QLabel("النسخ الاحتياطي والاستعادة")
-        title.setStyleSheet("font-size:16px;font-weight:700;margin-bottom:10px;")
-        self.layout().addWidget(title)
+        header = PageHeader("النسخ الاحتياطي والاستعادة", "إدارة وحماية بيانات النظام")
+        self.layout().addWidget(header)
 
-        btn_layout = QHBoxLayout()
-        backup_btn = QPushButton("إنشاء نسخة احتياطية")
-        backup_btn.clicked.connect(self._do_backup)
-        btn_layout.addWidget(backup_btn)
-        self.layout().addLayout(btn_layout)
+        header.add_action("إنشاء نسخة احتياطية", self._do_backup)
+        header.add_action("التحقق من الكل", self._verify_all, variant="secondary")
 
         self.table = QTableWidget()
         self.table.setColumnCount(4)
@@ -47,11 +45,11 @@ class BackupPage(QWidget):
         )
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setAlternatingRowColors(True)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSortingEnabled(True)
         self.layout().addWidget(self.table)
-
-        verify_all = QPushButton("التحقق من جميع النسخ الاحتياطية")
-        verify_all.clicked.connect(self._verify_all)
-        self.layout().addWidget(verify_all)
 
         self.refresh()
 
@@ -104,9 +102,7 @@ class BackupPage(QWidget):
     def _verify(self, backup_path):
         result = verify_backup(backup_path)
         if result["valid"]:
-            QMessageBox.information(
-                self, "تحقق", f"النسخة سليمة ({result['size']} بايت)",
-            )
+            toast(self, "تم إنشاء النسخة الاحتياطية", "success")
         else:
             QMessageBox.warning(
                 self, "تحقق", f"النسخة تالفة: {result.get('error', 'خطأ غير معروف')}",
@@ -135,9 +131,7 @@ class BackupPage(QWidget):
                 "backup_restored",
                 f"استعادة من: {Path(backup_path).name}",
             )
-            QMessageBox.information(
-                self, "نجاح", "تمت استعادة قاعدة البيانات. يرجى إعادة تشغيل التطبيق.",
-            )
+            toast(self, "تم التحقق بنجاح", "success")
         except Exception as e:
             QMessageBox.warning(
                 self, "خطأ", f"فشلت الاستعادة: {e}",
@@ -147,7 +141,7 @@ class BackupPage(QWidget):
         from lab_system.app.services.recovery_service import list_backups
         backups = list_backups()
         if not backups:
-            QMessageBox.information(self, "تحقق", "لا توجد نسخ احتياطية")
+            toast(self, "لا توجد نسخ احتياطية", "warning")
             return
         valid = 0
         invalid = 0
@@ -157,8 +151,4 @@ class BackupPage(QWidget):
                 valid += 1
             else:
                 invalid += 1
-        QMessageBox.information(
-            self,
-            "نتيجة التحقق",
-            f"النسخ السليمة: {valid}\nالنسخ التالفة: {invalid}\nالمجموع: {len(backups)}",
-        )
+        toast(self, "تمت الاستعادة بنجاح", "success")

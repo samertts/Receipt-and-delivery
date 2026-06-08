@@ -1,3 +1,4 @@
+from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
@@ -22,6 +23,8 @@ from lab_system.app.services.receipt_service import (
     list_receipts,
     set_receipt_status,
 )
+from lab_system.app.ui.notifications import toast
+from lab_system.app.ui.page_header import PageHeader
 from lab_system.app.ui.receipt_detail_dialog import ReceiptDetailDialog
 from lab_system.app.ui.receipt_dialog import ReceiptDialog
 
@@ -48,50 +51,48 @@ class ReceiptsPage(QWidget):
         self._load()
 
     def _build_ui(self):
-        title = QLabel("إدارة الإيصالات")
-        title.setStyleSheet("font-size:16px;font-weight:700;margin-bottom:10px;")
-        self.layout().addWidget(title)
+        header = PageHeader("إدارة الإيصالات", "عرض وإضافة وتعديل إيصالات الاستلام والتسليم")
+        self.layout().addWidget(header)
 
-        toolbar = QHBoxLayout()
+        header.add_action("إيصال جديد", self._new_receipt, tooltip="إيصال جديد (Ctrl+N)")
+
+        filter_row = QHBoxLayout()
+        filter_row.setSpacing(8)
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("بحث برقم الإيصال أو اسم الجهة...")
         self.search_input.textChanged.connect(self._on_search)
-        toolbar.addWidget(self.search_input)
+        filter_row.addWidget(self.search_input)
 
         self.filter_status = QComboBox()
         self.filter_status.addItem("جميع الحالات", "")
         for key, (_, label) in STATUS_STYLES.items():
             self.filter_status.addItem(label, key)
         self.filter_status.currentIndexChanged.connect(self._on_filter)
-        toolbar.addWidget(self.filter_status)
+        filter_row.addWidget(self.filter_status)
 
         self.filter_type = QComboBox()
         self.filter_type.addItem("جميع الأنواع", "")
         for t in list_transaction_types():
             self.filter_type.addItem(t["name"], t["id"])
         self.filter_type.currentIndexChanged.connect(self._on_filter)
-        toolbar.addWidget(self.filter_type)
+        filter_row.addWidget(self.filter_type)
 
         self.date_from = QDateEdit()
         self.date_from.setCalendarPopup(True)
         self.date_from.setDisplayFormat("yyyy-MM-dd")
         self.date_from.dateChanged.connect(self._on_filter)
-        toolbar.addWidget(QLabel("من:"))
-        toolbar.addWidget(self.date_from)
+        filter_row.addWidget(QLabel("من:"))
+        filter_row.addWidget(self.date_from)
 
         self.date_to = QDateEdit()
         self.date_to.setCalendarPopup(True)
         self.date_to.setDisplayFormat("yyyy-MM-dd")
         self.date_to.dateChanged.connect(self._on_filter)
-        toolbar.addWidget(QLabel("إلى:"))
-        toolbar.addWidget(self.date_to)
+        filter_row.addWidget(QLabel("إلى:"))
+        filter_row.addWidget(self.date_to)
 
-        new_btn = QPushButton("إيصال جديد")
-        new_btn.clicked.connect(self._new_receipt)
-        toolbar.addWidget(new_btn)
-
-        self.layout().addLayout(toolbar)
+        self.layout().addLayout(filter_row)
 
         self.table = QTableWidget()
         self.table.setColumnCount(8)
@@ -109,6 +110,9 @@ class ReceiptsPage(QWidget):
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setAlternatingRowColors(True)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSortingEnabled(True)
         self.layout().addWidget(self.table)
 
         pagination = QHBoxLayout()
@@ -171,10 +175,11 @@ class ReceiptsPage(QWidget):
             self.table.setItem(i, 3, QTableWidgetItem(rd["receiver_org"] or ""))
             self.table.setItem(i, 4, QTableWidgetItem(rd["created_at"] or ""))
             status_code = rd["status"]
-            _, status_ar = STATUS_STYLES.get(status_code, ("", status_code))
+            status_color, status_ar = STATUS_STYLES.get(status_code, ("#6B7280", status_code))
             item = QTableWidgetItem(status_ar)
-            color, _ = STATUS_STYLES.get(status_code, ("#000", ""))
-            item.setForeground(Qt.GlobalColor(color) if color.startswith("#") else None)
+            sc = QColor(status_color)
+            item.setForeground(sc)
+            item.setBackground(QColor(sc.red(), sc.green(), sc.blue(), 30))
             self.table.setItem(i, 5, item)
             self.table.setItem(i, 6, QTableWidgetItem(rd.get("sender_name", "")))
 
@@ -297,7 +302,7 @@ class ReceiptsPage(QWidget):
         reply = QMessageBox.question(
             self,
             "تأكيد الحذف",
-            "هل أنت متأكد من حذف هذا الإيصال permanently؟",
+            "هل أنت متأكد من حذف هذا الإيصال نهائياً؟",
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
