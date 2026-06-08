@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
@@ -24,7 +25,12 @@ def list_users(
     query = db.query(User)
     if role:
         query = query.filter(User.role == role)
-    return query.order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
+    total_count = query.count()
+    items = query.order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
+    return JSONResponse(
+        content=[UserResponse.model_validate(u).model_dump(mode="json") for u in items],
+        headers={"X-Total-Count": str(total_count)},
+    )
 
 
 @router.post("", response_model=UserResponse, status_code=201)

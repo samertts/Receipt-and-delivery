@@ -12,6 +12,7 @@ def log_audit(
     action_type: str,
     request: Optional[Request] = None,
     details: str = "",
+    changes_json: str = "",
     db: Optional[Session] = None,
 ) -> None:
     ip_address = request.client.host if request and request.client else "0.0.0.0"
@@ -25,6 +26,7 @@ def log_audit(
             action_type=action_type,
             ip_address=ip_address,
             details=details,
+            changes_json=changes_json,
         )
         db.add(audit)
         db.commit()

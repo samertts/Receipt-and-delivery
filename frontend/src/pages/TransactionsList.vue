@@ -25,20 +25,32 @@
     <div v-if="loading" class="text-center py-12 text-slate-400">جاري التحميل...</div>
     <div v-else-if="error" class="bg-red-50 text-red-600 text-sm p-4 rounded-lg">{{ error }}</div>
     <div v-else-if="items.length === 0" class="text-center py-12 text-slate-400">لا توجد معاملات</div>
-    <div v-else class="space-y-3">
-      <div v-for="tx in items" :key="tx.id" @click="viewTransaction(tx.id)"
-        class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 cursor-pointer transition-colors">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="font-semibold text-slate-800">{{ tx.transaction_no }}</div>
-            <div class="text-sm text-slate-500 mt-1">{{ tx.transaction_type }} - {{ tx.sender_name }} → {{ tx.receiver_name }}</div>
-            <div class="text-xs text-slate-400 mt-1">{{ tx.transaction_date }}</div>
+    <div v-else>
+      <div class="space-y-3">
+        <div v-for="tx in items" :key="tx.id" @click="viewTransaction(tx.id)"
+          class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 cursor-pointer transition-colors">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="font-semibold text-slate-800">{{ tx.transaction_no }}</div>
+              <div class="text-sm text-slate-500 mt-1">{{ tx.transaction_type }} - {{ tx.sender_name }} → {{ tx.receiver_name }}</div>
+              <div class="text-xs text-slate-400 mt-1">{{ tx.transaction_date }}</div>
+            </div>
+            <div class="text-left">
+              <span :class="statusClass(tx.status)" class="px-2.5 py-1 rounded-full text-xs font-medium">
+                {{ statusLabel(tx.status) }}
+              </span>
+            </div>
           </div>
-          <div class="text-left">
-            <span :class="statusClass(tx.status)" class="px-2.5 py-1 rounded-full text-xs font-medium">
-              {{ statusLabel(tx.status) }}
-            </span>
-          </div>
+        </div>
+      </div>
+      <div class="flex items-center justify-between mt-6 text-sm text-slate-500">
+        <span>إجمالي {{ total }} معاملة</span>
+        <div class="flex gap-2">
+          <button :disabled="page <= 1" @click="prevPage"
+            class="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-slate-50">السابق</button>
+          <span class="px-3 py-1.5">{{ page }} / {{ totalPages }}</span>
+          <button :disabled="page >= totalPages" @click="nextPage"
+            class="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-slate-50">التالي</button>
         </div>
       </div>
     </div>
@@ -46,16 +58,22 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { transactionsApi } from '../api'
+import { useTransactionStore } from '../stores/transactions'
 
 const router = useRouter()
+const store = useTransactionStore()
 const items = ref([])
 const loading = ref(true)
 const error = ref(null)
 const searchQuery = ref('')
 const statusFilter = ref('')
+const page = ref(1)
+const total = ref(0)
+const limit = 20
+
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / limit)))
 
 function statusLabel(status) {
   const labels = { draft: 'مسودة', approved: 'معتمد', rejected: 'مرفوض', archived: 'مؤرشف', cancelled: 'ملغي' }
@@ -76,18 +94,31 @@ function statusClass(status) {
 let debounceTimer = null
 function debouncedSearch() {
   clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(fetchData, 300)
+  debounceTimer = setTimeout(() => { page.value = 1; fetchData() }, 300)
+}
+
+function prevPage() {
+  if (page.value <= 1) return
+  page.value--
+  fetchData()
+}
+
+function nextPage() {
+  if (page.value >= totalPages.value) return
+  page.value++
+  fetchData()
 }
 
 async function fetchData() {
   loading.value = true
   error.value = null
   try {
-    const params = {}
+    const params = { page: page.value, limit }
     if (searchQuery.value) params.search = searchQuery.value
     if (statusFilter.value) params.status = statusFilter.value
-    const response = await transactionsApi.list(params)
-    items.value = response.data
+    await store.fetchList(params)
+    items.value = store.items
+    total.value = store.total
   } catch (e) {
     error.value = 'فشل في تحميل المعاملات'
   } finally {

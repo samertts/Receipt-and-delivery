@@ -61,6 +61,110 @@ class TestLoginAPI:
         assert response.status_code == 422
 
 
+class TestRefreshToken:
+    def test_refresh_success(self, client, db):
+        from app.models.user import User
+        from app.services.security import hash_password
+
+        user = User(
+            username="refreshuser",
+            full_name="Refresh User",
+            password_hash=hash_password("Test@1234"),
+            role="admin",
+            status="active",
+        )
+        db.add(user)
+        db.commit()
+
+        login_resp = client.post(
+            "/api/auth/login",
+            json={"username": "refreshuser", "password": "Test@1234"},
+        )
+        assert login_resp.status_code == 200
+        refresh_token = login_resp.json()["refresh_token"]
+        assert refresh_token
+
+        refresh_resp = client.post(
+            "/api/auth/refresh",
+            json={"refresh_token": refresh_token},
+        )
+        assert refresh_resp.status_code == 200
+        data = refresh_resp.json()
+        assert "access_token" in data
+        assert "refresh_token" in data
+
+    def test_refresh_invalid_token(self, client):
+        response = client.post(
+            "/api/auth/refresh",
+            json={"refresh_token": "invalid-token"},
+        )
+        assert response.status_code == 401
+
+
+class TestLogout:
+    def test_logout_success(self, client, admin_token):
+        response = client.post(
+            "/api/auth/logout",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 200
+
+    def test_logout_without_auth(self, client):
+        response = client.post("/api/auth/logout")
+        assert response.status_code == 401
+
+
+class TestChangePassword:
+    def test_change_password_success(self, client, db):
+        from app.models.user import User
+        from app.services.security import hash_password
+
+        user = User(
+            username="changepw",
+            full_name="Change PW",
+            password_hash=hash_password("Old@1234"),
+            role="user",
+            status="active",
+        )
+        db.add(user)
+        db.commit()
+
+        login_resp = client.post(
+            "/api/auth/login",
+            json={"username": "changepw", "password": "Old@1234"},
+        )
+        token = login_resp.json()["access_token"]
+
+        response = client.post(
+            "/api/auth/change-password",
+            json={"current_password": "Old@1234", "new_password": "New@5678"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200
+
+        login_resp2 = client.post(
+            "/api/auth/login",
+            json={"username": "changepw", "password": "New@5678"},
+        )
+        assert login_resp2.status_code == 200
+
+    def test_change_password_wrong_current(self, client, admin_token):
+        response = client.post(
+            "/api/auth/change-password",
+            json={"current_password": "Wrong@123", "new_password": "New@5678"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 401
+
+    def test_change_password_weak_new(self, client, admin_token):
+        response = client.post(
+            "/api/auth/change-password",
+            json={"current_password": "Admin@123", "new_password": "weak"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 422
+
+
 class TestProtectedEndpoints:
     def test_health_no_auth(self, client):
         response = client.get("/api/health")

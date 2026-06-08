@@ -160,7 +160,6 @@ def soft_delete_receipt(receipt_id, user_id=None):
     now = datetime.now().isoformat(timespec="seconds")
     with _db.get_conn() as conn:
         conn.execute("UPDATE receipts SET deleted_at=? WHERE id=?", (now, receipt_id))
-        conn.execute("DELETE FROM receipts_fts WHERE rowid=?", (receipt_id,))
     log_action(user_id, 'soft_delete', f'Receipt {receipt_id}')
 
 
@@ -170,10 +169,11 @@ def hard_delete_receipt(receipt_id, user_id=None):
             "SELECT file_path, thumbnail_path FROM attachments WHERE receipt_id=?",
             (receipt_id,),
         ).fetchall()
-        conn.execute("DELETE FROM receipts_fts WHERE rowid=?", (receipt_id,))
         conn.execute("DELETE FROM receipt_items WHERE receipt_id=?", (receipt_id,))
         conn.execute("DELETE FROM attachments WHERE receipt_id=?", (receipt_id,))
+        conn.execute("DELETE FROM receipt_history WHERE receipt_id=?", (receipt_id,))
         conn.execute("DELETE FROM receipts WHERE id=?", (receipt_id,))
+        conn.execute("DELETE FROM receipts_fts WHERE rowid=?", (receipt_id,))
     for att in atts:
         for p in (att['file_path'], att['thumbnail_path'] if att['thumbnail_path'] else None):
             if p:
@@ -187,15 +187,6 @@ def hard_delete_receipt(receipt_id, user_id=None):
 def restore_receipt(receipt_id, user_id=None):
     with _db.get_conn() as conn:
         conn.execute("UPDATE receipts SET deleted_at=NULL WHERE id=?", (receipt_id,))
-        row = conn.execute(
-            "SELECT receipt_no, sender_name, receiver_name FROM receipts WHERE id=?",
-            (receipt_id,),
-        ).fetchone()
-        if row:
-            conn.execute(
-                "INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name) VALUES(?,?,?,?)",
-                (receipt_id, row["receipt_no"], row["sender_name"], row["receiver_name"]),
-            )
     log_action(user_id, 'restore', f'Receipt {receipt_id}')
 
 
@@ -337,8 +328,8 @@ def list_receipts(
         where = ["1=1"]
     with _db.get_conn() as conn:
         if q:
-            fts_terms = q.strip().replace('"', '""')
-            fts_q = " OR ".join(f'{t}*' for t in fts_terms.split())
+            fts_terms = q.strip().replace('"', '""').replace('-', ' ')
+            fts_q = " OR ".join(f'{t}*' for t in fts_terms.split() if t)
             fts_rows = conn.execute(
                 "SELECT rowid FROM receipts_fts WHERE receipts_fts MATCH ? LIMIT ?",
                 (fts_q, page_size * 10),

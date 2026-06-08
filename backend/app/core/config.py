@@ -1,11 +1,19 @@
 import secrets
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _read_app_version() -> str:
+    version_file = Path(__file__).resolve().parent.parent.parent.parent / 'VERSION'
+    if version_file.exists():
+        return version_file.read_text(encoding='utf-8').strip() or '0.0.0'
+    return '0.0.0'
+
+
 class Settings(BaseSettings):
     app_name: str = "نظام إدارة المعاملات المختبرية"
-    app_version: str = "1.0.0"
+    app_version: str = _read_app_version()
     debug: bool = False
 
     secret_key: str = ""
@@ -29,6 +37,8 @@ class Settings(BaseSettings):
     rate_limit_api_window: int = 60
 
     password_min_length: int = 8
+
+    redis_url: str = ""
 
     backup_retention_days: int = 30
     auto_backup_enabled: bool = False

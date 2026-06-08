@@ -8,7 +8,7 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium text-slate-700 mb-1">نوع المعاملة</label>
-          <input v-model="form.transaction_type" required placeholder例: Sample Receipt"
+          <input v-model="form.transaction_type" required placeholder="مثال: استلام عينات"
             class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
         </div>
         <div>
@@ -27,14 +27,30 @@
             class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">معرف المؤسسة المرسلة</label>
-          <input v-model="form.sender_organization_id" required
-            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+          <label class="block text-sm font-medium text-slate-700 mb-1">المنشأة المرسلة</label>
+          <div class="relative">
+            <input v-model="senderOrgSearch" @focus="openSenderDropdown" @input="openSenderDropdown"
+              placeholder="ابحث عن منشأة..."
+              class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+            <ul v-if="senderDropdownOpen && filteredSenderOrgs.length" dir="rtl"
+              class="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+              <li v-for="org in filteredSenderOrgs" :key="org.id" @click="selectSenderOrg(org)"
+                class="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm">{{ org.name }} ({{ org.code }})</li>
+            </ul>
+          </div>
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">معرف المؤسسة المستلمة</label>
-          <input v-model="form.receiver_organization_id" required
-            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+          <label class="block text-sm font-medium text-slate-700 mb-1">المنشأة المستلمة</label>
+          <div class="relative">
+            <input v-model="receiverOrgSearch" @focus="openReceiverDropdown" @input="openReceiverDropdown"
+              placeholder="ابحث عن منشأة..."
+              class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+            <ul v-if="receiverDropdownOpen && filteredReceiverOrgs.length" dir="rtl"
+              class="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+              <li v-for="org in filteredReceiverOrgs" :key="org.id" @click="selectReceiverOrg(org)"
+                class="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm">{{ org.name }} ({{ org.code }})</li>
+            </ul>
+          </div>
         </div>
         <div>
           <label class="block text-sm font-medium text-slate-700 mb-1">رقم التفويض</label>
@@ -62,8 +78,16 @@
           <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div>
               <label class="block text-xs text-slate-500">نوع العينة</label>
-              <input v-model="item.sample_type" required
-                class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm" />
+              <div class="relative">
+                <input v-model="item.sample_type" @focus="openSampleDropdown(idx)" @input="openSampleDropdown(idx)"
+                  required placeholder="اختر أو اكتب..."
+                  class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm" />
+                <ul v-if="sampleDropdownIdx === idx && filteredSampleTypes.length" dir="rtl"
+                  class="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-32 overflow-y-auto">
+                  <li v-for="st in filteredSampleTypes" :key="st" @click="selectSampleType(idx, st)"
+                    class="px-3 py-1.5 hover:bg-blue-50 cursor-pointer text-sm">{{ st }}</li>
+                </ul>
+              </div>
             </div>
             <div>
               <label class="block text-xs text-slate-500">المجموع</label>
@@ -110,13 +134,79 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { transactionsApi } from '../api'
+import { ref, computed, onMounted } from 'vue'
+import { transactionsApi, organizationsApi } from '../api'
 
 const loading = ref(false)
 const submitting = ref(false)
 const error = ref(null)
 const success = ref(null)
+
+const organizations = ref([])
+const sampleTypes = [
+  'Serum', 'Plasma', 'Whole Blood', 'Urine', 'Stool',
+  'Sputum', 'CSF', 'Swab', 'Tissue', 'Water', 'Food', 'Other',
+]
+
+const senderOrgSearch = ref('')
+const receiverOrgSearch = ref('')
+const senderDropdownOpen = ref(false)
+const receiverDropdownOpen = ref(false)
+const sampleDropdownIdx = ref(-1)
+
+const filteredSenderOrgs = computed(() =>
+  organizations.value.filter((o) =>
+    o.name.includes(senderOrgSearch.value) || o.code.includes(senderOrgSearch.value)
+  )
+)
+const filteredReceiverOrgs = computed(() =>
+  organizations.value.filter((o) =>
+    o.name.includes(receiverOrgSearch.value) || o.code.includes(receiverOrgSearch.value)
+  )
+)
+const filteredSampleTypes = computed(() =>
+  sampleTypes.filter((s) =>
+    s.toLowerCase().includes(
+      (form.value.items[sampleDropdownIdx.value]?.sample_type || '').toLowerCase()
+    )
+  )
+)
+
+async function loadOrganizations() {
+  try {
+    const response = await organizationsApi.list()
+    organizations.value = response.data
+  } catch {
+    // silently fail; user can still type org ID
+  }
+}
+
+function openSenderDropdown() { senderDropdownOpen.value = true }
+function openReceiverDropdown() { receiverDropdownOpen.value = true }
+function openSampleDropdown(idx) { sampleDropdownIdx.value = idx }
+
+function selectSenderOrg(org) {
+  form.value.sender_organization_id = org.id
+  senderOrgSearch.value = `${org.name} (${org.code})`
+  senderDropdownOpen.value = false
+}
+function selectReceiverOrg(org) {
+  form.value.receiver_organization_id = org.id
+  receiverOrgSearch.value = `${org.name} (${org.code})`
+  receiverDropdownOpen.value = false
+}
+function selectSampleType(idx, st) {
+  form.value.items[idx].sample_type = st
+  sampleDropdownIdx.value = -1
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.relative')) {
+    senderDropdownOpen.value = false
+    receiverDropdownOpen.value = false
+    sampleDropdownIdx.value = -1
+  }
+})
 
 const form = ref({
   transaction_type: '',
@@ -171,5 +261,8 @@ async function submitForm() {
   }
 }
 
-onMounted(() => { loading.value = false })
+onMounted(() => {
+  loading.value = false
+  loadOrganizations()
+})
 </script>

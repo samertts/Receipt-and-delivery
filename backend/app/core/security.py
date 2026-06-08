@@ -29,7 +29,7 @@ def validate_password_strength(password: str) -> Optional[str]:
     return None
 
 
-class RateLimiter:
+class MemoryRateLimiter:
     def __init__(self, max_requests: int = 10, window_seconds: int = 60) -> None:
         self.max_requests = max_requests
         self.window_seconds = window_seconds
@@ -45,12 +45,68 @@ class RateLimiter:
         return False
 
 
-login_rate_limiter = RateLimiter(max_requests=5, window_seconds=60)
-api_rate_limiter = RateLimiter(max_requests=100, window_seconds=60)
+class RedisRateLimiter:
+    def __init__(self, max_requests: int = 10, window_seconds: int = 60) -> None:
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self._redis = None
+
+    def _ensure_redis(self):
+        if self._redis is None:
+            try:
+                import redis as _redis
+                redis_url = settings.redis_url if hasattr(settings, "redis_url") else "redis://localhost:6379/0"
+                self._redis = _redis.from_url(redis_url, decode_responses=True)
+            except ImportError:
+                logger.warning("redis package not installed, falling back to in-memory rate limiter")
+                return False
+            except Exception as e:
+                logger.warning(f"Redis connection failed: {e}, falling back to in-memory rate limiter")
+                return False
+        return True
+
+    def is_rate_limited(self, key: str) -> bool:
+        if not self._ensure_redis():
+            return fallback_limiter.is_rate_limited(key)
+        try:
+            pipe = self._redis.pipeline()
+            now = int(time.time())
+            window_start = now - self.window_seconds
+            pipe.zremrangebyscore(key, 0, window_start)
+            pipe.zcard(key)
+            pipe.expire(key, self.window_seconds)
+            _, count, _ = pipe.execute()
+            if count >= self.max_requests:
+                return True
+            self._redis.zadd(key, {str(now): now})
+            return False
+        except Exception as e:
+            logger.warning(f"Redis rate limiter error: {e}, falling back to in-memory")
+            return fallback_limiter.is_rate_limited(key)
+
+
+fallback_limiter = MemoryRateLimiter(max_requests=10, window_seconds=60)
+login_rate_limiter = MemoryRateLimiter(max_requests=5, window_seconds=60)
+api_rate_limiter = MemoryRateLimiter(max_requests=100, window_seconds=60)
+
+try:
+    redis_url = getattr(settings, "redis_url", "")
+    if redis_url:
+        import redis as _redis
+        login_rate_limiter = RedisRateLimiter(
+            max_requests=settings.rate_limit_login_max,
+            window_seconds=settings.rate_limit_login_window,
+        )
+        api_rate_limiter = RedisRateLimiter(
+            max_requests=settings.rate_limit_api_max,
+            window_seconds=settings.rate_limit_api_window,
+        )
+        logger.info("Using Redis-backed rate limiter")
+except (ImportError, Exception) as e:
+    logger.info(f"Using in-memory rate limiter ({e})")
 
 
 async def rate_limit_middleware(request: Request, call_next):
-    # Disable rate limiting in test mode
     if os.environ.get("TESTING") or settings.debug:
         return await call_next(request)
 

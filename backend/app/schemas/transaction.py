@@ -35,12 +35,28 @@ class TransactionCreate(BaseModel):
     receiver_organization_id: str
     sender_name: str = Field(..., min_length=1, max_length=180)
     receiver_name: str = Field(..., min_length=1, max_length=180)
+    sender_job_title: str = Field(default="", max_length=80)
+    receiver_job_title: str = Field(default="", max_length=80)
     authorization_no: str = Field(default="", max_length=100)
     authorization_date: str = Field(default="", max_length=20)
     transaction_date: str = Field(..., max_length=30)
     notes: str = Field(default="", max_length=2000)
+    transport_info: str = Field(default="", max_length=255)
     status: str = Field(default="draft", pattern="^(draft|approved|rejected|archived|cancelled)$")
     items: list[TransactionItemCreate] = Field(..., min_length=1)
+
+
+class TransactionItemUpdate(BaseModel):
+    id: Optional[str] = None
+    sample_type: Optional[str] = Field(None, min_length=1, max_length=80)
+    total_count: Optional[int] = Field(None, ge=1)
+    valid_count: Optional[int] = Field(None, ge=0)
+    damaged_count: Optional[int] = Field(None, ge=0)
+    rejected_count: Optional[int] = Field(None, ge=0)
+    nonconforming_count: Optional[int] = Field(None, ge=0)
+    transport_condition: Optional[str] = Field(None, max_length=100)
+    notes: Optional[str] = Field(None, max_length=500)
+    delete: bool = False
 
 
 class TransactionUpdate(BaseModel):
@@ -49,11 +65,15 @@ class TransactionUpdate(BaseModel):
     receiver_organization_id: Optional[str] = None
     sender_name: Optional[str] = Field(None, min_length=1, max_length=180)
     receiver_name: Optional[str] = Field(None, min_length=1, max_length=180)
+    sender_job_title: Optional[str] = Field(None, max_length=80)
+    receiver_job_title: Optional[str] = Field(None, max_length=80)
     authorization_no: Optional[str] = Field(None, max_length=100)
     authorization_date: Optional[str] = Field(None, max_length=20)
     transaction_date: Optional[str] = Field(None, max_length=30)
     notes: Optional[str] = Field(None, max_length=2000)
+    transport_info: Optional[str] = Field(None, max_length=255)
     status: Optional[str] = Field(None, pattern="^(draft|approved|rejected|archived|cancelled)$")
+    items: Optional[list[TransactionItemUpdate]] = None
 
 
 class TransactionResponse(BaseModel):
@@ -64,11 +84,15 @@ class TransactionResponse(BaseModel):
     receiver_organization_id: str
     sender_name: str
     receiver_name: str
+    sender_job_title: str = ""
+    receiver_job_title: str = ""
     authorization_no: str
     authorization_date: str
     transaction_date: str
     notes: str
+    transport_info: str = ""
     status: str
+    created_by: str = ""
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     items: list[TransactionItemResponse] = []
@@ -113,6 +137,7 @@ class AuditLogResponse(BaseModel):
     action_type: str
     ip_address: str
     details: str
+    changes_json: str = ""
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}

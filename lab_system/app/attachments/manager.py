@@ -38,6 +38,10 @@ def _check_magic_bytes(path: Path) -> str | None:
         return None
 
 
+def _compute_hash(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def save_attachment(receipt_id: int, src_path: str, category: str):
     src = Path(src_path)
     if not src.exists():
@@ -49,6 +53,17 @@ def save_attachment(receipt_id: int, src_path: str, category: str):
         raise ValueError('نوع الملف غير مدعوم أو الملف تالف')
     if detected_ext not in ALLOWED_EXTENSIONS:
         raise ValueError('نوع الملف غير مسموح به')
+
+    src_hash = _compute_hash(src)
+    with _db.get_conn() as conn:
+        existing = conn.execute(
+            "SELECT id, file_path FROM attachments WHERE file_hash=?", (src_hash,),
+        ).fetchone()
+        if existing:
+            raise ValueError(
+                f'الملف موجود مسبقاً (مرفق #{existing["id"]})',
+            )
+
     safe_name = _sanitize_filename(src.name)
     ts = datetime.now().strftime('%Y%m%d%H%M%S')
     target = STORAGE_DIR / 'attachments' / f'{ts}_{safe_name}'
@@ -61,11 +76,10 @@ def save_attachment(receipt_id: int, src_path: str, category: str):
         img.save(target, optimize=True, quality=80)
     else:
         shutil.copy2(src, target)
-    h = hashlib.sha256(target.read_bytes()).hexdigest()
     with _db.get_conn() as conn:
         conn.execute(
             'INSERT INTO attachments(receipt_id,file_path,file_type,file_hash,file_size,category,created_at) VALUES(?,?,?,?,?,?,?)',
-            (receipt_id, str(target), detected_ext, h, target.stat().st_size, category,
+            (receipt_id, str(target), detected_ext, src_hash, target.stat().st_size, category,
              datetime.now().isoformat(timespec='seconds')),
         )
-    return str(target), h
+    return str(target), src_hash

@@ -1,5 +1,27 @@
 # Changelog - نظام إدارة الاستلام المختبري
 
+## [1.2.0-dev] - 2026-06-08
+
+### Added
+- Refresh token rotation with blacklist (invalidation on use)
+- Logout endpoint with server-side token blacklisting
+- Change password endpoint with strength validation
+- Transaction deep update (add/delete items via PUT)
+- Pagination support with X-Total-Count header on list endpoints
+- Organization search dropdowns on new transaction form
+- Sample type autocomplete dropdown
+- Changes JSON viewer on audit logs page
+- Dashboard uses X-Total-Count for accurate counts
+- Redis-backed rate limiter with in-memory fallback
+- Network connectivity check in startup diagnostics
+- Real HTTP transport in APIClient (was stub)
+
+### Changed
+- Inactive users blocked at login and protected endpoints
+- Renamed RateLimiter to MemoryRateLimiter
+- Unused ROLE_HIERARCHY removed from deps
+- Transaction detail actions: delete now admin-only
+
 ## [1.0.0] - 2026-05-27
 
 ### Added

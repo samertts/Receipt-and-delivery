@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
@@ -25,8 +26,12 @@ def list_organizations(
     _: User = Depends(require_permission("view_organizations")),
 ):
     query = db.query(Organization)
-    # SQLAlchemy model doesn't have status; omitted for now, can be extended
-    return query.order_by(Organization.name).offset((page - 1) * limit).limit(limit).all()
+    total_count = query.count()
+    items = query.order_by(Organization.name).offset((page - 1) * limit).limit(limit).all()
+    return JSONResponse(
+        content=[OrganizationResponse.model_validate(o).model_dump(mode="json") for o in items],
+        headers={"X-Total-Count": str(total_count)},
+    )
 
 
 @router.post("", response_model=OrganizationResponse, status_code=201)

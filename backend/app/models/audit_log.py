@@ -13,3 +13,4 @@ class AuditLog(UUIDMixin, TimestampMixin, Base):
     ip_address: Mapped[str] = mapped_column(String(64), index=True)
     details: Mapped[str] = mapped_column(Text, default="")
     machine_name: Mapped[str] = mapped_column(String(100), default="")
+    changes_json: Mapped[str] = mapped_column(Text, default="")

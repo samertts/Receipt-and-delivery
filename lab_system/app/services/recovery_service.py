@@ -83,12 +83,13 @@ def _get_backup_record(path: str) -> dict | None:
 
 
 def _checkpoint_wal():
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.execute("PRAGMA busy_timeout = 5000;")
     try:
+        conn = sqlite3.connect(str(DB_PATH))
+        conn.execute("PRAGMA busy_timeout = 5000;")
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
-    finally:
         conn.close()
+    except Exception:
+        pass
 
 
 def restore_from_backup(backup_path: Path | str) -> dict:
