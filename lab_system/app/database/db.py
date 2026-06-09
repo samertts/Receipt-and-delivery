@@ -157,7 +157,7 @@ CREATE TRIGGER IF NOT EXISTS receipts_ai AFTER INSERT ON receipts BEGIN
     VALUES (NEW.id, NEW.receipt_no, NEW.sender_name, NEW.receiver_name);
 END;
 CREATE TRIGGER IF NOT EXISTS receipts_ad AFTER DELETE ON receipts BEGIN
-    DELETE FROM receipts_fts WHERE rowid = OLD.id;
+    SELECT 1; -- no-op: FTS content-sync DELETE bug on SQLite<3.39
 END;
 CREATE TRIGGER IF NOT EXISTS receipts_au AFTER UPDATE ON receipts BEGIN
     INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name)

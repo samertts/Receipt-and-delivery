@@ -26,6 +26,10 @@ def _sanitize_filename(name: str) -> str:
     return name[:128]
 
 
+def _compute_hash(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def _check_magic_bytes(path: Path) -> str | None:
     try:
         with open(path, 'rb') as f:
