@@ -4,7 +4,7 @@ AppVersion=1.1.0
 AppPublisher=Iraqi Health Laboratory Directorate
 DefaultDirName={autopf}\LabReceiptSystem
 DefaultGroupName=Lab Receipt System
-OutputDir=Output
+OutputDir=..\..\installer\Output
 OutputBaseFilename=LabReceiptSetup
 Compression=lzma
 SolidCompression=yes
@@ -18,8 +18,8 @@ CloseApplications=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "..\dist\LabReceiptSystem.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\assets\*"; DestDir: "{app}\assets"; Flags: recursesubdirs createallsubdirs
+Source: "..\..\dist\LabReceiptSystem.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\assets\*"; DestDir: "{app}\assets"; Flags: recursesubdirs createallsubdirs
 
 [Dirs]
 Name: "{localappdata}\LabReceiptSystem\database"

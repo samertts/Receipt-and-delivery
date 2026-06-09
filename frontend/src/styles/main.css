@@ -2,23 +2,86 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  direction: rtl;
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    direction: rtl;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-blue-500;
+  }
 }
 
-.gov-card {
-  @apply bg-white rounded-xl shadow-sm border border-slate-200;
+@layer components {
+  .gov-card {
+    @apply bg-white rounded-xl shadow-sm border border-slate-200;
+  }
+
+  .gov-btn {
+    @apply px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150 inline-flex items-center justify-center gap-2;
+  }
+
+  .gov-btn-primary {
+    @apply gov-btn bg-primary-900 text-white hover:bg-primary-800 active:bg-primary-900 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .gov-btn-secondary {
+    @apply gov-btn bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300;
+  }
+
+  .gov-btn-success {
+    @apply gov-btn bg-emerald-600 text-white hover:bg-emerald-700;
+  }
+
+  .gov-btn-danger {
+    @apply gov-btn bg-red-600 text-white hover:bg-red-700;
+  }
+
+  .gov-input {
+    @apply w-full px-4 py-2 border border-slate-300 rounded-lg text-sm transition-colors
+      focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500
+      placeholder:text-slate-400;
+  }
+
+  .gov-select {
+    @apply w-full px-4 py-2 border border-slate-300 rounded-lg text-sm transition-colors
+      focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500
+      bg-white;
+  }
+
+  .gov-badge {
+    @apply px-2.5 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1;
+  }
+
+  .gov-label {
+    @apply block text-sm font-medium text-slate-700 mb-1;
+  }
+
+  .skeleton {
+    @apply bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded animate-pulse;
+  }
 }
 
-.gov-btn {
-  @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors;
-}
-
-.gov-btn-primary {
-  @apply gov-btn bg-blue-900 text-white hover:bg-blue-800;
-}
-
-.gov-btn-secondary {
-  @apply gov-btn bg-slate-100 text-slate-700 hover:bg-slate-200;
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #475569 transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: #475569;
+    border-radius: 2px;
+  }
 }
