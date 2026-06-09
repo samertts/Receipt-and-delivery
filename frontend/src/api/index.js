@@ -2,6 +2,9 @@ import client from './client'
 
 export const authApi = {
   login: (data) => client.post('/auth/login', data),
+  refresh: (data) => client.post('/auth/refresh', data),
+  logout: () => client.post('/auth/logout'),
+  changePassword: (data) => client.post('/auth/change-password', data),
 }
 
 export const transactionsApi = {

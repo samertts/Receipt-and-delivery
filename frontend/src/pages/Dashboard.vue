@@ -71,15 +71,17 @@ function statusClass(status) {
 
 onMounted(async () => {
   try {
-    const [txRes, orgRes] = await Promise.all([
+    const [txRes, orgRes, approvedRes, draftRes] = await Promise.all([
       transactionsApi.list({ limit: 5 }),
-      organizationsApi.list({}),
+      organizationsApi.list({ limit: 1 }),
+      transactionsApi.list({ limit: 1, status: 'approved' }),
+      transactionsApi.list({ limit: 1, status: 'draft' }),
     ])
     recentTransactions.value = txRes.data
-    stats.value.totalTransactions = txRes.data.length
-    stats.value.approved = txRes.data.filter((t) => t.status === 'approved').length
-    stats.value.draft = txRes.data.filter((t) => t.status === 'draft').length
-    stats.value.totalOrganizations = orgRes.data.length
+    stats.value.totalTransactions = parseInt(txRes.headers['x-total-count'] || 0)
+    stats.value.approved = parseInt(approvedRes.headers['x-total-count'] || 0)
+    stats.value.draft = parseInt(draftRes.headers['x-total-count'] || 0)
+    stats.value.totalOrganizations = parseInt(orgRes.headers['x-total-count'] || 0)
   } catch (e) {
     error.value = 'فشل في تحميل البيانات'
   } finally {

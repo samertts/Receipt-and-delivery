@@ -38,6 +38,8 @@ class Settings(BaseSettings):
 
     password_min_length: int = 8
 
+    redis_url: str = ""
+
     backup_retention_days: int = 30
     auto_backup_enabled: bool = False
 

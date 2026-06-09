@@ -20,6 +20,9 @@
           <div><span class="text-slate-500">التاريخ:</span> {{ tx.transaction_date }}</div>
           <div><span class="text-slate-500">المرسل:</span> {{ tx.sender_name }}</div>
           <div><span class="text-slate-500">المستلم:</span> {{ tx.receiver_name }}</div>
+          <div v-if="tx.sender_job_title"><span class="text-slate-500">مسمى المرسل:</span> {{ tx.sender_job_title }}</div>
+          <div v-if="tx.receiver_job_title"><span class="text-slate-500">مسمى المستلم:</span> {{ tx.receiver_job_title }}</div>
+          <div v-if="tx.transport_info"><span class="text-slate-500">معلومات النقل:</span> {{ tx.transport_info }}</div>
           <div><span class="text-slate-500">رقم التفويض:</span> {{ tx.authorization_no || '-' }}</div>
           <div><span class="text-slate-500">تاريخ التفويض:</span> {{ tx.authorization_date || '-' }}</div>
           <div v-if="tx.notes" class="md:col-span-2"><span class="text-slate-500">ملاحظات:</span> {{ tx.notes }}</div>
@@ -54,11 +57,13 @@
           </table>
         </div>
       </div>
-      <div v-if="auth.isAdmin || auth.userRole === 'supervisor'" class="flex gap-3">
-        <button @click="updateStatus('approved')" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700">اعتماد</button>
-        <button @click="updateStatus('rejected')" class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700">رفض</button>
-        <button @click="updateStatus('archived')" class="bg-slate-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700">أرشفة</button>
-        <button @click="deleteTxn" class="bg-red-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-900">حذف</button>
+      <div class="flex gap-3">
+        <div v-if="auth.isAdmin || auth.userRole === 'supervisor'" class="flex gap-3">
+          <button @click="updateStatus('approved')" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700">اعتماد</button>
+          <button @click="updateStatus('rejected')" class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700">رفض</button>
+          <button @click="updateStatus('archived')" class="bg-slate-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700">أرشفة</button>
+        </div>
+        <button v-if="auth.isAdmin" @click="deleteTxn" class="bg-red-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-900">حذف</button>
       </div>
     </div>
   </div>

@@ -1,64 +1,202 @@
 # Changelog - نظام إدارة الاستلام المختبري
 
-## [1.1.0] - 2026-06-08
+جميع التغييرات المهمة على المشروع سيتم توثيقها في هذا الملف.
 
-### Fixed
-- FTS triggers: no-op on DELETE for SQLite<3.9 content-sync compatibility
-- FTS search: handle hyphens in search terms (prevent FTS syntax errors)
-- Hard delete: cascade to receipt_history before deleting receipt
-- Soft delete: preserve FTS entry so search still works after soft delete
-- Restore: rely on AFTER UPDATE trigger to rebuild FTS (remove manual INSERT)
-- Backup: use sqlite3.Connection.backup() with WAL checkpoint for consistent copies
-- Recovery: fix unclosed connection and unguarded wal_checkpoint
-- Attachments: SHA-256 duplicate detection prevents double-storing identical files
-- Startup diagnostics: check all 10 production indexes (was 5)
-- CI build: fix installer path (installer/setup.iss → lab_system/installer/LabReceipt.iss)
-- Auth: block inactive users at login and on protected endpoints
-- Permissions: fix ForbiddenError instantiation (was raising class instead of instance)
-- Remove unused ROLE_HIERARCHY from deps
-- Model registration: import app.db.base in test conftest to register all models with SQLAlchemy Base
+يعتمد هذا المشروع على مبادئ Semantic Versioning.
 
-### Changed
-- Backend app_version now reads from VERSION file (single source of truth)
-- All version references synchronized to 1.1.0
+---
 
-## [1.0.0] - 2026-05-27
+# [1.2.0-dev] - Development Branch
 
-### Added
-- Complete PySide6 desktop application with SQLite
-- FastAPI web backend with PostgreSQL
-- Vue 3 PWA frontend with 9 functional pages
-- JWT-based authentication with refresh tokens
-- Role-based access control (Admin/Supervisor/User/Auditor)
-- RESTful API with Swagger/ReDoc documentation
-- Structured JSON logging system
-- Centralized error handling with custom exceptions
-- Rate limiting (login: 5/min, API: 100/min)
-- Password strength validation
-- Audit logging for all sensitive operations
-- Dynamic receipt numbering (LAB-YYYY-XXXXXX)
-- PDF generation with QR Code + Code128 barcode
-- Attachment management with SHA-256 hash
-- SQLite migration system with lock protection
-- Backup system with retention policy
-- 35 Iraqi health organization seed data
-- Docker Compose setup (PostgreSQL + Backend + Frontend)
-- CI/CD pipeline (GitHub Actions + Inno Setup)
-- Comprehensive test suite (auth, RBAC, transactions, etc.)
-- Arabic RTL support throughout
-- PWA support with offline service worker config
+الحالة: Development Only
+
+الفرع:
+
+feature/v1.2.0-dev
+
+لم يتم دمج هذه التغييرات في الإنتاج.
+
+## Added
+
+* Refresh Token Rotation with Blacklist
+* Logout Endpoint with Token Blacklisting
+* Change Password Endpoint
+* Redis-backed Rate Limiter with In-Memory Fallback
+* Transaction Deep Update (Add/Delete Items via PUT)
+* Pagination using X-Total-Count
+* Organization Search Dropdowns
+* Sample Type Autocomplete
+* Audit Changes JSON Viewer
+* Dashboard Accurate Counters
+* Network Connectivity Diagnostics
+* Real HTTP Transport in APIClient
+
+## Changed
+
+* Block inactive users from login and protected endpoints
+* Rename RateLimiter to MemoryRateLimiter
+* Remove unused ROLE_HIERARCHY
+* Restrict transaction deletion to administrators
+
+## Notes
+
+This branch is under development and is not part of the production release.
+
+---
+
+# [1.1.0] - 2026-06-08
+
+الحالة: Production Release
+
+Tag:
+
+v1.1.0
+
+## Fixed
+
+### Full-Text Search (FTS)
+
+* Fixed SQLite content-sync FTS compatibility issues
+* Fixed hyphen handling in search queries
+* Fixed hard delete cleanup for FTS records
+* Preserved FTS entries during soft delete
+* Rebuilt FTS entries correctly during restore operations
+
+### Backup & Recovery
+
+* Replaced file-copy backups with sqlite3.Connection.backup()
+* Added WAL checkpoint handling
+* Improved backup consistency during active database usage
+* Fixed unclosed recovery connections
+* Protected recovery procedures against WAL-related failures
+
+### Attachments
+
+* Added SHA-256 duplicate detection
+* Prevented duplicate file storage
+
+### Diagnostics
+
+* Expanded startup diagnostics to validate all production indexes
 
 ### Security
-- bcrypt password hashing (12 rounds)
-- JWT HS256 with configurable expiry
-- CORS with configurable origins
-- Input validation via Pydantic
-- SQL injection prevention (parameterized queries + ORM)
-- Migration lock for concurrent safety
-- Immutable audit logs
 
-### Notes
-- Default credentials: admin / Admin@123 (change immediately)
-- Secret key auto-generated if not configured
-- Desktop app runs fully offline with SQLite
-- Web app requires PostgreSQL 16
+* Block inactive users at login
+* Block inactive users on protected endpoints
+* Fixed ForbiddenError instantiation issue
+* Removed unused ROLE_HIERARCHY references
+
+### CI/CD
+
+* Fixed Inno Setup installer path
+* Improved release version synchronization
+
+### Testing
+
+* Fixed SQLAlchemy model registration during tests
+
+## Changed
+
+* VERSION file is now the single source of truth
+* Application version automatically reads from VERSION
+* All version references synchronized to 1.1.0
+
+## Production Certification
+
+* Tests: 26/26 PASS
+* Build Certification: 117/117 PASS
+* Migration Certification: 328/328 PASS
+* FTS Integrity: PASS
+* Backup Integrity: PASS
+* Recovery Integrity: PASS
+* Attachment Integrity: PASS
+* Version Governance: PASS
+* CI/CD Validation: PASS
+
+---
+
+# [1.0.0] - 2026-05-27
+
+الحالة: Initial Production Baseline
+
+## Added
+
+### Desktop Application
+
+* PySide6 Desktop Application
+* SQLite Local Database
+* Full Offline Operation
+
+### Web Platform
+
+* FastAPI Backend
+* PostgreSQL Support
+* Vue 3 Progressive Web Application (PWA)
+
+### Core Features
+
+* Role-Based Access Control (RBAC)
+* REST API
+* Swagger / ReDoc Documentation
+* Structured Logging
+* Centralized Error Handling
+* Audit Logging
+* Dynamic Receipt Numbering
+* PDF Generation
+* QR Code Support
+* Barcode Support
+* Attachment Management
+* Migration Framework
+* Backup Framework
+* Iraqi Health Organization Seed Data
+* Docker Deployment Support
+* GitHub Actions CI/CD
+* Arabic RTL Support
+
+### Security
+
+* bcrypt Password Hashing
+* JWT Authentication
+* CORS Protection
+* Input Validation
+* SQL Injection Protection
+* Migration Locking
+* Immutable Audit Logs
+
+## Notes
+
+* Default Credentials: admin / Admin@123
+* Desktop Application Works Fully Offline
+* Web Platform Requires PostgreSQL
+* This version represents the initial production baseline
+
+---
+
+# Version Policy
+
+Production Branch:
+main
+
+Production Release:
+v1.1.0
+
+Development Branch:
+feature/v1.2.0-dev
+
+Rules:
+
+* No direct development on main
+* No direct commits to production releases
+* All new features start from feature branches
+* All merges require review and validation
+* Production releases must be tagged before deployment
+
+---
+
+Last Production Release:
+
+v1.1.0
+
+Repository:
+
+[git@github.com](mailto:git@github.com):samertts/Receipt-and-delivery.git

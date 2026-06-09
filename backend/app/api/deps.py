@@ -12,13 +12,6 @@ from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
-ROLE_HIERARCHY = {
-    "auditor": ["auditor"],
-    "user": ["user", "auditor"],
-    "supervisor": ["supervisor", "user", "auditor"],
-    "admin": ["admin", "supervisor", "user", "auditor"],
-}
-
 PERMISSION_ROLES = {
     "view_dashboard": ["admin", "supervisor", "user", "auditor"],
     "view_transactions": ["admin", "supervisor", "user", "auditor"],

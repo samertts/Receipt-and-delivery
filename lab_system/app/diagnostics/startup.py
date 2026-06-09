@@ -5,6 +5,8 @@ Runs on every startup to detect and repair common issues.
 """
 
 import sqlite3
+import urllib.error
+import urllib.request
 from datetime import datetime
 
 from lab_system.app.settings.config import CONFIG, STORAGE_DIR
@@ -98,6 +100,23 @@ def check_folders() -> dict:
     return {"created": created, "missing": missing}
 
 
+def check_network(host: str = "https://google.com", timeout: int = 5) -> dict:
+    """Check network connectivity by reaching a known host."""
+    result = {"reachable": False, "latency_ms": 0, "error": ""}
+    try:
+        import time
+        start = time.time()
+        req = urllib.request.Request(host, method="HEAD")
+        with urllib.request.urlopen(req, timeout=timeout):
+            result["latency_ms"] = int((time.time() - start) * 1000)
+            result["reachable"] = True
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError) as e:
+        result["error"] = str(e)
+    except Exception as e:
+        result["error"] = f"Unexpected: {e}"
+    return result
+
+
 def check_config() -> dict:
     """Verify configuration integrity."""
     issues = []
@@ -116,6 +135,7 @@ def run_all_checks() -> dict:
         "indexes": check_indexes(),
         "folders": check_folders(),
         "config": check_config(),
+        "network": check_network(),
         "all_ok": False,
     }
     report["all_ok"] = (
@@ -197,6 +217,14 @@ def diagnose_and_report() -> str:
             lines.append(f"  WARNING: {i}")
     else:
         lines.append("  OK")
+
+    net = check_network()
+    lines.append("")
+    lines.append("--- Network ---")
+    if net["reachable"]:
+        lines.append(f"  Reachable ({net['latency_ms']} ms)")
+    else:
+        lines.append(f"  Unreachable: {net['error']}")
     lines.append("=" * 60)
 
     return "\n".join(lines)

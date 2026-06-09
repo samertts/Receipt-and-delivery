@@ -17,7 +17,7 @@ class TransactionItem(UUIDMixin, TimestampMixin, Base):
     damaged_count: Mapped[int] = mapped_column(Integer)
     rejected_count: Mapped[int] = mapped_column(Integer)
     nonconforming_count: Mapped[int] = mapped_column(Integer)
-    transport_condition: Mapped[str] = mapped_column(String(100))
+    transport_condition: Mapped[str] = mapped_column(String(100), default="")
     notes: Mapped[str] = mapped_column(Text, default="")
 
     transaction: Mapped["Transaction"] = relationship(  # noqa: F821

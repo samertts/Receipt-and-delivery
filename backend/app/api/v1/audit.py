@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
@@ -21,4 +22,9 @@ def list_audit_logs(
     query = db.query(AuditLog)
     if action_type:
         query = query.filter(AuditLog.action_type == action_type)
-    return query.order_by(AuditLog.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
+    total_count = query.count()
+    items = query.order_by(AuditLog.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
+    return JSONResponse(
+        content=[AuditLogResponse.model_validate(i).model_dump(mode="json") for i in items],
+        headers={"X-Total-Count": str(total_count)},
+    )
