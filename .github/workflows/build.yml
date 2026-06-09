@@ -158,7 +158,14 @@ jobs:
           dir dist\
           exit /b 1
           )
-          echo EXE verified. Size:
+          for %%i in (dist\LabReceiptSystem.exe) do if %%~zi EQU 0 (
+          echo ERROR: EXE is zero bytes
+          exit /b 1
+          )
+          for %%i in (dist\LabReceiptSystem.exe) do if %%~zi LSS 5000000 (
+          echo WARNING: EXE is suspiciously small (%%~zi bytes)
+          )
+          for %%i in (dist\LabReceiptSystem.exe) do echo EXE verified successfully. Size: %%~zi bytes
           dir dist\LabReceiptSystem.exe
 
       - name: Install Inno Setup
@@ -166,11 +173,35 @@ jobs:
         run: |
           choco install innosetup -y
 
+      - name: Certify Installer Inputs
+        shell: cmd
+        run: |
+          python scripts/certify_installer_inputs.py
+          if errorlevel 1 (
+            echo ERROR: Installer input certification failed
+            exit /b 1
+          )
+          echo Installer inputs certified.
+
+      - name: Verify EXE Before Installer
+        shell: cmd
+        run: |
+          if not exist dist\LabReceiptSystem.exe (
+            echo ERROR: dist\LabReceiptSystem.exe not found before installer build
+            dir dist\
+            exit /b 1
+          )
+          for %%i in (dist\LabReceiptSystem.exe) do if %%~zi EQU 0 (
+            echo ERROR: dist\LabReceiptSystem.exe is zero bytes
+            exit /b 1
+          )
+          for %%i in (dist\LabReceiptSystem.exe) do echo EXE exists. Size: %%~zi bytes
+
       - name: Build Installer
         shell: cmd
         run: |
           for /f %%i in (VERSION) do set APP_VER=%%i
-          powershell -Command "(Get-Content lab_system/installer/LabReceipt.iss) -replace 'AppVersion=1.0.0', ('AppVersion=' + $env:APP_VER) | Set-Content lab_system/installer/LabReceipt.iss"
+          powershell -Command "$v = (Get-Content VERSION).Trim(); (Get-Content lab_system/installer/LabReceipt.iss) -replace '(?<=AppVersion=)[\d\w.-]+', $v | Set-Content lab_system/installer/LabReceipt.iss"
           ISCC lab_system/installer/LabReceipt.iss
 
       - name: Upload EXE
@@ -178,6 +209,19 @@ jobs:
         with:
           name: LabReceiptSystem
           path: dist/LabReceiptSystem.exe
+
+      - name: Verify Installer Output
+        shell: cmd
+        run: |
+          if not exist installer\Output\LabReceiptSetup.exe (
+            echo ERROR: Installer output not found
+            dir installer\Output\
+            exit /b 1
+          )
+          for %%i in (installer\Output\LabReceiptSetup.exe) do if %%~zi LSS 1000000 (
+            echo WARNING: Installer is suspiciously small (%%~zi bytes)
+          )
+          for %%i in (installer\Output\LabReceiptSetup.exe) do echo Installer verified. Size: %%~zi bytes
 
       - name: Upload Setup
         uses: actions/upload-artifact@v4
@@ -191,6 +235,20 @@ jobs:
         with:
           name: build-diagnostics
           path: build/
+
+      - name: Verify Release Artifacts
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: cmd
+        run: |
+          if not exist dist\LabReceiptSystem.exe (
+            echo ERROR: Release EXE missing
+            exit /b 1
+          )
+          if not exist installer\Output\LabReceiptSetup.exe (
+            echo ERROR: Release installer missing
+            exit /b 1
+          )
+          echo Release artifacts verified.
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
