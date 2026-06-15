@@ -7,6 +7,7 @@ Usage:
     python scripts/seed.py --desktop           # Seeds the desktop app SQLite DB
 """
 
+import os
 import sys
 
 from app.core.logging import setup_logging
@@ -78,7 +79,7 @@ def seed_admin(db):
         user = User(
             username="admin",
             full_name="مدير النظام",
-            password_hash=hash_password("Admin@123"),
+            password_hash=hash_password(os.environ.get('LAB_ADMIN_PASSWORD', 'Admin@123')),
             role="admin",
             status="active",
         )

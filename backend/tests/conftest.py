@@ -77,7 +77,10 @@ def admin_token(client, db: Session) -> str:
         "/api/auth/login",
         json={"username": "admin", "password": "Admin@123"},
     )
-    return response.json()["access_token"]
+    body = response.json()
+    if "data" in body:
+        return body["data"]["access_token"]
+    return body["access_token"]
 
 
 @pytest.fixture
@@ -99,4 +102,7 @@ def user_token(client, db: Session) -> str:
         "/api/auth/login",
         json={"username": "user1", "password": "User@1234"},
     )
-    return response.json()["access_token"]
+    body = response.json()
+    if "data" in body:
+        return body["data"]["access_token"]
+    return body["access_token"]

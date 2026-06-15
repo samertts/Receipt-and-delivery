@@ -1,11 +1,13 @@
 import sqlite3
 from datetime import datetime
 
+from lab_system.app.auth.permissions import with_permission
 from lab_system.app.database import db as _db
 from lab_system.app.settings.config import DB_PATH, STORAGE_DIR
 
 
-def create_backup(user_id=None, notes=''):
+@with_permission('backup.create')
+def create_backup(user_id=None, notes='', user=None):
     target = STORAGE_DIR / 'backups' / f'lab_system_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db'
     target.parent.mkdir(parents=True, exist_ok=True)
 

@@ -1,7 +1,8 @@
 import time
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Request
-from jose import jwt
+from jose import jwt, ExpiredSignatureError, JWTError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -10,6 +11,7 @@ from app.core.config import settings
 from app.core.exceptions import UnauthorizedError, ValidationError
 from app.core.security import validate_password_strength
 from app.db.session import get_db
+from app.models.blacklisted_token import BlacklistedToken
 from app.models.user import User
 from app.schemas.auth import (
     ChangePasswordRequest,
@@ -26,11 +28,51 @@ from app.services.security import (
 
 router = APIRouter(prefix="/auth", tags=["المصادقة"])
 
-_blacklisted_tokens: set[str] = set()
+
+def _token_blacklisted(token: str, db: Session) -> bool:
+    return db.query(BlacklistedToken).filter(BlacklistedToken.token == token).first() is not None
 
 
-def _token_blacklisted(token: str) -> bool:
-    return token in _blacklisted_tokens
+def _decode_token_exp(token: str) -> datetime | None:
+    try:
+        payload = jwt.decode(
+            token,
+            settings.effective_secret_key,
+            algorithms=[settings.algorithm],
+            options={"verify_exp": False},
+        )
+        exp = payload.get("exp")
+        if exp:
+            return datetime.fromtimestamp(exp, tz=timezone.utc)
+    except (ExpiredSignatureError, JWTError):
+        pass
+    return None
+
+
+def _blacklist_token(token: str, db: Session, expires_at: datetime | None = None) -> None:
+    existing = db.query(BlacklistedToken).filter(BlacklistedToken.token == token).first()
+    if existing:
+        return
+    if expires_at is None:
+        expires_at = _decode_token_exp(token)
+    entry = BlacklistedToken(
+        token=token,
+        blacklisted_at=datetime.now(timezone.utc),
+        expires_at=expires_at,
+    )
+    db.add(entry)
+    db.commit()
+
+
+def _purge_expired_blacklisted_tokens(db: Session) -> int:
+    now = datetime.now(timezone.utc)
+    deleted = db.query(BlacklistedToken).filter(
+        BlacklistedToken.expires_at.isnot(None),
+        BlacklistedToken.expires_at < now,
+    ).delete(synchronize_session=False)
+    if deleted:
+        db.commit()
+    return deleted
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -78,7 +120,7 @@ def refresh_token(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    if _token_blacklisted(payload.refresh_token):
+    if _token_blacklisted(payload.refresh_token, db):
         raise UnauthorizedError("رمز التحديث غير صالح")
 
     try:
@@ -98,7 +140,7 @@ def refresh_token(
     if not user or user.status != "active":
         raise UnauthorizedError("المستخدم غير موجود أو غير نشط")
 
-    _blacklisted_tokens.add(payload.refresh_token)
+    _blacklist_token(payload.refresh_token, db)
 
     new_access = create_access_token(sub=user.username, role=user.role)
     new_refresh = create_refresh_token(sub=user.username)
@@ -121,7 +163,7 @@ def logout(
     auth_header = request.headers.get("Authorization", "")
     token = auth_header.replace("Bearer ", "") if auth_header else ""
     if token:
-        _blacklisted_tokens.add(token)
+        _blacklist_token(token, db)
 
     log_audit(
         user_id=str(current_user.id),
@@ -152,7 +194,7 @@ def change_password(
     auth_header = request.headers.get("Authorization", "")
     current_token = auth_header.replace("Bearer ", "") if auth_header else ""
     if current_token:
-        _blacklisted_tokens.add(current_token)
+        _blacklist_token(current_token, db)
 
     log_audit(
         user_id=str(current_user.id),

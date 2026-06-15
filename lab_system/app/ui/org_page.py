@@ -20,6 +20,7 @@ from lab_system.app.auth.permissions import check_permission
 from lab_system.app.audit.logger import log_action
 from lab_system.app.services.org_service import list_organizations, upsert_organization
 from lab_system.app.ui.page_header import PageHeader
+from lab_system.app.utils.constants import TABLE_STYLE
 
 ORG_TYPES = [
     "مختبر صحة عامة",
@@ -101,6 +102,12 @@ class OrgDialog(QDialog):
         self._build_form()
         if self.editing:
             self._populate()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.reject()
+        else:
+            super().keyPressEvent(event)
 
     def _build_form(self):
         form = QFormLayout(self)
@@ -187,7 +194,7 @@ class OrgDialog(QDialog):
             "logo_path": "",
         }
         try:
-            upsert_organization(payload)
+            upsert_organization(payload, user=self.current_user)
             self.accept()
         except Exception as e:
             QMessageBox.warning(self, "خطأ", f"فشل الحفظ: {e}")
@@ -253,6 +260,7 @@ class OrgPage(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSortingEnabled(True)
+        self.table.setStyleSheet(TABLE_STYLE)
         self.layout().addWidget(self.table)
 
     def _filter_text(self):
@@ -348,7 +356,7 @@ class OrgPage(QWidget):
     def _toggle_status(self, org_id, current_status):
         new_status = "Inactive" if current_status == "Active" else "Active"
         check_permission(self.current_user, 'organizations.update')
-        upsert_organization({"id": org_id, "status": new_status})
+        upsert_organization({"id": org_id, "status": new_status}, user=self.current_user)
         log_action(
             self.current_user["id"],
             "org_status_toggled",

@@ -28,7 +28,8 @@ class TestAuditChangesJson:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert audit_resp.status_code == 200
-        logs = audit_resp.json()
+        body = audit_resp.json()
+        logs = body.get("data", body)
         matching = [log for log in logs if log.get("changes_json")]
         assert len(matching) > 0, "No audit log with changes_json found"
         log = matching[0]
@@ -60,7 +61,8 @@ class TestAuditChangesJson:
             "/api/audit-logs?limit=50",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        logs = audit_resp.json()
+        body = audit_resp.json()
+        logs = body.get("data", body)
         delete_logs = [log for log in logs if log.get("changes_json")]
         assert delete_logs
         changes = json.loads(delete_logs[0]["changes_json"])

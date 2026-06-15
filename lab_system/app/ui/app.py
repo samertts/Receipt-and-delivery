@@ -66,6 +66,12 @@ class ChangePasswordDialog(QDialog):
         save_btn.clicked.connect(self._save)
         layout.addRow(save_btn)
 
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.reject()
+        else:
+            super().keyPressEvent(event)
+
     def _save(self):
         if self.new_password.text() != self.confirm_password.text():
             QMessageBox.warning(self, "خطأ", "كلمتا المرور غير متطابقتين")
@@ -114,7 +120,9 @@ class LoginWindow(QDialog):
         layout.addWidget(submit)
 
     def keyPressEvent(self, event):
-        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+        if event.key() == Qt.Key_Escape:
+            self.reject()
+        elif event.key() in (Qt.Key_Return, Qt.Key_Enter):
             self._login()
         else:
             super().keyPressEvent(event)
@@ -152,7 +160,7 @@ class MainWindow(QMainWindow):
         self.sidebar.page_changed.connect(self._on_page_change)
 
         page_map = {
-            "dashboard": DashboardPage(user, auth_service=auth_service),
+            "dashboard": DashboardPage(user, auth_service=auth_service, navigate_cb=self._navigate_to),
             "receipts": ReceiptsPage(user),
             "orgs": OrgPage(user),
             "samples": ReceiptsPage(user),
@@ -193,6 +201,11 @@ class MainWindow(QMainWindow):
         self._session_timer = QTimer()
         self._session_timer.timeout.connect(self._check_session)
         self._session_timer.start(SESSION_CHECK_INTERVAL)
+
+        from lab_system.app.sync.service import sync_service
+        self._sync_timer = QTimer()
+        self._sync_timer.timeout.connect(sync_service.sync_pending)
+        self._sync_timer.start(60000)
 
         self._setup_shortcuts()
 
@@ -240,6 +253,12 @@ class MainWindow(QMainWindow):
         if self.auth:
             self.auth.touch_activity()
 
+    def _navigate_to(self, key):
+        """Public navigation helper, used by quick action callbacks."""
+        if key in self.page_keys:
+            self._on_page_change(key)
+            self.sidebar.set_active(key)
+
     def _check_session(self):
         if not self.auth:
             return
@@ -257,6 +276,7 @@ QMainWindow::separator {{ background: {THEME['border']}; width: 1px; }}
 QPushButton {{ background-color: {THEME['primary']}; color: white; border: none; border-radius: 6px; padding: 8px 20px; min-height: 38px; font-size: 12pt; font-weight: 600; }}
 QPushButton:hover {{ background-color: #0B3D6B; }}
 QPushButton:pressed {{ background-color: #092D4F; }}
+QPushButton:focus {{ outline: 2px solid {THEME['primary']}; outline-offset: 2px; }}
 QPushButton:disabled {{ background-color: #CBD5E1; color: #94A3B8; }}
 
 QLineEdit {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; font-size: 12pt; }}
@@ -283,6 +303,9 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 
 QDateEdit {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; }}
 QDateEdit:focus {{ border: 2px solid {THEME['primary']}; }}
+
+QSpinBox {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; }}
+QSpinBox:focus {{ border: 2px solid {THEME['primary']}; }}
 
 QGroupBox {{ font-weight: bold; border: 1px solid {THEME['border']}; border-radius: 8px; margin-top: 12px; padding-top: 16px; }}
 QGroupBox::title {{ subcontrol-origin: margin; left: 12px; padding: 0 6px; }}

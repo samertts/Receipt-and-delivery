@@ -1,20 +1,21 @@
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
 from app.core.audit import log_audit
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
+from app.core.response_envelope import paginated_response
 from app.core.security import validate_password_strength
 from app.db.session import get_db
 from app.models.user import User
+from app.repositories import UserRepository
 from app.schemas.auth import UserCreate, UserResponse, UserUpdate
 from app.services.security import hash_password
 
 router = APIRouter(prefix="/users", tags=["المستخدمين"])
 
 
-@router.get("", response_model=list[UserResponse])
+@router.get("")
 def list_users(
     page: int = Query(1, ge=1),
     limit: int = Query(20, le=100),
@@ -22,14 +23,16 @@ def list_users(
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("view_users")),
 ):
-    query = db.query(User)
+    repo = UserRepository(db)
+    filters = {}
     if role:
-        query = query.filter(User.role == role)
-    total_count = query.count()
-    items = query.order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
-    return JSONResponse(
-        content=[UserResponse.model_validate(u).model_dump(mode="json") for u in items],
-        headers={"X-Total-Count": str(total_count)},
+        filters["role"] = role
+    items, total = repo.list(page=page, limit=limit, filters=filters, order_by="created_at", desc=True)
+    return paginated_response(
+        items=[UserResponse.model_validate(u).model_dump(mode="json") for u in items],
+        total=total,
+        page=page,
+        per_page=limit,
     )
 
 

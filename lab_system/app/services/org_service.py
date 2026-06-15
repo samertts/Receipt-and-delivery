@@ -1,3 +1,4 @@
+from lab_system.app.auth.permissions import with_permission
 from lab_system.app.database import db as _db
 
 
@@ -8,7 +9,8 @@ def list_organizations(*, active_only=False):
         return conn.execute('SELECT * FROM organizations ORDER BY name').fetchall()
 
 
-def upsert_organization(payload):
+@with_permission('organizations.update')
+def upsert_organization(payload, user=None):
     with _db.get_conn() as conn:
         if payload.get('id'):
             conn.execute('''UPDATE organizations SET name=?,code=?,org_type=?,governorate=?,address=?,phone=?,email=?,logo_path=?,notes=?,status=? WHERE id=?''',

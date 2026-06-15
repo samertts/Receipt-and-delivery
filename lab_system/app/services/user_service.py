@@ -1,12 +1,22 @@
+import os
+import secrets
+import string
 from datetime import datetime, timedelta
 
+from lab_system.app.auth.permissions import with_permission
 from lab_system.app.auth.security import hash_password, verify_password
 from lab_system.app.database import db as _db
 from lab_system.app.utils.errors import AuthenticationError
 
 
+_ADMIN_PASSWORD_CHARS = string.ascii_letters + string.digits + "!@#$%^&*"
+
+
 def _generate_admin_password() -> str:
-    return 'Admin@123'
+    env_pw = os.environ.get('LAB_ADMIN_PASSWORD')
+    if env_pw:
+        return env_pw
+    return ''.join(secrets.choice(_ADMIN_PASSWORD_CHARS) for _ in range(16))
 
 
 def seed_default_users():
@@ -92,22 +102,26 @@ def list_users():
         return [dict(r) for r in rows]
 
 
-def create_user(full_name, username, password, role, institution_id=None, phone='', notes=''):
+@with_permission('users.create')
+def create_user(full_name, username, password, role, institution_id=None, phone='', notes='', user=None):
     with _db.get_conn() as conn:
         conn.execute('INSERT INTO users(full_name,username,password_hash,role,institution_id,phone,notes,status,password_changed_at) VALUES(?,?,?,?,?,?,?,?,?)',
                      (full_name, username, hash_password(password), role, institution_id, phone, notes, 'Active', datetime.now().isoformat(timespec='seconds')))
 
 
-def disable_user(user_id):
+@with_permission('users.update')
+def disable_user(user_id, user=None):
     with _db.get_conn() as conn:
         conn.execute("UPDATE users SET status='Inactive' WHERE id=?", (user_id,))
 
-def enable_user(user_id):
+@with_permission('users.update')
+def enable_user(user_id, user=None):
     with _db.get_conn() as conn:
         conn.execute("UPDATE users SET status='Active' WHERE id=?", (user_id,))
 
 
-def reset_password(user_id, new_password):
+@with_permission('users.reset_password')
+def reset_password(user_id, new_password, user=None):
     with _db.get_conn() as conn:
         conn.execute('UPDATE users SET password_hash=?, password_changed_at=? WHERE id=?',
                      (hash_password(new_password), datetime.now().isoformat(timespec='seconds'), user_id))

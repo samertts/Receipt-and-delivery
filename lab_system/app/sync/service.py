@@ -11,6 +11,7 @@ resolution stubs ready for future implementation.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -23,12 +24,17 @@ from lab_system.app.sync.device import get_branch_id, get_device_id
 def _utcnow() -> str:
     return datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
+
 SYNC_QUEUE_TABLE = 'sync_queue'
 SYNC_STATUS_PENDING = 'pending'
 SYNC_STATUS_SYNCED = 'synced'
 SYNC_STATUS_CONFLICT = 'conflict'
 
 SYNC_ACTIONS = ('create', 'update', 'delete')
+
+# Retry policy
+SYNC_MAX_RETRIES = 10
+SYNC_BACKOFF_BASE_SECONDS = 30
 
 
 @dataclass
@@ -79,13 +85,17 @@ class SyncService:
             return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def get_pending(self, limit: int = 100) -> list[SyncQueueEntry]:
+        """Return pending entries that have not exceeded max retries and are eligible for retry."""
         with _db.get_conn() as conn:
             rows = conn.execute(
                 f"""SELECT * FROM {SYNC_QUEUE_TABLE}
                     WHERE status = ?
+                      AND retry_count < ?
+                      AND (synced_at = '' OR
+                           CAST(julianday('now') - julianday(synced_at) AS REAL) * 86400 > ?)
                     ORDER BY created_at ASC
                     LIMIT ?""",
-                (SYNC_STATUS_PENDING, limit),
+                (SYNC_STATUS_PENDING, SYNC_MAX_RETRIES, SYNC_BACKOFF_BASE_SECONDS, limit),
             ).fetchall()
         return [SyncQueueEntry(**dict(r)) for r in rows]
 
@@ -106,8 +116,8 @@ class SyncService:
     def increment_retry(self, entry_id: int) -> int:
         with _db.get_conn() as conn:
             conn.execute(
-                f"UPDATE {SYNC_QUEUE_TABLE} SET retry_count = retry_count + 1 WHERE id=?",
-                (entry_id,),
+                f"UPDATE {SYNC_QUEUE_TABLE} SET retry_count = retry_count + 1, synced_at=? WHERE id=?",
+                (_utcnow(), entry_id),
             )
             row = conn.execute(
                 f"SELECT retry_count FROM {SYNC_QUEUE_TABLE} WHERE id=?",
@@ -143,10 +153,19 @@ class SyncService:
         _local_data: dict[str, Any],
     ) -> ConflictResolution:
         """
-        Conflict resolution stub.
-        Default strategy: server-wins.
-        Override to implement custom merge logic.
+        Conflict resolution: last-writer-wins based on timestamp comparison.
+
+        If both sides have timestamps, the later one wins.
+        Otherwise, defaults to server-wins.
         """
+        remote_ts = remote_data.get('updated_at') or remote_data.get('created_at', '')
+        local_ts = _local_data.get('updated_at') or _local_data.get('created_at', '') if isinstance(_local_data, dict) else ''
+        if remote_ts and local_ts and local_ts > remote_ts:
+            return ConflictResolution(
+                strategy='last-writer-wins',
+                resolved=True,
+                merged=_local_data,
+            )
         return ConflictResolution(
             strategy='server-wins',
             resolved=True,
@@ -176,7 +195,21 @@ class SyncService:
             for e in pending:
                 self.mark_synced(e.id)
             return {'synced': len(pending), 'conflicts': 0}
+        if response.status_code == 409:
+            for e in pending:
+                self.mark_conflict(e.id, response.data.get('detail', ''))
+            return {'synced': 0, 'conflicts': len(pending)}
+        for e in pending:
+            retries = self.increment_retry(e.id)
+            if retries >= SYNC_MAX_RETRIES:
+                self.mark_conflict(e.id, f'Max retries ({SYNC_MAX_RETRIES}) exceeded')
         return {'synced': 0, 'conflicts': len(pending)}
+
+    def sync_pending(self) -> dict[str, int]:
+        """Retry pending entries. Safe to call from a timer."""
+        if not self.is_online:
+            return {'error': 'disabled'}
+        return self.sync_all()
 
     def push_entity(
         self,
@@ -194,6 +227,21 @@ class SyncService:
                 self.mark_conflict(entry_id)
                 return {'entry_id': entry_id, 'status': 'conflict'}
         return {'entry_id': entry_id, 'status': SYNC_STATUS_PENDING}
+
+    def get_health(self) -> dict[str, Any]:
+        """Return sync health status for dashboard monitoring."""
+        stats = self.get_stats()
+        pending = stats.get(SYNC_STATUS_PENDING, 0)
+        conflicts = stats.get(SYNC_STATUS_CONFLICT, 0)
+        total = sum(stats.values()) if stats else 0
+        return {
+            'enabled': self.is_online,
+            'pending': pending,
+            'conflicts': conflicts,
+            'synced': stats.get(SYNC_STATUS_SYNCED, 0),
+            'total': total,
+            'healthy': pending == 0 and conflicts == 0,
+        }
 
 
 sync_service = SyncService()

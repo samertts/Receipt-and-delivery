@@ -74,7 +74,8 @@ class TestTransactionCRUD:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 200
-        assert isinstance(response.json(), list)
+        body = response.json()
+        assert isinstance(body.get("data", body), list)
 
     def test_list_transactions_pagination_header(self, client, db, admin_token):
         from app.models.transaction import Transaction
@@ -99,7 +100,8 @@ class TestTransactionCRUD:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 200
-        assert response.headers.get("X-Total-Count") == "5"
+        body = response.json()
+        assert body.get("meta", {}).get("total") == 5
 
     def test_get_transaction_not_found(self, client, admin_token):
         response = client.get(

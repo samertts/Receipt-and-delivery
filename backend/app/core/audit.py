@@ -1,3 +1,4 @@
+import hashlib
 from typing import Optional
 
 from app.core.logging import logger
@@ -5,6 +6,24 @@ from app.db.session import SessionLocal
 from app.models.audit_log import AuditLog
 from fastapi import Request
 from sqlalchemy.orm import Session
+
+
+def _get_prev_hash(db: Session) -> str:
+    prev = (
+        db.query(AuditLog)
+        .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+        .first()
+    )
+    if prev is None:
+        return ""
+    return AuditLog.compute_hash(
+        str(prev.id),
+        prev.user_id,
+        prev.action_type,
+        prev.ip_address,
+        prev.details,
+        prev.prev_hash or "",
+    )
 
 
 def log_audit(
@@ -21,12 +40,14 @@ def log_audit(
         db = SessionLocal()
         close_db = True
     try:
+        prev_hash = _get_prev_hash(db)
         audit = AuditLog(
             user_id=user_id,
             action_type=action_type,
             ip_address=ip_address,
             details=details,
             changes_json=changes_json,
+            prev_hash=prev_hash,
         )
         db.add(audit)
         db.commit()
@@ -41,3 +62,18 @@ def log_audit(
     finally:
         if close_db:
             db.close()
+
+
+def verify_audit_chain(db: Session) -> tuple[bool, int, str]:
+    entries = db.query(AuditLog).order_by(AuditLog.created_at.asc(), AuditLog.id.asc()).all()
+    for i, entry in enumerate(entries):
+        expected_prev = ""
+        if i > 0:
+            prev = entries[i - 1]
+            expected_prev = AuditLog.compute_hash(
+                str(prev.id), prev.user_id, prev.action_type,
+                prev.ip_address, prev.details, prev.prev_hash or "",
+            )
+        if (entry.prev_hash or "") != expected_prev:
+            return False, i, f"Hash mismatch at row {entry.id}"
+    return True, len(entries), f"Chain intact: {len(entries)} entries"

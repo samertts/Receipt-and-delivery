@@ -21,6 +21,7 @@ from lab_system.app.services.backup_service import create_backup
 from lab_system.app.services.recovery_service import verify_backup
 from lab_system.app.settings.config import DB_PATH
 from lab_system.app.ui.notifications import toast
+from lab_system.app.utils.constants import TABLE_STYLE
 from lab_system.app.ui.page_header import PageHeader
 
 
@@ -48,6 +49,7 @@ class BackupPage(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSortingEnabled(True)
+        self.table.setStyleSheet(TABLE_STYLE)
         self.layout().addWidget(self.table)
 
         self.refresh()
@@ -56,7 +58,7 @@ class BackupPage(QWidget):
         check_permission(self.current_user, 'backup.create')
         from pathlib import Path
         try:
-            path = create_backup(user_id=self.current_user.get("id"))
+            path = create_backup(user_id=self.current_user.get("id"), user=self.current_user)
             log_action(
                 self.current_user["id"],
                 "backup_created",
@@ -99,9 +101,10 @@ class BackupPage(QWidget):
             self.table.setCellWidget(i, 3, actions_widget)
 
     def _verify(self, backup_path):
+        check_permission(self.current_user, 'backup.verify')
         result = verify_backup(backup_path)
         if result["valid"]:
-            toast(self, "تم إنشاء النسخة الاحتياطية", "success")
+            toast(self, "النسخة سليمة", "success")
         else:
             QMessageBox.warning(
                 self, "تحقق", f"النسخة تالفة: {result.get('error', 'خطأ غير معروف')}",
@@ -124,13 +127,16 @@ class BackupPage(QWidget):
             result = verify_backup(backup_path)
             if not result.get("valid"):
                 raise ValueError(f"النسخة تالفة: {result.get('error', 'خطأ غير معروف')}")
-            shutil.copy2(src, DB_PATH)
+            from lab_system.app.services.recovery_service import restore_from_backup
+            result = restore_from_backup(backup_path)
+            if not result.get("success"):
+                raise RuntimeError(result.get("error", "فشلت الاستعادة"))
             log_action(
                 self.current_user["id"],
                 "backup_restored",
                 f"استعادة من: {Path(backup_path).name}",
             )
-            toast(self, "تم التحقق بنجاح", "success")
+        toast(self, "تم التحقق بنجاح", "success")
         except Exception as e:
             QMessageBox.warning(
                 self, "خطأ", f"فشلت الاستعادة: {e}",

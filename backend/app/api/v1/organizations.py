@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
 from app.core.audit import log_audit
 from app.core.exceptions import ConflictError, NotFoundError
+from app.core.response_envelope import paginated_response
 from app.db.session import get_db
 from app.models.organization import Organization
 from app.models.user import User
+from app.repositories import OrganizationRepository
 from app.schemas.transaction import (
     OrganizationCreate,
     OrganizationResponse,
@@ -17,7 +18,7 @@ from app.schemas.transaction import (
 router = APIRouter(prefix="/organizations", tags=["المؤسسات"])
 
 
-@router.get("", response_model=list[OrganizationResponse])
+@router.get("")
 def list_organizations(
     page: int = Query(1, ge=1),
     limit: int = Query(20, le=100),
@@ -25,12 +26,13 @@ def list_organizations(
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("view_organizations")),
 ):
-    query = db.query(Organization)
-    total_count = query.count()
-    items = query.order_by(Organization.name).offset((page - 1) * limit).limit(limit).all()
-    return JSONResponse(
-        content=[OrganizationResponse.model_validate(o).model_dump(mode="json") for o in items],
-        headers={"X-Total-Count": str(total_count)},
+    repo = OrganizationRepository(db)
+    items, total = repo.list(page=page, limit=limit, order_by="name", desc=False)
+    return paginated_response(
+        items=[OrganizationResponse.model_validate(o).model_dump(mode="json") for o in items],
+        total=total,
+        page=page,
+        per_page=limit,
     )
 
 

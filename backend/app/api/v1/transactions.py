@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_permission
 from app.core.audit import log_audit
 from app.core.exceptions import NotFoundError, ValidationError
+from app.core.response_envelope import paginated_response
 from app.db.session import get_db
 from app.models.transaction import Transaction
 from app.models.transaction_item import TransactionItem
@@ -59,7 +60,7 @@ def _build_changes_dict(txn: Transaction, update_data: dict) -> dict:
     return changes
 
 
-@router.get("", response_model=list[TransactionResponse])
+@router.get("")
 def list_transactions(
     page: int = Query(1, ge=1),
     limit: int = Query(20, le=100),
@@ -80,9 +81,11 @@ def list_transactions(
         .limit(limit)
         .all()
     )
-    return JSONResponse(
-        content=[TransactionResponse.model_validate(item).model_dump(mode="json") for item in items],
-        headers={"X-Total-Count": str(total_count)},
+    return paginated_response(
+        items=[TransactionResponse.model_validate(item).model_dump(mode="json") for item in items],
+        total=total_count,
+        page=page,
+        per_page=limit,
     )
 
 

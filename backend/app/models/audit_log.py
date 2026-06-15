@@ -1,3 +1,5 @@
+import hashlib
+
 from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -14,3 +16,10 @@ class AuditLog(UUIDMixin, TimestampMixin, Base):
     details: Mapped[str] = mapped_column(Text, default="")
     machine_name: Mapped[str] = mapped_column(String(100), default="")
     changes_json: Mapped[str] = mapped_column(Text, default="")
+    prev_hash: Mapped[str] = mapped_column(String(64), default="")
+
+    @staticmethod
+    def compute_hash(entry_id: str, user_id: str, action_type: str,
+                     ip_address: str, details: str, prev_hash: str) -> str:
+        raw = f"{entry_id}|{user_id}|{action_type}|{ip_address}|{details}|{prev_hash}"
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()

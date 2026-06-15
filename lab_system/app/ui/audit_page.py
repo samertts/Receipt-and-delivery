@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 
 from lab_system.app.database import db as _db
 from lab_system.app.ui.page_header import PageHeader
+from lab_system.app.utils.constants import TABLE_STYLE
 
 
 class AuditPage(QWidget):
@@ -32,6 +33,7 @@ class AuditPage(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSortingEnabled(True)
+        self.table.setStyleSheet(TABLE_STYLE)
         self.layout().addWidget(self.table)
 
         self.refresh()

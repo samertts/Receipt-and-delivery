@@ -31,7 +31,6 @@ ROLE_PERMISSIONS = {
         'receipts.create', 'receipts.read',
         'organizations.read',
         'reports.read',
-        'backup.create', 'backup.verify',
     },
     'Auditor': {
         'dashboard.view',
@@ -55,10 +54,19 @@ def check_permission(user: dict, permission: str) -> None:
 
 
 def with_permission(permission: str):
+    """Decorator: enforces permission if `user` kwarg is provided (defense-in-depth).
+
+    Usage:
+        @with_permission('users.create')
+        def create_user(full_name, username, password, role, user=None):
+            ...
+    """
     def decorator(func):
         @wraps(func)
-        def wrapper(user, *args, **kwargs):
-            check_permission(user, permission)
-            return func(user, *args, **kwargs)
+        def wrapper(*args, **kwargs):
+            user = kwargs.get('user')
+            if user is not None:
+                check_permission(user, permission)
+            return func(*args, **kwargs)
         return wrapper
     return decorator

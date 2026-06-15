@@ -17,7 +17,8 @@ from PySide6.QtWidgets import (
 from lab_system.app.database import db as _db
 from lab_system.app.diagnostics.startup import run_all_checks
 from lab_system.app.settings.config import CONFIG
-from lab_system.app.utils.constants import THEME
+from lab_system.app.sync.service import sync_service
+from lab_system.app.utils.constants import THEME, TABLE_STYLE
 
 ROLE_MAP = {
     "Admin": "مدير النظام",
@@ -54,10 +55,11 @@ class StatCard(QFrame):
 
 
 class DashboardPage(QWidget):
-    def __init__(self, user, auth_service=None) -> None:
+    def __init__(self, user, auth_service=None, navigate_cb=None) -> None:
         super().__init__()
         self._auth = auth_service
         self.current_user = user
+        self._navigate_cb = navigate_cb
         self.setLayout(QVBoxLayout(self))
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.setLayoutDirection(Qt.RightToLeft)
@@ -83,7 +85,11 @@ class DashboardPage(QWidget):
         bottom = QHBoxLayout()
         bottom.setSpacing(16)
         bottom.addWidget(self._build_recent_activity_box(), 2)
-        bottom.addWidget(self._build_backups_box(), 1)
+        right_col = QVBoxLayout()
+        right_col.setSpacing(12)
+        right_col.addWidget(self._build_backups_box())
+        right_col.addWidget(self._build_sync_health_box())
+        bottom.addLayout(right_col, 1)
         self.layout().addLayout(bottom)
 
         self._build_health_status()
@@ -168,10 +174,10 @@ class DashboardPage(QWidget):
         row.setSpacing(8)
 
         actions = [
-            ("استلام جديد", None),
-            ("التقارير", None),
-            ("إدارة الجهات", None),
-            ("المستخدمون", None),
+            ("استلام جديد", lambda: self._navigate_cb and self._navigate_cb("receipts")),
+            ("التقارير", lambda: self._navigate_cb and self._navigate_cb("reports")),
+            ("إدارة الجهات", lambda: self._navigate_cb and self._navigate_cb("orgs")),
+            ("المستخدمون", lambda: self._navigate_cb and self._navigate_cb("users")),
         ]
         for text, cb in actions:
             btn = QPushButton(text)
@@ -204,6 +210,7 @@ class DashboardPage(QWidget):
         table.setSortingEnabled(True)
         table.setSelectionBehavior(QTableWidget.SelectRows)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
+        table.setStyleSheet(TABLE_STYLE)
 
         with _db.get_conn() as conn:
             rows = conn.execute(
@@ -232,6 +239,7 @@ class DashboardPage(QWidget):
         table.setSortingEnabled(True)
         table.setSelectionBehavior(QTableWidget.SelectRows)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
+        table.setStyleSheet(TABLE_STYLE)
 
         with _db.get_conn() as conn:
             rows = conn.execute(
@@ -244,6 +252,23 @@ class DashboardPage(QWidget):
             table.setItem(i, 1, QTableWidgetItem(r["notes"] or "ناجح"))
 
         layout.addWidget(table)
+        return box
+
+    def _build_sync_health_box(self):
+        box = QGroupBox("حالة المزامنة")
+        layout = QVBoxLayout(box)
+        health = sync_service.get_health()
+        status = QLabel()
+        if not health['enabled']:
+            status.setText("⚙ المزامنة غير مفعلة")
+            status.setStyleSheet("color:#6B7280;font-weight:bold;padding:8px;")
+        elif health['healthy']:
+            status.setText(f"✓ سليمة — {health['synced']} عناصر متزامنة")
+            status.setStyleSheet(f"color:{THEME['success']};font-weight:bold;padding:8px;")
+        else:
+            status.setText(f"⚠ {health['pending']} معلقة, {health['conflicts']} تعارض")
+            status.setStyleSheet(f"color:{THEME['warning']};font-weight:bold;padding:8px;")
+        layout.addWidget(status)
         return box
 
     def _build_health_status(self):

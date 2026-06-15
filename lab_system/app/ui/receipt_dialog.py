@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -26,7 +27,7 @@ from lab_system.app.services.receipt_service import (
     get_receipt,
     update_receipt,
 )
-from lab_system.app.utils.constants import THEME
+from lab_system.app.utils.constants import THEME, TABLE_STYLE
 
 RECEIPT_STATUSES = ["مسودة", "معتمد", "مرفوض", "مؤرشف", "ملغي"]
 
@@ -38,6 +39,13 @@ STATUS_MAP = {
     "ملغي": "Cancelled",
 }
 
+_SECTION_HEADER = f"""
+    QLabel {{
+        font-size: 10pt; font-weight: 700; color: {THEME['primary']};
+        padding: 2px 0; margin-top: 6px;
+    }}
+"""
+
 
 class ReceiptDialog(QDialog):
     def __init__(self, current_user, receipt_id=None):
@@ -46,8 +54,8 @@ class ReceiptDialog(QDialog):
         self.receipt_id = receipt_id
         self.editing = receipt_id is not None
         self.setWindowTitle("تعديل الاستلام" if self.editing else "استلام جديد")
-        self.setMinimumWidth(900)
-        self.setMinimumHeight(700)
+        self.setMinimumWidth(880)
+        self.setMinimumHeight(620)
         self.setLayoutDirection(Qt.RightToLeft)
 
         self._build_form()
@@ -55,9 +63,21 @@ class ReceiptDialog(QDialog):
         if self.editing:
             self._load_receipt()
 
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.reject()
+        else:
+            super().keyPressEvent(event)
+
+    @staticmethod
+    def _section_header(text):
+        lbl = QLabel(text)
+        lbl.setStyleSheet(_SECTION_HEADER)
+        return lbl
+
     def _build_form(self):
         main = QVBoxLayout(self)
-        main.setContentsMargins(16, 16, 16, 16)
+        main.setContentsMargins(12, 12, 12, 12)
 
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet(f"""
@@ -65,11 +85,11 @@ class ReceiptDialog(QDialog):
                 border: 1px solid {THEME['border']};
                 border-radius: 8px;
                 background: {THEME['panel']};
-                padding: 16px;
+                padding: 12px;
             }}
             QTabBar::tab {{
-                padding: 10px 24px;
-                font-size: 12pt;
+                padding: 8px 20px;
+                font-size: 11pt;
                 font-weight: 600;
                 border: none;
                 border-bottom: 3px solid transparent;
@@ -93,17 +113,18 @@ class ReceiptDialog(QDialog):
         btn_row.setSpacing(8)
         btn_row.addStretch()
 
-        save_btn = QPushButton("حفظ")
+        save_btn = QPushButton("حفظ (Ctrl+S)")
         save_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {THEME['primary']}; color: white;
                 border: none; border-radius: 6px;
-                padding: 10px 32px; min-height: 40px;
-                font-size: 13pt; font-weight: 600;
+                padding: 8px 28px; min-height: 36px;
+                font-size: 12pt; font-weight: 600;
             }}
             QPushButton:hover {{ background-color: #0B3D6B; }}
         """)
         save_btn.clicked.connect(self._save)
+        save_btn.setShortcut("Ctrl+S")
         btn_row.addWidget(save_btn)
 
         cancel_btn = QPushButton("إلغاء")
@@ -111,7 +132,7 @@ class ReceiptDialog(QDialog):
             QPushButton {{
                 background-color: {THEME['panel']}; color: #334155;
                 border: 1px solid {THEME['border']}; border-radius: 6px;
-                padding: 10px 32px; min-height: 40px; font-size: 13pt;
+                padding: 8px 28px; min-height: 36px; font-size: 12pt;
             }}
             QPushButton:hover {{ background-color: #F1F5F9; }}
         """)
@@ -122,13 +143,35 @@ class ReceiptDialog(QDialog):
 
     def _build_info_tab(self):
         tab = QWidget()
-        form = QFormLayout(tab)
-        form.setSpacing(12)
-        form.setContentsMargins(8, 8, 8, 8)
+        layout = QVBoxLayout(tab)
+        layout.setSpacing(2)
+        layout.setContentsMargins(8, 4, 8, 4)
 
+        layout.addWidget(self._section_header("بيانات المعاملة"))
+        f1 = QFormLayout()
+        f1.setSpacing(6)
+        f1.setContentsMargins(0, 0, 0, 0)
         self.tx_type = QComboBox()
+        self.status_combo = QComboBox()
+        self.status_combo.addItems(RECEIPT_STATUSES)
+        f1.addRow("نوع المعاملة *:", self.tx_type)
+        f1.addRow("الحالة:", self.status_combo)
+        layout.addLayout(f1)
+
+        layout.addWidget(self._section_header("الجهات"))
+        f2 = QFormLayout()
+        f2.setSpacing(6)
+        f2.setContentsMargins(0, 0, 0, 0)
         self.sender_org = QComboBox()
         self.receiver_org = QComboBox()
+        f2.addRow("الجهة المرسلة:", self.sender_org)
+        f2.addRow("الجهة المستقبلة:", self.receiver_org)
+        layout.addLayout(f2)
+
+        layout.addWidget(self._section_header("جهات الاتصال"))
+        f3 = QFormLayout()
+        f3.setSpacing(6)
+        f3.setContentsMargins(0, 0, 0, 0)
         self.sender_name = QLineEdit()
         self.sender_name.setPlaceholderText("اسم المرسل *")
         self.receiver_name = QLineEdit()
@@ -137,32 +180,34 @@ class ReceiptDialog(QDialog):
         self.sender_job.setPlaceholderText("مسمى وظيفة المرسل")
         self.receiver_job = QLineEdit()
         self.receiver_job.setPlaceholderText("مسمى وظيفة المستلم")
+        f3.addRow("اسم المرسل *:", self.sender_name)
+        f3.addRow("اسم المستلم *:", self.receiver_name)
+        f3.addRow("مسمى وظيفة المرسل:", self.sender_job)
+        f3.addRow("مسمى وظيفة المستلم:", self.receiver_job)
+        layout.addLayout(f3)
+
+        layout.addWidget(self._section_header("الوثيقة"))
+        f4 = QFormLayout()
+        f4.setSpacing(6)
+        f4.setContentsMargins(0, 0, 0, 0)
         self.auth_doc = QLineEdit()
         self.auth_doc.setPlaceholderText("رقم الوثيقة")
         self.auth_date = QDateEdit()
         self.auth_date.setCalendarPopup(True)
         self.auth_date.setDate(self.auth_date.date().currentDate())
         self.auth_date.setDisplayFormat("yyyy-MM-dd")
+        f4.addRow("رقم الوثيقة:", self.auth_doc)
+        f4.addRow("تاريخ الوثيقة:", self.auth_date)
+        layout.addLayout(f4)
 
-        self.status_combo = QComboBox()
-        self.status_combo.addItems(RECEIPT_STATUSES)
-
-        form.addRow("نوع المعاملة *:", self.tx_type)
-        form.addRow("الجهة المرسلة:", self.sender_org)
-        form.addRow("الجهة المستقبلة:", self.receiver_org)
-        form.addRow("اسم المرسل *:", self.sender_name)
-        form.addRow("اسم المستلم *:", self.receiver_name)
-        form.addRow("مسمى وظيفة المرسل:", self.sender_job)
-        form.addRow("مسمى وظيفة المستلم:", self.receiver_job)
-        form.addRow("رقم الوثيقة:", self.auth_doc)
-        form.addRow("تاريخ الوثيقة:", self.auth_date)
-        form.addRow("الحالة:", self.status_combo)
+        layout.addStretch()
         return tab
 
     def _build_samples_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
 
         self.items_table = QTableWidget()
         self.items_table.setColumnCount(9)
@@ -179,11 +224,16 @@ class ReceiptDialog(QDialog):
                 "حذف",
             ],
         )
-        self.items_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        h = self.items_table.horizontalHeader()
+        h.setSectionResizeMode(0, QHeaderView.Stretch)
+        for c in (1, 2, 3, 4, 5, 8):
+            h.setSectionResizeMode(c, QHeaderView.ResizeToContents)
+        h.setSectionResizeMode(6, QHeaderView.ResizeToContents)
+        h.setSectionResizeMode(7, QHeaderView.ResizeToContents)
         self.items_table.setAlternatingRowColors(True)
-        self.items_table.setSortingEnabled(True)
         self.items_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.items_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.items_table.setStyleSheet(TABLE_STYLE)
         layout.addWidget(self.items_table)
 
         add_btn = QPushButton("+ إضافة عينة")
@@ -191,8 +241,8 @@ class ReceiptDialog(QDialog):
             QPushButton {{
                 background: {THEME['panel']}; color: {THEME['primary']};
                 border: 2px dashed {THEME['primary']}; border-radius: 8px;
-                padding: 12px; font-size: 12pt; font-weight: 600;
-                min-height: 44px;
+                padding: 10px; font-size: 11pt; font-weight: 600;
+                min-height: 36px;
             }}
             QPushButton:hover {{
                 background: #EFF6FF; border-color: #0B3D6B;
@@ -204,9 +254,14 @@ class ReceiptDialog(QDialog):
 
     def _build_review_tab(self):
         tab = QWidget()
-        form = QFormLayout(tab)
-        form.setSpacing(12)
-        form.setContentsMargins(8, 8, 8, 8)
+        layout = QVBoxLayout(tab)
+        layout.setSpacing(2)
+        layout.setContentsMargins(8, 4, 8, 4)
+
+        layout.addWidget(self._section_header("ملاحظات إضافية"))
+        form = QFormLayout()
+        form.setSpacing(6)
+        form.setContentsMargins(0, 0, 0, 0)
 
         self.notes = QLineEdit()
         self.notes.setPlaceholderText("ملاحظات عامة")
@@ -218,6 +273,8 @@ class ReceiptDialog(QDialog):
         form.addRow("ملاحظات:", self.notes)
         form.addRow("معلومات النقل:", self.transport_info)
         form.addRow("تعليقات إضافية:", self.additional_comments)
+        layout.addLayout(form)
+        layout.addStretch()
         return tab
 
     def _load_catalogs(self):
@@ -310,11 +367,16 @@ class ReceiptDialog(QDialog):
         self.items_table.setCellWidget(row, 7, notes_inp)
 
         del_btn = QPushButton("حذف")
-        del_btn.clicked.connect(lambda: self._remove_item_row(row))
+        del_btn.clicked.connect(self._remove_item_row)
         self.items_table.setCellWidget(row, 8, del_btn)
 
-    def _remove_item_row(self, row):
-        self.items_table.removeRow(row)
+    def _remove_item_row(self):
+        button = self.sender()
+        if button:
+            for row in range(self.items_table.rowCount()):
+                if self.items_table.cellWidget(row, 8) is button:
+                    self.items_table.removeRow(row)
+                    break
 
     def _collect_item_data(self):
         items = []

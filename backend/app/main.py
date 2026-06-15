@@ -1,20 +1,41 @@
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from typing import Callable, Awaitable
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1 import audit, auth, organizations, transactions, users
+from app.api.v1 import audit, auth, organizations, sync, transactions, users
 from app.core.config import settings
 from app.core.exceptions import AppException
 from app.core.logging import logger, setup_logging
+from app.core.response_envelope import wrap_response
 from app.core.security import rate_limit_middleware
+
+
+ENVELOPE_EXCLUDE_PATHS = {"/api/docs", "/api/redoc", "/api/openapi.json", "/api/health"}
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     setup_logging(level=settings.log_level)
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
+    if "lab_user:lab_pass" in settings.database_url:
+        logger.warning(
+            "Default database credentials detected in database_url. "
+            "Change them before deploying to production."
+        )
+    try:
+        from app.api.v1.auth import _purge_expired_blacklisted_tokens
+        from app.db.session import SessionLocal
+        db = SessionLocal()
+        purged = _purge_expired_blacklisted_tokens(db)
+        if purged:
+            logger.info(f"Purged {purged} expired blacklisted tokens")
+        db.close()
+    except Exception as exc:
+        logger.warning(f"Could not purge expired tokens on startup: {exc}")
     yield
     logger.info("Application shutting down")
 
@@ -37,6 +58,38 @@ app.add_middleware(
 )
 
 app.middleware("http")(rate_limit_middleware)
+
+
+@app.middleware("http")
+async def response_envelope_middleware(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    response = await call_next(request)
+    if response.status_code >= 400:
+        return response
+    path = request.url.path
+    if path in ENVELOPE_EXCLUDE_PATHS:
+        return response
+    if request.method != "GET":
+        return response
+    ct = response.headers.get("content-type", "")
+    if "json" not in ct:
+        return response
+    body = b""
+    async for chunk in response.body_iterator:
+        body += chunk
+    if not body:
+        return response
+    import json
+    try:
+        data = json.loads(body)
+        if isinstance(data, dict) and "data" in data and "meta" in data:
+            return JSONResponse(content=data, status_code=response.status_code)
+        if not isinstance(data, list):
+            return JSONResponse(content=data, status_code=response.status_code)
+        return JSONResponse(content=wrap_response(data), status_code=response.status_code)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return Response(content=body, status_code=response.status_code, headers=dict(response.headers))
 
 
 @app.exception_handler(AppException)
@@ -69,6 +122,14 @@ app.include_router(users.router, prefix="/api")
 app.include_router(organizations.router, prefix="/api")
 app.include_router(transactions.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
+app.include_router(sync.router, prefix="/api")
+
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(organizations.router, prefix="/api/v1")
+app.include_router(transactions.router, prefix="/api/v1")
+app.include_router(audit.router, prefix="/api/v1")
+app.include_router(sync.router, prefix="/api/v1")
 
 
 @app.get("/api/health")

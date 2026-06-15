@@ -21,3 +21,29 @@ THEME = {
     'header_bg': '#F8FAFC',
     'table_alt': '#F8FAFC',
 }
+
+TABLE_STYLE = f"""
+    QTableWidget {{
+        border: 1px solid {THEME['border']};
+        border-radius: 6px;
+        gridline-color: {THEME['border']};
+        selection-background-color: #DBEAFE;
+        selection-color: {THEME['sidebar_active']};
+        outline: none;
+    }}
+    QTableWidget::item:hover {{
+        background-color: #F1F5F9;
+    }}
+    QTableWidget::item:selected {{
+        background-color: #DBEAFE;
+        color: {THEME['sidebar_active']};
+    }}
+    QHeaderView::section {{
+        background-color: {THEME['header_bg']};
+        color: #475569;
+        font-weight: 600;
+        padding: 8px;
+        border: none;
+        border-bottom: 2px solid {THEME['border']};
+    }}
+"""

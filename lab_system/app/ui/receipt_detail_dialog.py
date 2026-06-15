@@ -19,6 +19,7 @@ from lab_system.app.audit.logger import log_action
 from lab_system.app.printing.receipt_pdf import generate_receipt_pdf
 from lab_system.app.services.receipt_service import get_receipt
 from lab_system.app.ui.notifications import toast
+from lab_system.app.utils.constants import THEME, TABLE_STYLE
 
 
 def _open_file_safe(path):
@@ -49,6 +50,13 @@ STATUS_STYLES = {
     "Cancelled": "color:#6B7280;font-weight:bold;",
 }
 
+_SECTION = f"""
+    QLabel {{
+        font-size: 10pt; font-weight: 700; color: {THEME['primary']};
+        padding: 2px 0; margin-top: 6px;
+    }}
+"""
+
 
 class ReceiptDetailDialog(QDialog):
     def __init__(self, current_user, receipt_id):
@@ -57,55 +65,86 @@ class ReceiptDetailDialog(QDialog):
         self.receipt_id = receipt_id
         self.setWindowTitle("تفاصيل الإيصال")
         self.setMinimumWidth(800)
-        self.setMinimumHeight(600)
+        self.setMinimumHeight(580)
         self.setLayoutDirection(Qt.RightToLeft)
         self._build_ui()
         self._load()
 
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.reject()
+        else:
+            super().keyPressEvent(event)
+
+    @staticmethod
+    def _section_header(text):
+        lbl = QLabel(text)
+        lbl.setStyleSheet(_SECTION)
+        return lbl
+
     def _build_ui(self):
         main = QVBoxLayout(self)
+        main.setContentsMargins(12, 12, 12, 12)
+        main.setSpacing(4)
 
         self.title_label = QLabel()
-        self.title_label.setStyleSheet("font-size:16px;font-weight:700;")
+        self.title_label.setStyleSheet("font-size:15px;font-weight:700;")
         main.addWidget(self.title_label)
 
         self.status_label = QLabel()
         main.addWidget(self.status_label)
 
-        details_form = QFormLayout()
+        main.addWidget(self._section_header("بيانات المعاملة"))
+        f1 = QFormLayout()
+        f1.setSpacing(4)
+        f1.setContentsMargins(0, 0, 0, 0)
+        self.tx_type_label = QLabel()
         self.sender_org_label = QLabel()
         self.receiver_org_label = QLabel()
+        f1.addRow("نوع المعاملة:", self.tx_type_label)
+        f1.addRow("الجهة المرسلة:", self.sender_org_label)
+        f1.addRow("الجهة المستقبلة:", self.receiver_org_label)
+        main.addLayout(f1)
+
+        main.addWidget(self._section_header("جهات الاتصال"))
+        f2 = QFormLayout()
+        f2.setSpacing(4)
+        f2.setContentsMargins(0, 0, 0, 0)
         self.sender_name_label = QLabel()
         self.receiver_name_label = QLabel()
         self.sender_job_label = QLabel()
         self.receiver_job_label = QLabel()
+        f2.addRow("اسم المرسل:", self.sender_name_label)
+        f2.addRow("اسم المستلم:", self.receiver_name_label)
+        f2.addRow("مسمى وظيفة المرسل:", self.sender_job_label)
+        f2.addRow("مسمى وظيفة المستلم:", self.receiver_job_label)
+        main.addLayout(f2)
+
+        main.addWidget(self._section_header("الوثيقة"))
+        f3 = QFormLayout()
+        f3.setSpacing(4)
+        f3.setContentsMargins(0, 0, 0, 0)
         self.auth_doc_label = QLabel()
         self.auth_date_label = QLabel()
-        self.tx_type_label = QLabel()
         self.created_label = QLabel()
+        f3.addRow("رقم الوثيقة:", self.auth_doc_label)
+        f3.addRow("تاريخ الوثيقة:", self.auth_date_label)
+        f3.addRow("تاريخ الإنشاء:", self.created_label)
+        main.addLayout(f3)
+
+        main.addWidget(self._section_header("ملاحظات"))
+        f4 = QFormLayout()
+        f4.setSpacing(4)
+        f4.setContentsMargins(0, 0, 0, 0)
         self.notes_label = QLabel()
         self.transport_label = QLabel()
         self.comments_label = QLabel()
+        f4.addRow("ملاحظات:", self.notes_label)
+        f4.addRow("معلومات النقل:", self.transport_label)
+        f4.addRow("تعليقات إضافية:", self.comments_label)
+        main.addLayout(f4)
 
-        details_form.addRow("نوع المعاملة:", self.tx_type_label)
-        details_form.addRow("الجهة المرسلة:", self.sender_org_label)
-        details_form.addRow("الجهة المستقبلة:", self.receiver_org_label)
-        details_form.addRow("اسم المرسل:", self.sender_name_label)
-        details_form.addRow("اسم المستلم:", self.receiver_name_label)
-        details_form.addRow("مسمى وظيفة المرسل:", self.sender_job_label)
-        details_form.addRow("مسمى وظيفة المستلم:", self.receiver_job_label)
-        details_form.addRow("رقم الوثيقة:", self.auth_doc_label)
-        details_form.addRow("تاريخ الوثيقة:", self.auth_date_label)
-        details_form.addRow("تاريخ الإنشاء:", self.created_label)
-        details_form.addRow("ملاحظات:", self.notes_label)
-        details_form.addRow("معلومات النقل:", self.transport_label)
-        details_form.addRow("تعليقات إضافية:", self.comments_label)
-        main.addLayout(details_form)
-
-        items_title = QLabel("العينات:")
-        items_title.setStyleSheet("font-weight:700;margin-top:10px;")
-        main.addWidget(items_title)
-
+        main.addWidget(self._section_header("العينات"))
         self.items_table = QTableWidget()
         self.items_table.setColumnCount(8)
         self.items_table.setHorizontalHeaderLabels(
@@ -120,34 +159,42 @@ class ReceiptDetailDialog(QDialog):
                 "ملاحظات",
             ],
         )
-        self.items_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.Stretch,
-        )
+        h = self.items_table.horizontalHeader()
+        h.setSectionResizeMode(0, QHeaderView.Stretch)
+        for c in range(1, 6):
+            h.setSectionResizeMode(c, QHeaderView.ResizeToContents)
+        h.setSectionResizeMode(6, QHeaderView.ResizeToContents)
+        h.setSectionResizeMode(7, QHeaderView.ResizeToContents)
         self.items_table.setAlternatingRowColors(True)
-        self.items_table.setSortingEnabled(True)
         self.items_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.items_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.items_table.setStyleSheet(TABLE_STYLE)
         main.addWidget(self.items_table)
 
-        atts_title = QLabel("المرفقات:")
-        atts_title.setStyleSheet("font-weight:700;margin-top:10px;")
-        main.addWidget(atts_title)
-
+        main.addWidget(self._section_header("المرفقات"))
         self.attachments_table = QTableWidget()
         self.attachments_table.setColumnCount(3)
         self.attachments_table.setHorizontalHeaderLabels(
             ["الملف", "النوع", "فتح"],
         )
         self.attachments_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.Stretch,
+            0, QHeaderView.Stretch,
+        )
+        self.attachments_table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeToContents,
+        )
+        self.attachments_table.horizontalHeader().setSectionResizeMode(
+            2, QHeaderView.ResizeToContents,
         )
         self.attachments_table.setAlternatingRowColors(True)
-        self.attachments_table.setSortingEnabled(True)
         self.attachments_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.attachments_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.attachments_table.setStyleSheet(TABLE_STYLE)
         main.addWidget(self.attachments_table)
 
         btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+        btn_row.addStretch()
         print_btn = QPushButton("طباعة")
         print_btn.clicked.connect(self._print_pdf)
         btn_row.addWidget(print_btn)
