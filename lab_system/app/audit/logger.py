@@ -1,6 +1,5 @@
 import hashlib
 import platform
-import sqlite3
 from datetime import datetime
 
 from lab_system.app.database import db as _db

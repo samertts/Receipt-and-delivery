@@ -1,3 +1,7 @@
+def _unwrap(body: dict) -> dict:
+    return body.get("data", body)
+
+
 class TestUsers:
     def test_create_user(self, client, admin_token):
         response = client.post(
@@ -11,7 +15,7 @@ class TestUsers:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 201
-        data = response.json()
+        data = _unwrap(response.json())
         assert data["username"] == "newuser"
         assert data["role"] == "user"
 

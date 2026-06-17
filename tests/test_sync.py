@@ -268,7 +268,6 @@ class TestAPIClientAdvanced:
         assert resp.data == {"ok": True}
 
     def test_send_http_error(self, monkeypatch):
-        import io
         import json
         import urllib.error
         from lab_system.app.sync.api_client import APIClient
@@ -287,7 +286,6 @@ class TestAPIClientAdvanced:
         assert resp.status_code == 409
 
     def test_send_http_error_bad_json(self, monkeypatch):
-        import io
         import urllib.error
         from lab_system.app.sync.api_client import APIClient
         client = APIClient()

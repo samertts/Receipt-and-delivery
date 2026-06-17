@@ -1,0 +1,10 @@
+> import platform
+> from datetime import datetime
+  
+> from lab_system.app.database import db as _db
+  
+  
+> def log_action(user_id, action, details=''):
+>     with _db.get_conn() as conn:
+>         conn.execute('INSERT INTO audit_logs(user_id,action,machine_name,timestamp,details) VALUES(?,?,?,?,?)',
+>                      (user_id, action, platform.node(), datetime.now().isoformat(timespec='seconds'), details))

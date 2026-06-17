@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
 
 from lab_system.app.auth.permissions import check_permission
 from lab_system.app.audit.logger import log_action
-from lab_system.app.database.db import DEFAULT_SETTINGS, get_conn
+from lab_system.app.services.desktop_settings_service import DesktopSettingsService
 from lab_system.app.ui.notifications import toast
 from lab_system.app.ui.page_header import PageHeader
 
@@ -17,6 +17,7 @@ class SettingsPage(QWidget):
     def __init__(self, current_user) -> None:
         super().__init__()
         self.current_user = current_user
+        self._settings_svc = DesktopSettingsService()
         self.setLayout(QVBoxLayout(self))
         self.setLayoutDirection(Qt.RightToLeft)
 
@@ -27,9 +28,10 @@ class SettingsPage(QWidget):
 
         self.fields = {}
         form = QFormLayout()
-        for key, default in DEFAULT_SETTINGS.items():
+        defaults = self._settings_svc.get_defaults()
+        for key, default in defaults.items():
             inp = QLineEdit()
-            inp.setText(self._get_setting(key, default))
+            inp.setText(self._settings_svc.get(key, default))
             self.fields[key] = inp
             form.addRow(self._label_for(key), inp)
         self.layout().addLayout(form)
@@ -51,15 +53,9 @@ class SettingsPage(QWidget):
         }
         return labels.get(key, key)
 
-    def _get_setting(self, key: str, default: str) -> str:
-        with get_conn() as conn:
-            row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
-            return row["value"] if row else default
-
     def _save(self):
         check_permission(self.current_user, 'settings.update')
-        with get_conn() as conn:
-            for key, inp in self.fields.items():
-                conn.execute("INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)", (key, inp.text()))
+        settings = {key: inp.text() for key, inp in self.fields.items()}
+        self._settings_svc.set_all(settings)
         log_action(self.current_user["id"], "settings_updated", "تحديث إعدادات النظام")
         toast(self, "تم حفظ الإعدادات", "success")

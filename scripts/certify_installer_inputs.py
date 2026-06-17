@@ -14,7 +14,6 @@ Checks:
   - Path consistency between build output and installer expectations
 """
 
-import os
 import struct
 import sys
 from pathlib import Path
@@ -148,7 +147,7 @@ if iss_path.exists():
     contains_assets = "assets" in iss_text
     ok(contains_assets, "Installer script missing assets Source directive")
 
-    output_dir_lines = [l for l in iss_text.splitlines() if "OutputDir" in l]
+    output_dir_lines = [ln for ln in iss_text.splitlines() if "OutputDir" in ln]
     ok(len(output_dir_lines) > 0, "Installer script missing OutputDir directive")
     if output_dir_lines:
         print(f"  OutputDir: {output_dir_lines[0].strip()}")

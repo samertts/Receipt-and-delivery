@@ -240,7 +240,6 @@ class TestCatalogService:
 
 class TestMigration:
     def setup_method(self):
-        from lab_system.app.database.db import SCHEMA
         import tempfile
         self.tmp = Path(tempfile.mkdtemp(prefix="lab_mig_"))
         self.db_path = self.tmp / "test.db"
@@ -271,7 +270,7 @@ class TestMigration:
         conn.close()
 
     def test_migrate_from_scratch(self):
-        from lab_system.app.database.db import SCHEMA, migrate_db, SCHEMA_VERSION
+        from lab_system.app.database.db import SCHEMA, migrate_db
         conn = self._make_conn()
         conn.executescript(SCHEMA.replace("INSERT INTO meta(key,value) VALUES('schema_version','9')",
                                           "INSERT INTO meta(key,value) VALUES('schema_version','0')"))
@@ -304,7 +303,7 @@ class TestMigration:
         conn.close()
 
     def test_v9_index_exists(self):
-        from lab_system.app.database.db import SCHEMA, migrate_db, SCHEMA_VERSION
+        from lab_system.app.database.db import SCHEMA, migrate_db
         conn = self._make_conn()
         conn.executescript(SCHEMA)
         conn.commit()

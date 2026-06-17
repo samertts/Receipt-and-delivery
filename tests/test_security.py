@@ -202,7 +202,7 @@ class TestAuditLog:
             assert row['prev_hash'] == ''
 
     def test_audit_chain_links_entries(self):
-        from lab_system.app.audit.logger import log_action, _row_hash, verify_audit_chain
+        from lab_system.app.audit.logger import log_action, _row_hash
         from lab_system.app.database import db as _db
         log_action(1, 'chain_a', 'first')
         log_action(1, 'chain_b', 'second')
@@ -216,7 +216,6 @@ class TestAuditLog:
 
     def test_verify_audit_chain_intact(self):
         from lab_system.app.audit.logger import log_action, verify_audit_chain
-        from lab_system.app.database import db as _db
         log_action(1, 'vchain_1')
         log_action(1, 'vchain_2')
         ok, count, msg = verify_audit_chain()

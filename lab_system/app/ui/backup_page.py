@@ -1,5 +1,4 @@
 
-import shutil
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -16,10 +15,9 @@ from PySide6.QtWidgets import (
 
 from lab_system.app.auth.permissions import check_permission
 from lab_system.app.audit.logger import log_action
-from lab_system.app.database import db as _db
+from lab_system.app.services.backup_listing_service import BackupListingService
 from lab_system.app.services.backup_service import create_backup
 from lab_system.app.services.recovery_service import verify_backup
-from lab_system.app.settings.config import DB_PATH
 from lab_system.app.ui.notifications import toast
 from lab_system.app.utils.constants import TABLE_STYLE
 from lab_system.app.ui.page_header import PageHeader
@@ -29,6 +27,7 @@ class BackupPage(QWidget):
     def __init__(self, current_user) -> None:
         super().__init__()
         self.current_user = current_user
+        self._listing_svc = BackupListingService()
         self.setLayout(QVBoxLayout(self))
         self.setLayoutDirection(Qt.RightToLeft)
 
@@ -70,10 +69,7 @@ class BackupPage(QWidget):
             )
 
     def refresh(self):
-        with _db.get_conn() as conn:
-            rows = conn.execute(
-                "SELECT * FROM backups ORDER BY id DESC",
-            ).fetchall()
+        rows = self._listing_svc.list_backups()
         self.table.setRowCount(len(rows))
         for i, r in enumerate(rows):
             self.table.setItem(i, 0, QTableWidgetItem(r["backup_file"]))
@@ -136,7 +132,7 @@ class BackupPage(QWidget):
                 "backup_restored",
                 f"استعادة من: {Path(backup_path).name}",
             )
-        toast(self, "تم التحقق بنجاح", "success")
+            toast(self, "تمت الاستعادة بنجاح", "success")
         except Exception as e:
             QMessageBox.warning(
                 self, "خطأ", f"فشلت الاستعادة: {e}",
@@ -156,4 +152,5 @@ class BackupPage(QWidget):
                 valid += 1
             else:
                 invalid += 1
-        toast(self, "تمت الاستعادة بنجاح", "success")
+        s = f"صحيح: {valid}, تالف: {invalid}" if invalid else f"جميع النسخ سليمة ({valid})"
+        toast(self, s, "success" if invalid == 0 else "warning")

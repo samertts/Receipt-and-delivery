@@ -195,7 +195,8 @@ def hard_delete_receipt(receipt_id, user_id=None, user=None):
     log_action(user_id, 'hard_delete', f'Receipt {receipt_id}')
 
 
-def restore_receipt(receipt_id, user_id=None):
+@with_permission('receipts.restore')
+def restore_receipt(receipt_id, user_id=None, user=None):
     with _db.get_conn() as conn:
         conn.execute("UPDATE receipts SET deleted_at=NULL WHERE id=?", (receipt_id,))
     log_action(user_id, 'restore', f'Receipt {receipt_id}')

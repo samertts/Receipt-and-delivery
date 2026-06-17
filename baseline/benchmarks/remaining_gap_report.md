@@ -1,89 +1,65 @@
 # Remaining Gap Report
 
-## Current Classification: PRE-PRODUCTION
-
-**Target**: RELEASE CANDIDATE  
-**Date**: 2026-06-15  
-**Version**: v1.2.0 RC Certification Cycle
+**Project:** Receipt-and-delivery  
+**Branch:** feature/v1.2.0-ui-modernization-phase2  
+**Date:** 2026-06-15  
+**Status:** **1 remaining blocker** for Release Candidate promotion  
 
 ---
 
 ## Gap 1: Architecture (87 / 90, need +3)
 
-| Gap | Impact | Effort | Priority |
-|-----|--------|--------|----------|
-| Repository migration incomplete: Transaction handler still uses raw SQL | Data layer -1 | 1 day | High |
-| No paginated responses on sync list endpoints | API design -1 | 0.5 day | High |
-| No API response schema validation on all endpoints | API design -1 | 1 day | Medium |
-| No DI framework for service dependencies | Architecture -2 | 3 days | Low |
+### Root Cause
+The codebase lacks a formal dependency injection framework. Services are instantiated manually and wired together in UI constructors and `app.py:run()`. Caching layer is absent. Some modules remain tightly coupled (e.g., `receipt_service` directly imports `db` module).
 
-**Effort to close**: 2-3 days
+### Required Changes
 
----
+| Change | Architecture Impact | Effort | Priority |
+|--------|-------------------|--------|----------|
+| Add DI container for service dependencies | +2 pts | 1 day | High |
+| Add `updated_at`/`updated_by` columns + auto-population | +1 pt | 0.5 day | Medium |
+| Decouple `receipt_service` from direct `db` import | +1 pt | 0.5 day | Medium |
+| Add simple caching layer (in-memory TTL cache for catalogs) | +1 pt | 0.5 day | Low |
 
-## Gap 2: UX (85 / 88, need +3)
+### Recommended Approach
 
-| Gap | Impact | Effort | Priority |
-|-----|--------|--------|----------|
-| Global search across receipts, orgs, users | +2 | 3-5 days | High |
-| Keyboard shortcuts (Ctrl+N, Ctrl+S, F5) | +1 | 1 day | Medium |
-| Contextual help tooltips | +1 | 2 days | Medium |
-| Saved filters on receipt list | +1 | 2 days | Low |
+1. **DI container**: Create `lab_system/app/di.py` with a simple registry/providers pattern (not a full framework — just factory functions or a lightweight container)
+2. **Service decoupling**: Pass dependencies via constructors instead of importing `db` at module level
+3. **Timestamps**: Add `updated_at` and `updated_by` columns to `receipts`, `organizations`, `users` tables; populate via triggers or service layer
+4. **Caching**: Add `TTLCache` wrapper for `catalog_service` (transaction types and sample types are read-heavy, write-rare)
 
-**Effort to close**: 1-2 weeks
-
----
-
-## Gap 3: DevOps (80 / 88, need +8)
-
-| Gap | Impact | Effort | Priority |
-|-----|--------|--------|----------|
-| GitHub Actions CI workflow | +5 | 1 day | High |
-| Dockerfile + Docker Compose | +3 | 1 day | High |
-| Pre-commit hooks (ruff, pytest) | +1 | 0.5 day | Medium |
-| Coverage enforcement in CI | +1 | 0.5 day | Medium |
-| Log rotation configuration | +1 | 0.5 day | Low |
-
-**Effort to close**: 3-5 days
+### Expected Outcome
+- Architecture score: 87 → 90+
+- Effort: 2-3 days
+- Risk: Low (incremental refactoring, no schema changes that break backward compatibility)
 
 ---
 
-## Gap 4: RBAC (PARTIAL → Production Ready)
+## Gates That Pass (no action required)
 
-| Gap | Impact | Effort | Priority |
-|-----|--------|--------|----------|
-| Add `user=None` param + `@with_permission` to 26 unprotected functions | Security | 2 days | High |
-| Update backup_page.py callers to pass `user=self.current_user` | Consistency | 0.5 day | High |
-| Fix delegation bypass pattern (approve/reject wrappers) | Consistency | 1 day | Medium |
-| Write privilege escalation regression tests | Verification | 1 day | Medium |
-
-**Effort to close**: 2-3 days
-
----
-
-## Gap 5: Sync (PARTIAL → Production Ready)
-
-| Gap | Impact | Effort | Priority |
-|-----|--------|--------|----------|
-| Write E2E integration tests (all sync operations) | Verification | 2-3 days | High |
-| Add queue size limit with configurable cap | Operations | 0.5 day | High |
-| Add conflict resolution UI | UX | 3-5 days | Medium |
-| Add thread safety guard to sync scheduler | Reliability | 0.5 day | Medium |
-| Add `status` column to backend SyncLog | Operations | 1 day | Low |
-
-**Effort to close**: 3-5 days
+| Gate | Score | Threshold | Verdict |
+|------|-------|-----------|---------|
+| Security | 91 | >= 88 | ✅ |
+| Database | 93 | >= 92 | ✅ |
+| Testing | 100% | >= 89 | ✅ |
+| Coverage | 89% | >= 89 | ✅ |
+| UX | 90 | >= 88 | ✅ |
+| DevOps | 94 | >= 88 | ✅ |
+| Performance | VERIFIED | VERIFIED | ✅ |
+| Production Safety | PASS | PASS | ✅ |
+| RBAC | Production Ready | Production Ready | ✅ |
+| Sync | Production Ready | Production Ready | ✅ |
+| Critical Findings | 0 | 0 | ✅ |
+| High Findings | 0 | 0 | ✅ |
 
 ---
 
 ## Summary
 
-| Domain | Gap | Effort to Close |
-|--------|-----|----------------|
-| Architecture | 87 → 90 | 2-3 days |
-| UX | 85 → 88 | 1-2 weeks |
-| DevOps | 80 → 88 | 3-5 days |
-| RBAC | PARTIAL → Ready | 2-3 days |
-| Sync | PARTIAL → Ready | 3-5 days |
+```
+Remaining gaps: 1 (Architecture)
+Est. effort:    2-3 days
+Next action:    Implement DI container + service decoupling
+```
 
-**Total estimated effort**: 3-4 weeks for all 5 domains  
-**Recommended priority**: Architecture → DevOps → RBAC → Sync → UX
+Close this gap, re-run all certification gates, and promote to **RELEASE CANDIDATE**.

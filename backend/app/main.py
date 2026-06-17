@@ -1,20 +1,25 @@
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 from typing import Callable, Awaitable
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1 import audit, auth, organizations, sync, transactions, users
+from app.api.v1 import audit, auth, health, organizations, sync, transactions, users
 from app.core.config import settings
 from app.core.exceptions import AppException
 from app.core.logging import logger, setup_logging
-from app.core.response_envelope import wrap_response
+from app.core.response_envelope import wrap_response, error_response
 from app.core.security import rate_limit_middleware
 
 
-ENVELOPE_EXCLUDE_PATHS = {"/api/docs", "/api/redoc", "/api/openapi.json", "/api/health"}
+ENVELOPE_EXCLUDE_PATHS = {
+    "/api/docs", "/api/redoc", "/api/openapi.json",
+    "/api/health", "/api/health/live", "/api/health/ready",
+    "/api/health/version", "/api/health/dependencies",
+    "/api/v1/health", "/api/v1/health/live", "/api/v1/health/ready",
+    "/api/v1/health/version", "/api/v1/health/dependencies",
+}
 
 
 @asynccontextmanager
@@ -27,10 +32,10 @@ async def lifespan(_app: FastAPI):
             "Change them before deploying to production."
         )
     try:
-        from app.api.v1.auth import _purge_expired_blacklisted_tokens
+        from app.services.auth_service import AuthService
         from app.db.session import SessionLocal
         db = SessionLocal()
-        purged = _purge_expired_blacklisted_tokens(db)
+        purged = AuthService.purge_expired_blacklisted_tokens(db)
         if purged:
             logger.info(f"Purged {purged} expired blacklisted tokens")
         db.close()
@@ -70,8 +75,6 @@ async def response_envelope_middleware(
     path = request.url.path
     if path in ENVELOPE_EXCLUDE_PATHS:
         return response
-    if request.method != "GET":
-        return response
     ct = response.headers.get("content-type", "")
     if "json" not in ct:
         return response
@@ -83,11 +86,10 @@ async def response_envelope_middleware(
     import json
     try:
         data = json.loads(body)
-        if isinstance(data, dict) and "data" in data and "meta" in data:
+        if isinstance(data, dict) and "success" in data and "meta" in data:
             return JSONResponse(content=data, status_code=response.status_code)
-        if not isinstance(data, list):
-            return JSONResponse(content=data, status_code=response.status_code)
-        return JSONResponse(content=wrap_response(data), status_code=response.status_code)
+        wrapped = wrap_response(data=data)
+        return JSONResponse(content=wrapped, status_code=response.status_code)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return Response(content=body, status_code=response.status_code, headers=dict(response.headers))
 
@@ -100,7 +102,11 @@ async def app_exception_handler(request: Request, exc: AppException):
     )
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": exc.detail, "error_code": exc.error_code},
+        content=error_response(
+            message=exc.detail,
+            error_code=exc.error_code,
+            status_code=exc.status_code,
+        ),
     )
 
 
@@ -113,7 +119,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
     return JSONResponse(
         status_code=500,
-        content={"detail": "خطأ داخلي في الخادم", "error_code": "INTERNAL_ERROR"},
+        content=error_response(
+            message="خطأ داخلي في الخادم",
+            error_code="INTERNAL_ERROR",
+            status_code=500,
+        ),
     )
 
 
@@ -130,8 +140,5 @@ app.include_router(organizations.router, prefix="/api/v1")
 app.include_router(transactions.router, prefix="/api/v1")
 app.include_router(audit.router, prefix="/api/v1")
 app.include_router(sync.router, prefix="/api/v1")
-
-
-@app.get("/api/health")
-def health():
-    return {"status": "ok", "version": settings.app_version, "app_name": settings.app_name}
+app.include_router(health.router, prefix="/api")
+app.include_router(health.router, prefix="/api/v1")

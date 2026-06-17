@@ -290,7 +290,7 @@ class ReceiptsPage(QWidget):
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
-            set_receipt_status(receipt_id, new_status)
+            set_receipt_status(receipt_id, new_status, user=self.current_user)
             log_action(
                 self.current_user["id"],
                 f"receipt_{new_status.lower()}",
@@ -307,7 +307,7 @@ class ReceiptsPage(QWidget):
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
-            hard_delete_receipt(receipt_id)
+            hard_delete_receipt(receipt_id, user=self.current_user)
             log_action(
                 self.current_user["id"],
                 "receipt_deleted",

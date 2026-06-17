@@ -14,12 +14,9 @@ Usage:
 """
 
 import json
-import os
 import sqlite3
 import sys
 import time
-import tempfile
-from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -323,7 +320,7 @@ def main():
         v3 = all_results.get('100000', {}).get('query_benchmarks', {}).get(q, {}).get('avg_s', '-')
         print(f"{'query:'+q:<35} {str(v1):<12} {str(v2):<12} {str(v3):<12}")
 
-    print(f"\nDone.")
+    print("\nDone.")
 
 
 if __name__ == "__main__":

@@ -353,26 +353,29 @@ def migrate_db(conn: sqlite3.Connection) -> None:
 
 
 def _recreate_table_with_fk(conn: sqlite3.Connection, table: str) -> None:
-    tables = {
-        'backups': """CREATE TABLE IF NOT EXISTS _new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            backup_file TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            created_by INTEGER REFERENCES users(id),
-            notes TEXT DEFAULT ''
-        )""",
-        'audit_logs': """CREATE TABLE IF NOT EXISTS _new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER REFERENCES users(id),
-            action TEXT NOT NULL,
-            machine_name TEXT NOT NULL,
-            timestamp TEXT NOT NULL,
-            details TEXT DEFAULT ''
-        )""",
-    }
-    ddl = tables.get(table)
-    if not ddl:
+    fk_map = {'user_id': 'users(id)', 'created_by': 'users(id)'}
+    cols = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    if not cols:
         return
+    col_defs = []
+    for c in cols:
+        cid, name, ctype, notnull, default, pk = c
+        parts = [name, ctype]
+        if pk:
+            parts.append("PRIMARY KEY AUTOINCREMENT" if pk == 1
+                         else "PRIMARY KEY")
+        if notnull:
+            parts.append("NOT NULL")
+        if default is not None:
+            if default == '':
+                parts.append("DEFAULT ''")
+            else:
+                parts.append(f"DEFAULT '{default}'")
+        ref = fk_map.get(name)
+        if ref:
+            parts.append(f"REFERENCES {ref}")
+        col_defs.append(" ".join(parts))
+    ddl = f"CREATE TABLE IF NOT EXISTS _new ({', '.join(col_defs)})"
     conn.execute(f"SAVEPOINT sp_fk_{table}")
     conn.execute(ddl)
     conn.execute(f"INSERT OR IGNORE INTO _new SELECT * FROM {table}")

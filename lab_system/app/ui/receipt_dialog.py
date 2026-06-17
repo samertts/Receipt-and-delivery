@@ -445,7 +445,7 @@ class ReceiptDialog(QDialog):
                         "المجموع يجب أن يساوي مجموع الصالح + التالف + المرفوض + غير المطابق",
                     )
             if self.editing:
-                update_receipt(self.receipt_id, data, items)
+                update_receipt(self.receipt_id, data, items, user=self.current_user)
             else:
                 self._rid, self._no = create_receipt(data, items, self.current_user["id"])
             self.accept()

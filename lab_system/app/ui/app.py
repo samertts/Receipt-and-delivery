@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QStackedWidget,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -141,6 +142,79 @@ class LoginWindow(QDialog):
             QMessageBox.warning(self, "خطأ", f"حدث خطأ غير متوقع: {exc}")
 
 
+class AboutDialog(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("حول النظام")
+        self.setLayoutDirection(Qt.RightToLeft)
+        self.setFixedSize(500, 400)
+        layout = QVBoxLayout(self)
+
+        title = QLabel(APP_NAME)
+        title.setStyleSheet("font-size:20px;font-weight:700;color:#2563EB;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        tabs = QTabWidget()
+        about_tab = QWidget()
+        about_layout = QVBoxLayout(about_tab)
+        try:
+            from lab_system.app.settings.config import STORAGE_DIR
+            version_path = STORAGE_DIR.parent.parent / "VERSION"
+            ver = version_path.read_text().strip() if version_path.exists() else "1.2.0-dev"
+        except Exception:
+            ver = "1.2.0-dev"
+        for text in [
+            f"الإصدار: {ver}",
+            "نظام إدارة استلام وتسليم العينات المخبرية",
+            "لجنة الصحة العراقية - دائرة المختبرات",
+            "",
+            "© 2026 جميع الحقوق محفوظة",
+            "",
+            "تم التطوير باستخدام:",
+            "• PySide6 لواجهة المستخدم",
+            "• FastAPI لخدمات الويب",
+            "• SQLite / PostgreSQL لقواعد البيانات",
+        ]:
+            lbl = QLabel(text)
+            lbl.setStyleSheet("font-size:12pt;")
+            about_layout.addWidget(lbl)
+        about_layout.addStretch()
+
+        sys_tab = QWidget()
+        sys_layout = QVBoxLayout(sys_tab)
+        import platform
+        import sys as _sys
+        for label, value in [
+            ("نظام التشغيل", platform.platform()),
+            ("بايثون", _sys.version.split()[0]),
+            ("المعالج", platform.machine()),
+            ("المستخدم", platform.node()),
+        ]:
+            row = QHBoxLayout()
+            lbl = QLabel(f"{label}:")
+            lbl.setStyleSheet("font-weight:600;")
+            val = QLabel(value)
+            row.addWidget(lbl)
+            row.addWidget(val, 1)
+            sys_layout.addLayout(row)
+        sys_layout.addStretch()
+
+        tabs.addTab(about_tab, "حول")
+        tabs.addTab(sys_tab, "معلومات النظام")
+        layout.addWidget(tabs)
+
+        close_btn = QPushButton("إغلاق")
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.accept()
+        else:
+            super().keyPressEvent(event)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, user, auth_service=None) -> None:
         super().__init__()
@@ -225,6 +299,31 @@ class MainWindow(QMainWindow):
         new_action.triggered.connect(self._new_item)
         self.addAction(new_action)
 
+        help_action = QAction("مساعدة", self)
+        help_action.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_H))
+        help_action.triggered.connect(self._show_about)
+        self.addAction(help_action)
+
+        dash_action = QAction("لوحة القيادة", self)
+        dash_action.setShortcut(QKeySequence(Qt.ALT | Qt.Key_1))
+        dash_action.triggered.connect(lambda: self._navigate_to("dashboard"))
+        self.addAction(dash_action)
+
+        receipts_action = QAction("الإيصالات", self)
+        receipts_action.setShortcut(QKeySequence(Qt.ALT | Qt.Key_2))
+        receipts_action.triggered.connect(lambda: self._navigate_to("receipts"))
+        self.addAction(receipts_action)
+
+        orgs_action = QAction("الجهات", self)
+        orgs_action.setShortcut(QKeySequence(Qt.ALT | Qt.Key_3))
+        orgs_action.triggered.connect(lambda: self._navigate_to("orgs"))
+        self.addAction(orgs_action)
+
+        users_action = QAction("المستخدمين", self)
+        users_action.setShortcut(QKeySequence(Qt.ALT | Qt.Key_4))
+        users_action.triggered.connect(lambda: self._navigate_to("users"))
+        self.addAction(users_action)
+
     def _refresh_current(self):
         page = self.pages.currentWidget()
         if hasattr(page, "refresh"):
@@ -252,6 +351,10 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentIndex(idx)
         if self.auth:
             self.auth.touch_activity()
+
+    def _show_about(self):
+        dlg = AboutDialog()
+        dlg.exec()
 
     def _navigate_to(self, key):
         """Public navigation helper, used by quick action callbacks."""
