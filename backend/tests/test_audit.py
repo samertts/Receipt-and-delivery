@@ -5,7 +5,8 @@ class TestAuditLogs:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 200
-        assert isinstance(response.json(), list)
+        body = response.json()
+        assert isinstance(body, list) or "data" in body
 
     def test_audit_logs_user_forbidden(self, client, user_token):
         response = client.get(

@@ -16,7 +16,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from lab_system.app.database import db as _db
-from lab_system.app.settings.config import CONFIG
 
 errors = []
 n_pass = 0
@@ -289,9 +288,9 @@ for target in range(1, _db.SCHEMA_VERSION):
 
 elapsed = time.time() - start
 print(f"\n{'=' * 72}")
-print(f"MIGRATION UPGRADE CERTIFICATION REPORT")
+print("MIGRATION UPGRADE CERTIFICATION REPORT")
 print(f"{'=' * 72}")
-print(f"Paths tested:  v1→v8, v2→v8, v3→v8, v4→v8, v5→v8, v6→v8, v7→v8")
+print("Paths tested:  v1→v8, v2→v8, v3→v8, v4→v8, v5→v8, v6→v8, v7→v8")
 print(f"Total checks:  {n_total}")
 print(f"Passed:        {n_pass}")
 print(f"Failed:        {n_total - n_pass}")
@@ -303,8 +302,8 @@ if errors:
         print(f"  ✗ {e}")
     sys.exit(1)
 
-print(f"\n✅ ALL UPGRADE PATHS CERTIFIED")
-print(f"   Schema correct at every version transition")
-print(f"   Data preserved across all migrations")
-print(f"   WAL + foreign_keys active after upgrade")
-print(f"   Migration lock released")
+print("\n✅ ALL UPGRADE PATHS CERTIFIED")
+print("   Schema correct at every version transition")
+print("   Data preserved across all migrations")
+print("   WAL + foreign_keys active after upgrade")
+print("   Migration lock released")

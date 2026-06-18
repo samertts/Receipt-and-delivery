@@ -20,3 +20,4 @@ installer/Output/
 .coverage
 coverage.xml
 htmlcov/
+.generated_secret_key.json

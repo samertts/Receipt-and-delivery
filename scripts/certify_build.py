@@ -39,7 +39,7 @@ print("=" * 72)
 # -----------------------------------------------------------------------
 # 1. PyInstaller spec analysis
 # -----------------------------------------------------------------------
-print(f"\n  1. PyInstaller spec (lab_system.spec) ...")
+print("\n  1. PyInstaller spec (lab_system.spec) ...")
 
 spec_path = ROOT / "lab_system.spec"
 ok(spec_path.exists(), "lab_system.spec exists")
@@ -120,7 +120,7 @@ ok("icon='assets/icons/app.ico'" in spec_text, "app icon specified")
 # -----------------------------------------------------------------------
 # 2. Inno Setup installer analysis
 # -----------------------------------------------------------------------
-print(f"\n  2. Inno Setup installer (installer/setup.iss) ...")
+print("\n  2. Inno Setup installer (installer/setup.iss) ...")
 
 iss_path = ROOT / "installer" / "setup.iss"
 ok(iss_path.exists(), "installer/setup.iss exists")
@@ -149,7 +149,7 @@ ok("dist\\{#MyAppExeName}" in iss_text or "dist\\LabReceiptSystem.exe" in iss_te
 # -----------------------------------------------------------------------
 # 3. Secondary installer (LabReceipt.iss)
 # -----------------------------------------------------------------------
-print(f"\n  3. Secondary installer (lab_system/installer/LabReceipt.iss) ...")
+print("\n  3. Secondary installer (lab_system/installer/LabReceipt.iss) ...")
 
 iss2_path = ROOT / "lab_system" / "installer" / "LabReceipt.iss"
 ok(iss2_path.exists(), "LabReceipt.iss exists")
@@ -166,7 +166,7 @@ ok("AppVersion=" in iss2_text, "  AppVersion defined")
 # -----------------------------------------------------------------------
 # 4. CI pipeline verification
 # -----------------------------------------------------------------------
-print(f"\n  4. CI pipeline (.github/workflows/build.yml) ...")
+print("\n  4. CI pipeline (.github/workflows/build.yml) ...")
 
 ci_path = ROOT / ".github/workflows/build.yml"
 ok(ci_path.exists(), "build.yml exists")
@@ -199,7 +199,7 @@ ok("for /f %%i in (VERSION) do set APP_VER=%%i" in ci_text or "APP_VER" in ci_te
 # -----------------------------------------------------------------------
 # 5. Asset verification
 # -----------------------------------------------------------------------
-print(f"\n  5. Assets verification ...")
+print("\n  5. Assets verification ...")
 
 icon = ROOT / "assets" / "icons" / "app.ico"
 ok(icon.exists() and icon.stat().st_size > 0, "app.ico exists and non-empty")
@@ -221,7 +221,7 @@ ok(len(ver) > 0, f"VERSION file non-empty: '{ver}'")
 # -----------------------------------------------------------------------
 # 6. Requirements verification
 # -----------------------------------------------------------------------
-print(f"\n  6. Requirements verification ...")
+print("\n  6. Requirements verification ...")
 
 req_path = ROOT / "requirements.txt"
 ok(req_path.exists(), "requirements.txt exists")
@@ -234,7 +234,7 @@ for pkg in required_pkgs:
 # Summary
 # -----------------------------------------------------------------------
 print(f"\n{'=' * 72}")
-print(f"WINDOWS BUILD & DEPLOYMENT CERTIFICATION REPORT")
+print("WINDOWS BUILD & DEPLOYMENT CERTIFICATION REPORT")
 print(f"{'=' * 72}")
 print(f"Total checks:  {n_total}")
 print(f"Passed:        {n_pass}")
@@ -246,11 +246,11 @@ if errors:
         print(f"  ✗ {e}")
     sys.exit(1)
 
-print(f"\n✅ ALL BUILD VERIFICATION CHECKS PASSED")
-print(f"   PyInstaller spec: complete (all imports, excludes, datas)")
-print(f"   Inno Setup: all directories, version sync, uninstall data preservation")
-print(f"   CI pipeline: full build-test-package-release chain")
-print(f"   Assets: icon present, VERSION file bundled")
-print(f"   Requirements: all runtime dependencies present")
-print(f"\n   NOTE: EXE build and Setup.exe generation require Windows CI execution.")
-print(f"   Static verification confirms all build artifacts are correctly configured.")
+print("\n✅ ALL BUILD VERIFICATION CHECKS PASSED")
+print("   PyInstaller spec: complete (all imports, excludes, datas)")
+print("   Inno Setup: all directories, version sync, uninstall data preservation")
+print("   CI pipeline: full build-test-package-release chain")
+print("   Assets: icon present, VERSION file bundled")
+print("   Requirements: all runtime dependencies present")
+print("\n   NOTE: EXE build and Setup.exe generation require Windows CI execution.")
+print("   Static verification confirms all build artifacts are correctly configured.")

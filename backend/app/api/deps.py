@@ -26,6 +26,7 @@ PERMISSION_ROLES = {
     "view_reports": ["admin", "supervisor"],
     "manage_settings": ["admin"],
     "manage_backups": ["admin"],
+    "sync_data": ["admin"],
 }
 
 

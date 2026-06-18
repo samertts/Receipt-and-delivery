@@ -1,0 +1,278 @@
+{
+  "1000": {
+    "dataset_size": 1000,
+    "db_path": "/home/samertts/workspace/projects/Receipt-and-delivery/baseline/benchmarks/bench_1000.db",
+    "creation_time_s": 0.0,
+    "db_size_mb": 0.7,
+    "actual_receipts": 1000,
+    "actual_items": 5538,
+    "query_benchmarks": {
+      "list_receipts_page1": {
+        "min_s": 0.0022,
+        "avg_s": 0.0023,
+        "max_s": 0.0023,
+        "runs": 3
+      },
+      "fts_search": {
+        "min_s": 0.0032,
+        "avg_s": 0.0044,
+        "max_s": 0.0054,
+        "runs": 3
+      },
+      "monthly_report": {
+        "min_s": 0.0021,
+        "avg_s": 0.0054,
+        "max_s": 0.0074,
+        "runs": 3
+      },
+      "sample_summary": {
+        "min_s": 0.0088,
+        "avg_s": 0.0125,
+        "max_s": 0.0161,
+        "runs": 3
+      },
+      "institution_stats": {
+        "min_s": 0.0028,
+        "avg_s": 0.0036,
+        "max_s": 0.0041,
+        "runs": 3
+      },
+      "full_export": {
+        "min_s": 0.0089,
+        "avg_s": 0.0145,
+        "max_s": 0.0199,
+        "runs": 3
+      },
+      "filter_by_status": {
+        "min_s": 0.0022,
+        "avg_s": 0.0025,
+        "max_s": 0.0028,
+        "runs": 3
+      },
+      "dashboard_counts": {
+        "min_s": 0.0027,
+        "avg_s": 0.0028,
+        "max_s": 0.003,
+        "runs": 3
+      }
+    },
+    "backup_benchmarks": {
+      "file_copy_backup": {
+        "min_s": 0.0025,
+        "avg_s": 0.0071,
+        "max_s": 0.0151,
+        "runs": 3
+      }
+    },
+    "fts_benchmarks": {
+      "fts_\u0645\u0635\u0644": {
+        "min_s": 0.0017,
+        "avg_s": 0.0046,
+        "max_s": 0.0082,
+        "runs": 3
+      },
+      "fts_\u062f\u0645": {
+        "min_s": 0.0017,
+        "avg_s": 0.002,
+        "max_s": 0.0022,
+        "runs": 3
+      },
+      "fts_BENCH": {
+        "min_s": 0.0023,
+        "avg_s": 0.0029,
+        "max_s": 0.0039,
+        "runs": 3
+      },
+      "fts_Org": {
+        "min_s": 0.0019,
+        "avg_s": 0.0026,
+        "max_s": 0.0034,
+        "runs": 3
+      }
+    }
+  },
+  "10000": {
+    "dataset_size": 10000,
+    "db_path": "/home/samertts/workspace/projects/Receipt-and-delivery/baseline/benchmarks/bench_10000.db",
+    "creation_time_s": 0.0,
+    "db_size_mb": 4.8,
+    "actual_receipts": 10000,
+    "actual_items": 55030,
+    "query_benchmarks": {
+      "list_receipts_page1": {
+        "min_s": 0.0026,
+        "avg_s": 0.0029,
+        "max_s": 0.0031,
+        "runs": 3
+      },
+      "fts_search": {
+        "min_s": 0.0024,
+        "avg_s": 0.0043,
+        "max_s": 0.0069,
+        "runs": 3
+      },
+      "monthly_report": {
+        "min_s": 0.0113,
+        "avg_s": 0.0129,
+        "max_s": 0.0139,
+        "runs": 3
+      },
+      "sample_summary": {
+        "min_s": 0.0903,
+        "avg_s": 0.11,
+        "max_s": 0.1337,
+        "runs": 3
+      },
+      "institution_stats": {
+        "min_s": 0.0206,
+        "avg_s": 0.0237,
+        "max_s": 0.0285,
+        "runs": 3
+      },
+      "full_export": {
+        "min_s": 0.1142,
+        "avg_s": 0.1203,
+        "max_s": 0.1245,
+        "runs": 3
+      },
+      "filter_by_status": {
+        "min_s": 0.0056,
+        "avg_s": 0.0068,
+        "max_s": 0.0082,
+        "runs": 3
+      },
+      "dashboard_counts": {
+        "min_s": 0.0118,
+        "avg_s": 0.0121,
+        "max_s": 0.0122,
+        "runs": 3
+      }
+    },
+    "backup_benchmarks": {
+      "file_copy_backup": {
+        "min_s": 0.0205,
+        "avg_s": 0.0249,
+        "max_s": 0.0283,
+        "runs": 3
+      }
+    },
+    "fts_benchmarks": {
+      "fts_\u0645\u0635\u0644": {
+        "min_s": 0.0021,
+        "avg_s": 0.0025,
+        "max_s": 0.0031,
+        "runs": 3
+      },
+      "fts_\u062f\u0645": {
+        "min_s": 0.0023,
+        "avg_s": 0.0026,
+        "max_s": 0.0028,
+        "runs": 3
+      },
+      "fts_BENCH": {
+        "min_s": 0.0029,
+        "avg_s": 0.0039,
+        "max_s": 0.0045,
+        "runs": 3
+      },
+      "fts_Org": {
+        "min_s": 0.002,
+        "avg_s": 0.0022,
+        "max_s": 0.0027,
+        "runs": 3
+      }
+    }
+  },
+  "100000": {
+    "dataset_size": 100000,
+    "db_path": "/home/samertts/workspace/projects/Receipt-and-delivery/baseline/benchmarks/bench_100000.db",
+    "creation_time_s": 35.93,
+    "db_size_mb": 51.8,
+    "actual_receipts": 100000,
+    "actual_items": 549476,
+    "query_benchmarks": {
+      "list_receipts_page1": {
+        "min_s": 0.2766,
+        "avg_s": 0.2842,
+        "max_s": 0.2976,
+        "runs": 3
+      },
+      "fts_search": {
+        "min_s": 0.003,
+        "avg_s": 0.0032,
+        "max_s": 0.0035,
+        "runs": 3
+      },
+      "monthly_report": {
+        "min_s": 0.1335,
+        "avg_s": 0.1426,
+        "max_s": 0.149,
+        "runs": 3
+      },
+      "sample_summary": {
+        "min_s": 0.9252,
+        "avg_s": 1.1098,
+        "max_s": 1.4594,
+        "runs": 3
+      },
+      "institution_stats": {
+        "min_s": 0.1694,
+        "avg_s": 0.1741,
+        "max_s": 0.1775,
+        "runs": 3
+      },
+      "full_export": {
+        "min_s": 1.271,
+        "avg_s": 1.3489,
+        "max_s": 1.4422,
+        "runs": 3
+      },
+      "filter_by_status": {
+        "min_s": 0.0281,
+        "avg_s": 0.0336,
+        "max_s": 0.0423,
+        "runs": 3
+      },
+      "dashboard_counts": {
+        "min_s": 0.0897,
+        "avg_s": 0.0993,
+        "max_s": 0.1057,
+        "runs": 3
+      }
+    },
+    "backup_benchmarks": {
+      "file_copy_backup": {
+        "min_s": 0.1721,
+        "avg_s": 0.1973,
+        "max_s": 0.2274,
+        "runs": 3
+      }
+    },
+    "fts_benchmarks": {
+      "fts_\u0645\u0635\u0644": {
+        "min_s": 0.0035,
+        "avg_s": 0.0115,
+        "max_s": 0.0165,
+        "runs": 3
+      },
+      "fts_\u062f\u0645": {
+        "min_s": 0.0027,
+        "avg_s": 0.0038,
+        "max_s": 0.0054,
+        "runs": 3
+      },
+      "fts_BENCH": {
+        "min_s": 0.0134,
+        "avg_s": 0.018,
+        "max_s": 0.0219,
+        "runs": 3
+      },
+      "fts_Org": {
+        "min_s": 0.0025,
+        "avg_s": 0.0028,
+        "max_s": 0.003,
+        "runs": 3
+      }
+    }
+  }
+}

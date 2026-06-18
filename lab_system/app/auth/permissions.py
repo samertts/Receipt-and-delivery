@@ -5,7 +5,7 @@ from lab_system.app.utils.errors import AuthorizationError
 ROLE_PERMISSIONS = {
     'Admin': {
         'dashboard.view',
-        'receipts.create', 'receipts.read', 'receipts.update', 'receipts.delete',
+        'receipts.create', 'receipts.read', 'receipts.update', 'receipts.delete', 'receipts.restore',
         'receipts.approve', 'receipts.reject', 'receipts.archive', 'receipts.cancel',
         'organizations.create', 'organizations.read', 'organizations.update', 'organizations.delete',
         'users.create', 'users.read', 'users.update', 'users.delete',
@@ -17,7 +17,7 @@ ROLE_PERMISSIONS = {
     },
     'Supervisor': {
         'dashboard.view',
-        'receipts.create', 'receipts.read', 'receipts.update',
+        'receipts.create', 'receipts.read', 'receipts.update', 'receipts.restore',
         'receipts.approve', 'receipts.reject', 'receipts.archive', 'receipts.cancel',
         'organizations.read', 'organizations.update',
         'users.read',
@@ -31,7 +31,6 @@ ROLE_PERMISSIONS = {
         'receipts.create', 'receipts.read',
         'organizations.read',
         'reports.read',
-        'backup.create', 'backup.verify',
     },
     'Auditor': {
         'dashboard.view',
@@ -55,10 +54,20 @@ def check_permission(user: dict, permission: str) -> None:
 
 
 def with_permission(permission: str):
+    """Decorator: enforces permission — fail-closed if `user` kwarg is missing.
+
+    Usage:
+        @with_permission('users.create')
+        def create_user(full_name, username, password, role, user=None):
+            ...
+    """
     def decorator(func):
         @wraps(func)
-        def wrapper(user, *args, **kwargs):
+        def wrapper(*args, **kwargs):
+            user = kwargs.get('user')
+            if user is None:
+                raise AuthorizationError('غير مصرح لك بهذا الإجراء')
             check_permission(user, permission)
-            return func(user, *args, **kwargs)
+            return func(*args, **kwargs)
         return wrapper
     return decorator

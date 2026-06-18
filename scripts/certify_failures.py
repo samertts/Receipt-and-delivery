@@ -22,14 +22,12 @@ import sys
 import tempfile
 import time
 import shutil
-import os
 from pathlib import Path
 from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from lab_system.app.database import db as _db
-from lab_system.app.settings.config import CONFIG
 
 errors = []
 n_pass = 0
@@ -81,7 +79,7 @@ print("=" * 72)
 # -----------------------------------------------------------------------
 # Test 1: Corrupted database (garbage content, not a valid SQLite file)
 # -----------------------------------------------------------------------
-print(f"\n  Test 1: Corrupted database (invalid header) ...")
+print("\n  Test 1: Corrupted database (invalid header) ...")
 tmp1, db1, orig1 = setup_test_db()
 try:
     # Corrupt by writing a valid SQLite header but then corrupting the schema
@@ -108,7 +106,7 @@ finally:
 # -----------------------------------------------------------------------
 # Test 2: Missing WAL file
 # -----------------------------------------------------------------------
-print(f"  Test 2: Missing WAL file ...")
+print("  Test 2: Missing WAL file ...")
 tmp2, db2, orig2 = setup_test_db()
 try:
     wal = db2.with_name(db2.name + "-wal")
@@ -125,7 +123,7 @@ finally:
 # -----------------------------------------------------------------------
 # Test 3: Missing attachments
 # -----------------------------------------------------------------------
-print(f"  Test 3: Missing attachments ...")
+print("  Test 3: Missing attachments ...")
 tmp3, db3, orig3 = setup_test_db()
 try:
     from lab_system.app.services.receipt_service import hard_delete_receipt
@@ -139,10 +137,10 @@ finally:
 # -----------------------------------------------------------------------
 # Test 4: No backups / empty backups dir
 # -----------------------------------------------------------------------
-print(f"  Test 4: No backups available ...")
+print("  Test 4: No backups available ...")
 tmp4, db4, orig4 = setup_test_db()
 try:
-    from lab_system.app.services.recovery_service import list_backups, verify_backup
+    from lab_system.app.services.recovery_service import verify_backup
     # Verify that verify_backup handles missing files correctly
     result = verify_backup(tmp4 / "nonexistent.db")
     ok(not result["valid"], "verify_backup fails for missing file")
@@ -154,7 +152,7 @@ finally:
 # -----------------------------------------------------------------------
 # Test 5: Interrupted migration (stuck lock)
 # -----------------------------------------------------------------------
-print(f"  Test 5: Interrupted migration (stuck lock) ...")
+print("  Test 5: Interrupted migration (stuck lock) ...")
 tmp5, db5, orig5 = setup_test_db()
 conn = sqlite3.connect(str(db5))
 conn.execute("PRAGMA foreign_keys = ON;")
@@ -182,7 +180,7 @@ finally:
 # -----------------------------------------------------------------------
 # Test 6: Interrupted restore
 # -----------------------------------------------------------------------
-print(f"  Test 6: Interrupted restore (simulated partial copy) ...")
+print("  Test 6: Interrupted restore (simulated partial copy) ...")
 tmp6, db6, orig6 = setup_test_db()
 backup_dir = tmp6 / "backups"
 shutil.rmtree(tmp6 / "backups", ignore_errors=True)
@@ -214,7 +212,7 @@ finally:
 # -----------------------------------------------------------------------
 # Test 7: Missing database file entirely (first run scenario)
 # -----------------------------------------------------------------------
-print(f"  Test 7: Missing database file (first run) ...")
+print("  Test 7: Missing database file (first run) ...")
 tmp7 = Path(tempfile.mkdtemp())
 db7 = tmp7 / "lab_system.db"
 orig7 = _db.CONFIG.db_path
@@ -234,7 +232,7 @@ finally:
 # -----------------------------------------------------------------------
 # Test 8: WAL checkpoint before backup restore (crash-safe restore)
 # -----------------------------------------------------------------------
-print(f"  Test 8: WAL checkpoint before restore (crash safety) ...")
+print("  Test 8: WAL checkpoint before restore (crash safety) ...")
 tmp8, db8, orig8 = setup_test_db()
 try:
     from lab_system.app.services.recovery_service import _checkpoint_wal
@@ -257,17 +255,17 @@ finally:
 # -----------------------------------------------------------------------
 elapsed = time.time() - start
 print(f"\n{'=' * 72}")
-print(f"FAILURE RECOVERY CERTIFICATION REPORT")
+print("FAILURE RECOVERY CERTIFICATION REPORT")
 print(f"{'=' * 72}")
-print(f"Scenarios tested: 8")
-print(f"  - Corrupted database (zero-length)")
-print(f"  - Missing WAL file")
-print(f"  - Missing attachment files")
-print(f"  - No backups available")
-print(f"  - Stuck migration lock (interrupted migration)")
-print(f"  - Partial/incomplete backup")
-print(f"  - Missing database (first run)")
-print(f"  - WAL checkpoint safety")
+print("Scenarios tested: 8")
+print("  - Corrupted database (zero-length)")
+print("  - Missing WAL file")
+print("  - Missing attachment files")
+print("  - No backups available")
+print("  - Stuck migration lock (interrupted migration)")
+print("  - Partial/incomplete backup")
+print("  - Missing database (first run)")
+print("  - WAL checkpoint safety")
 print(f"Total checks:  {n_total}")
 print(f"Passed:        {n_pass}")
 print(f"Failed:        {n_total - n_pass}")
@@ -279,12 +277,12 @@ if errors:
         print(f"  ✗ {e}")
     sys.exit(1)
 
-print(f"\n✅ ALL FAILURE RECOVERY SCENARIOS CERTIFIED")
-print(f"   Corrupted DB: detected, descriptive error")
-print(f"   Missing WAL: graceful handling")
-print(f"   Missing attachments: no crash on delete")
-print(f"   Empty backups: graceful detection")
-print(f"   Stuck migration lock: prevented concurrent init")
-print(f"   Partial backup: rejected with clear message")
-print(f"   First run: database created with full schema")
-print(f"   WAL checkpoint: safe, DB readable after")
+print("\n✅ ALL FAILURE RECOVERY SCENARIOS CERTIFIED")
+print("   Corrupted DB: detected, descriptive error")
+print("   Missing WAL: graceful handling")
+print("   Missing attachments: no crash on delete")
+print("   Empty backups: graceful detection")
+print("   Stuck migration lock: prevented concurrent init")
+print("   Partial backup: rejected with clear message")
+print("   First run: database created with full schema")
+print("   WAL checkpoint: safe, DB readable after")

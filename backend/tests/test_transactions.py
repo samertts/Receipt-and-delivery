@@ -1,3 +1,7 @@
+def _unwrap(body: dict) -> dict:
+    return body.get("data", body)
+
+
 class TestTransactionCRUD:
     def test_create_transaction(self, client, admin_token):
         payload = {
@@ -33,7 +37,7 @@ class TestTransactionCRUD:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 201
-        data = response.json()
+        data = _unwrap(response.json())
         assert data["transaction_no"].startswith("TXN-")
         assert data["status"] == "draft"
         assert len(data["items"]) == 1
@@ -74,11 +78,11 @@ class TestTransactionCRUD:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 200
-        assert isinstance(response.json(), list)
+        body = response.json()
+        assert isinstance(body.get("data", body), list)
 
     def test_list_transactions_pagination_header(self, client, db, admin_token):
         from app.models.transaction import Transaction
-        from app.models.transaction_item import TransactionItem
 
         for i in range(5):
             txn = Transaction(
@@ -99,7 +103,8 @@ class TestTransactionCRUD:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 200
-        assert response.headers.get("X-Total-Count") == "5"
+        body = response.json()
+        assert body.get("meta", {}).get("total") == 5
 
     def test_get_transaction_not_found(self, client, admin_token):
         response = client.get(
@@ -145,7 +150,7 @@ class TestTransactionDeepUpdate:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 200, f"Body: {response.text}"
-        data = response.json()
+        data = _unwrap(response.json())
         assert data["notes"] == "updated notes"
         assert len(data["items"]) == 2
 
@@ -178,4 +183,4 @@ class TestTransactionDeepUpdate:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 200
-        assert len(response.json()["items"]) == 0
+        assert len(_unwrap(response.json())["items"]) == 0

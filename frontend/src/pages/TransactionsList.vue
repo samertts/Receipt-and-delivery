@@ -1,48 +1,48 @@
 <template>
   <div>
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-      <h1 class="text-2xl font-bold text-slate-800">المعاملات</h1>
+      <h1 class="text-2xl font-bold text-slate-800">{{ L.tx.title }}</h1>
       <router-link to="/newtransaction" class="gov-btn-primary">
-        <span v-html="icons.plus"></span>
-        معاملة جديدة
+        <span v-html="ICONS.plus"></span>
+        {{ L.nav.newTransaction }}
       </router-link>
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-4 space-y-3">
       <div class="flex flex-col sm:flex-row gap-3">
         <div class="relative flex-1">
-          <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" v-html="icons.search"></span>
+          <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" v-html="ICONS.search"></span>
           <input
             v-model="searchQuery"
             @input="debouncedSearch"
-            placeholder="بحث برقم المعاملة أو اسم المرسل..."
+            :placeholder="L.tx.searchPlaceholder"
             class="gov-input pr-10"
           />
           <button
             v-if="searchQuery"
             @click="searchQuery = ''; debouncedSearch()"
             class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-            aria-label="مسح البحث"
+            :aria-label="L.actions.clear"
           >
-            <span v-html="icons.close"></span>
+            <span v-html="ICONS.close"></span>
           </button>
         </div>
         <select v-model="statusFilter" @change="fetchData" class="gov-select sm:w-40">
-          <option value="">جميع الحالات</option>
-          <option value="draft">مسودة</option>
-          <option value="approved">معتمد</option>
-          <option value="rejected">مرفوض</option>
-          <option value="archived">مؤرشف</option>
-          <option value="cancelled">ملغي</option>
+          <option value="">{{ L.tx.allStatus }}</option>
+          <option value="draft">{{ L.status.draft }}</option>
+          <option value="approved">{{ L.status.approved }}</option>
+          <option value="rejected">{{ L.status.rejected }}</option>
+          <option value="archived">{{ L.status.archived }}</option>
+          <option value="cancelled">{{ L.status.cancelled }}</option>
         </select>
       </div>
       <div class="flex flex-col sm:flex-row gap-3 text-sm">
         <div class="flex items-center gap-2">
-          <span class="text-slate-500 shrink-0">من:</span>
+          <span class="text-slate-500 shrink-0">{{ L.tx.from }}:</span>
           <input v-model="dateFrom" type="date" @change="fetchData" class="gov-input text-sm" />
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-slate-500 shrink-0">إلى:</span>
+          <span class="text-slate-500 shrink-0">{{ L.tx.to }}:</span>
           <input v-model="dateTo" type="date" @change="fetchData" class="gov-input text-sm" />
         </div>
         <button
@@ -50,39 +50,46 @@
           @click="clearFilters"
           class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
         >
-          <span v-html="icons.close"></span>
-          مسح الفلاتر
+          <span v-html="ICONS.close"></span>
+          {{ L.actions.clear }}
         </button>
       </div>
     </div>
 
-    <div v-if="loading" class="space-y-3">
-      <div v-for="i in 3" :key="i" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-        <div class="skeleton h-5 w-48 mb-2"></div>
-        <div class="skeleton h-4 w-72 mb-2"></div>
-        <div class="skeleton h-3 w-32"></div>
+    <div v-if="loading" role="status" aria-live="polite" aria-label="تحميل المعاملات">
+      <div class="space-y-3">
+        <div v-for="i in 3" :key="i" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+          <div class="skeleton h-5 w-48 mb-2"></div>
+          <div class="skeleton h-4 w-72 mb-2"></div>
+          <div class="skeleton h-3 w-32"></div>
+        </div>
       </div>
     </div>
 
-    <div v-else-if="error" class="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-lg flex items-center gap-3">
-      <span v-html="icons.alert"></span>
+    <div v-else-if="error" role="alert" class="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-lg flex items-center gap-3">
+      <span v-html="ICONS.alert" class="shrink-0"></span>
       <span>{{ error }}</span>
-      <button @click="fetchData" class="mr-auto text-red-600 hover:text-red-800 font-medium">إعادة المحاولة</button>
+      <button @click="fetchData" class="mr-auto text-red-600 hover:text-red-800 font-medium">{{ L.actions.retry }}</button>
     </div>
 
-    <div v-else-if="items.length === 0" class="text-center py-16 bg-white rounded-xl shadow-sm border border-slate-200">
-      <div class="text-slate-300 text-5xl mb-4" v-html="icons.doc"></div>
-      <p class="text-slate-500 text-sm">لا توجد معاملات تطابق معايير البحث</p>
+    <div v-else-if="items.length === 0" class="text-center py-16 bg-white rounded-xl shadow-sm border border-slate-200" role="status" aria-live="polite">
+      <div class="text-slate-300 text-5xl mb-4" v-html="ICONS.doc"></div>
+      <p class="text-slate-500 text-sm">{{ hasActiveFilters ? L.actions.noResults : L.tx.noTransactions }}</p>
       <button v-if="hasActiveFilters" @click="clearFilters" class="gov-btn-secondary mt-4">
-        مسح الفلاتر
+        {{ L.actions.clear }}
       </button>
     </div>
 
-    <div v-else class="space-y-2">
+    <div v-else class="space-y-2" role="status" aria-live="polite">
       <div
         v-for="tx in items" :key="tx.id"
+        v-memo="[tx.status, tx.transaction_no]"
         @click="viewTransaction(tx.id)"
+        @keydown.enter="viewTransaction(tx.id)"
+        @keydown.space.prevent="viewTransaction(tx.id)"
         class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 hover:shadow-md cursor-pointer transition-all"
+        tabindex="0" role="button"
+        :aria-label="`${L.tx.transaction} ${tx.transaction_no} — ${statusLabel(tx.status)}`"
       >
         <div class="flex items-center justify-between">
           <div class="min-w-0 flex-1">
@@ -97,26 +104,26 @@
               <span class="font-medium text-slate-600">{{ tx.receiver_name }}</span>
             </div>
             <div class="text-xs text-slate-400 mt-1 flex items-center gap-1">
-              <span v-html="icons.calendar"></span>
+              <span v-html="ICONS.calendar"></span>
               {{ tx.transaction_date }}
             </div>
           </div>
           <div class="text-slate-300 mr-4">
-            <span v-html="icons.arrowLeft"></span>
+            <span v-html="ICONS.arrowLeft"></span>
           </div>
         </div>
       </div>
     </div>
 
     <div v-if="items.length > 0" class="flex items-center justify-between mt-4 text-sm text-slate-500">
-      <span>إجمالي {{ total }} معاملة</span>
+      <span>{{ L.tx.total }} {{ total }} {{ L.tx.transaction }}</span>
       <div class="flex gap-2 items-center">
         <button
           :disabled="page <= 1"
           @click="prevPage"
           class="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-slate-50 transition-colors"
         >
-          السابق
+          {{ L.tx.previous }}
         </button>
         <span class="px-3 py-1.5 text-slate-600">{{ page }} / {{ totalPages }}</span>
         <button
@@ -124,7 +131,7 @@
           @click="nextPage"
           class="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-slate-50 transition-colors"
         >
-          التالي
+          {{ L.tx.next }}
         </button>
       </div>
     </div>
@@ -132,15 +139,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, shallowRef, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTransactionStore } from '../stores/transactions'
 import { statusLabel, statusClass } from '../composables/useStatus'
 import { ICONS } from '../composables/useIcons'
+import { L } from '../composables/useLocale'
 
 const router = useRouter()
 const store = useTransactionStore()
-const icons = ICONS
 
 const items = ref([])
 const loading = ref(true)
@@ -155,9 +162,6 @@ const limit = 20
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / limit)))
 const hasActiveFilters = computed(() => searchQuery.value || statusFilter.value || dateFrom.value || dateTo.value)
-
-const DOC_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`
-icons.doc = DOC_ICON
 
 let debounceTimer = null
 function debouncedSearch() {
@@ -199,7 +203,7 @@ async function fetchData() {
     items.value = store.items
     total.value = store.total
   } catch (e) {
-    error.value = 'فشل في تحميل المعاملات'
+    error.value = L.errors.loadFailedTx
   } finally {
     loading.value = false
   }

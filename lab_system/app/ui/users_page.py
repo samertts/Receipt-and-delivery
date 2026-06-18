@@ -24,6 +24,7 @@ from lab_system.app.services.user_service import (
     reset_password,
 )
 from lab_system.app.ui.notifications import toast
+from lab_system.app.utils.constants import TABLE_STYLE
 from lab_system.app.ui.page_header import PageHeader
 from lab_system.app.utils.validators import validate_password, validate_username
 
@@ -113,6 +114,7 @@ class UsersPage(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSortingEnabled(True)
+        self.table.setStyleSheet(TABLE_STYLE)
         self.layout().addWidget(self.table)
 
     def _add_user(self):
@@ -133,7 +135,7 @@ class UsersPage(QWidget):
             return
 
         try:
-            create_user(full_name, username, password, role, institution_id)
+            create_user(full_name, username, password, role, institution_id, user=self.current_user)
             log_action(
                 self.current_user["id"],
                 "user_created",
@@ -206,7 +208,7 @@ class UsersPage(QWidget):
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
-            disable_user(user_id)
+            disable_user(user_id, user=self.current_user)
             log_action(
                 self.current_user["id"],
                 "user_disabled",
@@ -217,7 +219,7 @@ class UsersPage(QWidget):
     def _enable_user(self, user_id):
         check_permission(self.current_user, 'users.update')
         from lab_system.app.services.user_service import enable_user
-        enable_user(user_id)
+        enable_user(user_id, user=self.current_user)
         log_action(
             self.current_user["id"],
             "user_enabled",
@@ -235,7 +237,7 @@ class UsersPage(QWidget):
             if error:
                 QMessageBox.warning(self, "خطأ", error)
                 return
-            reset_password(user_id, password)
+            reset_password(user_id, password, user=self.current_user)
             log_action(
                 self.current_user["id"],
                 "password_reset",

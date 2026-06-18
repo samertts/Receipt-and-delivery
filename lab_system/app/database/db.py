@@ -7,7 +7,7 @@ from pathlib import Path
 
 from lab_system.app.settings.config import CONFIG
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 10
 
 SCHEMA = '''
 PRAGMA foreign_keys = ON;
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS migration_lock (
  updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS backups (id INTEGER PRIMARY KEY AUTOINCREMENT, backup_file TEXT NOT NULL, created_at TEXT NOT NULL, created_by INTEGER REFERENCES users(id), notes TEXT DEFAULT '');
-CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER REFERENCES users(id), action TEXT NOT NULL, machine_name TEXT NOT NULL, timestamp TEXT NOT NULL, details TEXT DEFAULT '');
+CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER REFERENCES users(id), action TEXT NOT NULL, machine_name TEXT NOT NULL, timestamp TEXT NOT NULL, details TEXT DEFAULT '', prev_hash TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS login_attempts (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  username TEXT NOT NULL,
@@ -150,6 +150,7 @@ CREATE INDEX IF NOT EXISTS idx_items_sample ON receipt_items(sample_type_id);
 CREATE INDEX IF NOT EXISTS idx_org_code ON organizations(code);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_receipts_status_created ON receipts(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_receipt_items_receipt_id ON receipt_items(receipt_id);
 CREATE VIRTUAL TABLE IF NOT EXISTS receipts_fts USING fts5(receipt_no, sender_name, receiver_name, content='receipts', content_rowid='id');
 CREATE VIRTUAL TABLE IF NOT EXISTS organizations_fts USING fts5(name, code, content='organizations', content_rowid='id');
 CREATE TRIGGER IF NOT EXISTS receipts_ai AFTER INSERT ON receipts BEGIN
@@ -332,28 +333,49 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         """)
         _record_migration(conn, 'v8_receipt_history', 'receipt history table')
 
+    if current < 9:
+        conn.executescript("""
+            CREATE INDEX IF NOT EXISTS idx_receipt_items_receipt_id ON receipt_items(receipt_id);
+            CREATE INDEX IF NOT EXISTS idx_receipts_deleted ON receipts(deleted_at);
+        """)
+        conn.execute("DELETE FROM receipts_fts;")
+        conn.execute(
+            "INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name) "
+            "SELECT id, receipt_no, sender_name, receiver_name FROM receipts "
+            "WHERE deleted_at IS NULL OR deleted_at = ''"
+        )
+        _record_migration(conn, 'v9_index_and_fts_fix', 'receipt_items(receipt_id) index, deleted_at index, FTS rebuild')
+
+    if current < 10:
+        if 'prev_hash' not in _table_columns(conn, 'audit_logs'):
+            conn.execute("ALTER TABLE audit_logs ADD COLUMN prev_hash TEXT DEFAULT ''")
+        _record_migration(conn, 'v10_audit_integrity', 'add prev_hash column for audit chain integrity')
+
 
 def _recreate_table_with_fk(conn: sqlite3.Connection, table: str) -> None:
-    tables = {
-        'backups': """CREATE TABLE IF NOT EXISTS _new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            backup_file TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            created_by INTEGER REFERENCES users(id),
-            notes TEXT DEFAULT ''
-        )""",
-        'audit_logs': """CREATE TABLE IF NOT EXISTS _new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER REFERENCES users(id),
-            action TEXT NOT NULL,
-            machine_name TEXT NOT NULL,
-            timestamp TEXT NOT NULL,
-            details TEXT DEFAULT ''
-        )""",
-    }
-    ddl = tables.get(table)
-    if not ddl:
+    fk_map = {'user_id': 'users(id)', 'created_by': 'users(id)'}
+    cols = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    if not cols:
         return
+    col_defs = []
+    for c in cols:
+        cid, name, ctype, notnull, default, pk = c
+        parts = [name, ctype]
+        if pk:
+            parts.append("PRIMARY KEY AUTOINCREMENT" if pk == 1
+                         else "PRIMARY KEY")
+        if notnull:
+            parts.append("NOT NULL")
+        if default is not None:
+            if default == '':
+                parts.append("DEFAULT ''")
+            else:
+                parts.append(f"DEFAULT '{default}'")
+        ref = fk_map.get(name)
+        if ref:
+            parts.append(f"REFERENCES {ref}")
+        col_defs.append(" ".join(parts))
+    ddl = f"CREATE TABLE IF NOT EXISTS _new ({', '.join(col_defs)})"
     conn.execute(f"SAVEPOINT sp_fk_{table}")
     conn.execute(ddl)
     conn.execute(f"INSERT OR IGNORE INTO _new SELECT * FROM {table}")

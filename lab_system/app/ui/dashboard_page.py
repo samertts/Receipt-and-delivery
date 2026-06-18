@@ -1,5 +1,3 @@
-from datetime import datetime, timedelta
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFrame,
@@ -14,10 +12,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from lab_system.app.database import db as _db
 from lab_system.app.diagnostics.startup import run_all_checks
+from lab_system.app.services.dashboard_service import DashboardService
 from lab_system.app.settings.config import CONFIG
-from lab_system.app.utils.constants import THEME
+from lab_system.app.sync.service import sync_service
+from lab_system.app.utils.constants import THEME, TABLE_STYLE
 
 ROLE_MAP = {
     "Admin": "مدير النظام",
@@ -54,10 +53,12 @@ class StatCard(QFrame):
 
 
 class DashboardPage(QWidget):
-    def __init__(self, user, auth_service=None) -> None:
+    def __init__(self, user, auth_service=None, navigate_cb=None) -> None:
         super().__init__()
         self._auth = auth_service
         self.current_user = user
+        self._navigate_cb = navigate_cb
+        self._dashboard_svc = DashboardService()
         self.setLayout(QVBoxLayout(self))
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.setLayoutDirection(Qt.RightToLeft)
@@ -83,7 +84,11 @@ class DashboardPage(QWidget):
         bottom = QHBoxLayout()
         bottom.setSpacing(16)
         bottom.addWidget(self._build_recent_activity_box(), 2)
-        bottom.addWidget(self._build_backups_box(), 1)
+        right_col = QVBoxLayout()
+        right_col.setSpacing(12)
+        right_col.addWidget(self._build_backups_box())
+        right_col.addWidget(self._build_sync_health_box())
+        bottom.addLayout(right_col, 1)
         self.layout().addLayout(bottom)
 
         self._build_health_status()
@@ -112,42 +117,20 @@ class DashboardPage(QWidget):
                     grid.setColumnStretch(c, 1)
 
     def _build_stats_grid(self):
-        today = datetime.now().strftime("%Y-%m-%d")
-        week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-        month_ago = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-
-        with _db.get_conn() as conn:
-            total = conn.execute("SELECT COUNT(*) FROM receipts").fetchone()[0]
-            today_count = conn.execute(
-                "SELECT COUNT(*) FROM receipts WHERE date(created_at) = ?", (today,)
-            ).fetchone()[0]
-            week_count = conn.execute(
-                "SELECT COUNT(*) FROM receipts WHERE date(created_at) >= ?", (week_ago,)
-            ).fetchone()[0]
-            month_count = conn.execute(
-                "SELECT COUNT(*) FROM receipts WHERE date(created_at) >= ?", (month_ago,)
-            ).fetchone()[0]
-            pending = conn.execute(
-                "SELECT COUNT(*) FROM receipts WHERE status = 'Draft'"
-            ).fetchone()[0]
-            completed = conn.execute(
-                "SELECT COUNT(*) FROM receipts WHERE status = 'Approved'"
-            ).fetchone()[0]
-            org_count = conn.execute("SELECT COUNT(*) FROM organizations").fetchone()[0]
-            user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        stats = self._dashboard_svc.get_stats()
 
         grid = QGridLayout()
         grid.setSpacing(12)
 
         cards = [
-            ("إجمالي الاستلامات", total, THEME['primary'], "📦"),
-            ("استلامات اليوم", today_count, THEME['success'], "📅"),
-            ("آخر 7 أيام", week_count, "#D97706", "📊"),
-            ("آخر 30 يوماً", month_count, "#7C3AED", "📈"),
-            ("قيد المعالجة", pending, THEME['warning'], "⏳"),
-            ("المكتملة", completed, THEME['success'], "✅"),
-            ("الجهات", org_count, "#0891B2", "🏛️"),
-            ("المستخدمون", user_count, "#DC2626", "👥"),
+            ("إجمالي الاستلامات", stats["total"], THEME['primary'], "📦"),
+            ("استلامات اليوم", stats["today_count"], THEME['success'], "📅"),
+            ("آخر 7 أيام", stats["week_count"], "#D97706", "📊"),
+            ("آخر 30 يوماً", stats["month_count"], "#7C3AED", "📈"),
+            ("قيد المعالجة", stats["pending"], THEME['warning'], "⏳"),
+            ("المكتملة", stats["completed"], THEME['success'], "✅"),
+            ("الجهات", stats["org_count"], "#0891B2", "🏛️"),
+            ("المستخدمون", stats["user_count"], "#DC2626", "👥"),
         ]
 
         cols = 4
@@ -168,10 +151,10 @@ class DashboardPage(QWidget):
         row.setSpacing(8)
 
         actions = [
-            ("استلام جديد", None),
-            ("التقارير", None),
-            ("إدارة الجهات", None),
-            ("المستخدمون", None),
+            ("استلام جديد", lambda: self._navigate_cb and self._navigate_cb("receipts")),
+            ("التقارير", lambda: self._navigate_cb and self._navigate_cb("reports")),
+            ("إدارة الجهات", lambda: self._navigate_cb and self._navigate_cb("orgs")),
+            ("المستخدمون", lambda: self._navigate_cb and self._navigate_cb("users")),
         ]
         for text, cb in actions:
             btn = QPushButton(text)
@@ -204,11 +187,9 @@ class DashboardPage(QWidget):
         table.setSortingEnabled(True)
         table.setSelectionBehavior(QTableWidget.SelectRows)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
+        table.setStyleSheet(TABLE_STYLE)
 
-        with _db.get_conn() as conn:
-            rows = conn.execute(
-                "SELECT timestamp, user_id, action FROM audit_logs ORDER BY id DESC LIMIT 10"
-            ).fetchall()
+        rows = self._dashboard_svc.get_recent_activity(limit=10)
 
         table.setRowCount(len(rows))
         for i, r in enumerate(rows):
@@ -232,11 +213,9 @@ class DashboardPage(QWidget):
         table.setSortingEnabled(True)
         table.setSelectionBehavior(QTableWidget.SelectRows)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
+        table.setStyleSheet(TABLE_STYLE)
 
-        with _db.get_conn() as conn:
-            rows = conn.execute(
-                "SELECT created_at, notes FROM backups ORDER BY id DESC LIMIT 5"
-            ).fetchall()
+        rows = self._dashboard_svc.get_recent_backups(limit=5)
 
         table.setRowCount(len(rows))
         for i, r in enumerate(rows):
@@ -244,6 +223,23 @@ class DashboardPage(QWidget):
             table.setItem(i, 1, QTableWidgetItem(r["notes"] or "ناجح"))
 
         layout.addWidget(table)
+        return box
+
+    def _build_sync_health_box(self):
+        box = QGroupBox("حالة المزامنة")
+        layout = QVBoxLayout(box)
+        health = sync_service.get_health()
+        status = QLabel()
+        if not health['enabled']:
+            status.setText("⚙ المزامنة غير مفعلة")
+            status.setStyleSheet("color:#6B7280;font-weight:bold;padding:8px;")
+        elif health['healthy']:
+            status.setText(f"✓ سليمة — {health['synced']} عناصر متزامنة")
+            status.setStyleSheet(f"color:{THEME['success']};font-weight:bold;padding:8px;")
+        else:
+            status.setText(f"⚠ {health['pending']} معلقة, {health['conflicts']} تعارض")
+            status.setStyleSheet(f"color:{THEME['warning']};font-weight:bold;padding:8px;")
+        layout.addWidget(status)
         return box
 
     def _build_health_status(self):

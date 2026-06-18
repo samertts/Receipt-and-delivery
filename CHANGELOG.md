@@ -6,6 +6,43 @@
 
 ---
 
+# [1.2.0-rc1] - 2026-06-17
+
+الحالة: Release Candidate
+
+## Added
+
+* Centralized dependency injection container (ServiceContainer)
+* Service layer for all backend API routes
+* DashboardService, DesktopAuditService, DesktopSettingsService, BackupListingService
+* Health endpoints: /health, /health/live, /health/ready, /health/version, /health/dependencies
+* Last-admin protection (cannot delete last admin)
+* Self-role-change protection (admin cannot change own role)
+* Fail-closed permission decorator (raises error when user=None)
+
+## Changed
+
+* All API routes now use service layer (AuthService, UserService, OrganizationService, TransactionService, AuditService, SyncService)
+* Error response format standardized: error_code and status_code moved to meta block
+* Response envelope middleware cleaned up (removed duplicate)
+* Desktop UI pages (dashboard, audit, settings, backup) now use service layer
+
+## Fixed
+
+* Cross-layer violations in desktop UI (12 violations eliminated)
+* UI call sites bypassing authorization (receipts_page.py, receipt_dialog.py)
+* Test fixture ordering issues (conftest.py rewritten for robustness)
+* Ruff lint errors (unused imports)
+
+## Security
+
+* Fail-closed @with_permission decorator
+* Last-admin protection
+* Self-role-change protection
+* All endpoints verified with RBAC
+
+---
+
 # [1.2.0-dev] - Development Branch
 
 الحالة: Development Only

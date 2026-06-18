@@ -94,7 +94,7 @@ for label, sql in QUERIES.items():
 conn.close()
 
 # Now add the proposed index and re-benchmark
-print(f"\nAdding index idx_receipt_items_receipt_id ...")
+print("\nAdding index idx_receipt_items_receipt_id ...")
 conn2 = sqlite3.connect(DB)
 conn2.execute("PRAGMA busy_timeout = 5000;")
 conn2.execute("PRAGMA foreign_keys = ON;")

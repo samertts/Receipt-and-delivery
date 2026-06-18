@@ -7,14 +7,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from lab_system.app.database import db as _db
+from lab_system.app.services.desktop_audit_service import DesktopAuditService
 from lab_system.app.ui.page_header import PageHeader
+from lab_system.app.utils.constants import TABLE_STYLE
 
 
 class AuditPage(QWidget):
     def __init__(self, current_user) -> None:
         super().__init__()
         self.current_user = current_user
+        self._audit_svc = DesktopAuditService()
         self.setLayout(QVBoxLayout(self))
         self.setLayoutDirection(Qt.RightToLeft)
 
@@ -32,13 +34,13 @@ class AuditPage(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSortingEnabled(True)
+        self.table.setStyleSheet(TABLE_STYLE)
         self.layout().addWidget(self.table)
 
         self.refresh()
 
     def refresh(self):
-        with _db.get_conn() as conn:
-            rows = conn.execute("SELECT * FROM audit_logs ORDER BY id DESC LIMIT 200").fetchall()
+        rows = self._audit_svc.list_logs(limit=200)
         self.table.setRowCount(len(rows))
         for i, r in enumerate(rows):
             self.table.setItem(i, 0, QTableWidgetItem(r["timestamp"]))

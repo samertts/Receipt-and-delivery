@@ -1,17 +1,17 @@
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from app.api.container_deps import get_audit_service
 from app.api.deps import require_permission
+from app.core.response_envelope import paginated_response
 from app.db.session import get_db
-from app.models.audit_log import AuditLog
 from app.models.user import User
 from app.schemas.transaction import AuditLogResponse
 
 router = APIRouter(prefix="/audit-logs", tags=["سجل التدقيق"])
 
 
-@router.get("", response_model=list[AuditLogResponse])
+@router.get("")
 def list_audit_logs(
     page: int = Query(1, ge=1),
     limit: int = Query(50, le=200),
@@ -19,12 +19,11 @@ def list_audit_logs(
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("view_audit_logs")),
 ):
-    query = db.query(AuditLog)
-    if action_type:
-        query = query.filter(AuditLog.action_type == action_type)
-    total_count = query.count()
-    items = query.order_by(AuditLog.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
-    return JSONResponse(
-        content=[AuditLogResponse.model_validate(i).model_dump(mode="json") for i in items],
-        headers={"X-Total-Count": str(total_count)},
+    svc = get_audit_service(db)
+    items, total = svc.list_audit_logs(page=page, limit=limit, action_type=action_type)
+    return paginated_response(
+        items=[AuditLogResponse.model_validate(i).model_dump(mode="json") for i in items],
+        total=total,
+        page=page,
+        per_page=limit,
     )

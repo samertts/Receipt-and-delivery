@@ -1,3 +1,4 @@
+import io
 import os
 import shutil
 import sqlite3
@@ -227,6 +228,156 @@ class TestAPIClient:
         assert resp.status_code in (0, 501)
 
 
+class TestAPIClientAdvanced:
+    """Mock-based tests covering _send internals."""
+
+    def test_set_token(self):
+        from lab_system.app.sync.api_client import APIClient
+        client = APIClient()
+        client.set_token("my-token")
+        assert client._token == "my-token"
+
+    def test_status_when_disabled(self):
+        from lab_system.app.sync.api_client import APIClient
+        client = APIClient()
+        resp = client.status()
+        assert not resp.success
+
+    def test_send_success(self, monkeypatch):
+        import json
+        from lab_system.app.sync.api_client import APIClient
+        client = APIClient()
+        client.enable("http://example.com", token="test-token")
+
+        class FakeResp:
+            status = 200
+
+            def read(self):
+                return json.dumps({"ok": True}).encode()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                pass
+
+        monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=30: FakeResp())
+        resp = client._send("POST", "/sync/push", {"key": "val"})
+        assert resp.success
+        assert resp.status_code == 200
+        assert resp.data == {"ok": True}
+
+    def test_send_http_error(self, monkeypatch):
+        import json
+        import urllib.error
+        from lab_system.app.sync.api_client import APIClient
+        client = APIClient()
+        client.enable("http://example.com")
+
+        def fake_urlopen(req, timeout=30):
+            error = urllib.error.HTTPError(
+                url=req.full_url, code=409, msg="Conflict", hdrs={}, fp=io.BytesIO(json.dumps({"detail": "conflict"}).encode())
+            )
+            raise error
+
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        resp = client.status()
+        assert not resp.success
+        assert resp.status_code == 409
+
+    def test_send_http_error_bad_json(self, monkeypatch):
+        import urllib.error
+        from lab_system.app.sync.api_client import APIClient
+        client = APIClient()
+        client.enable("http://example.com")
+
+        def fake_urlopen(req, timeout=30):
+            error = urllib.error.HTTPError(
+                url=req.full_url, code=500, msg="Server Error", hdrs={}, fp=io.BytesIO(b"not json")
+            )
+            raise error
+
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        resp = client.status()
+        assert not resp.success
+        assert resp.status_code == 500
+        assert "raw" in resp.data
+
+    def test_send_url_error(self, monkeypatch):
+        import urllib.error
+        from lab_system.app.sync.api_client import APIClient
+        client = APIClient()
+        client.enable("http://example.com")
+
+        def fake_urlopen(req, timeout=30):
+            raise urllib.error.URLError("Connection refused")
+
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        resp = client.status()
+        assert not resp.success
+        assert resp.status_code == 0
+
+    def test_send_generic_exception(self, monkeypatch):
+        from lab_system.app.sync.api_client import APIClient
+        client = APIClient()
+        client.enable("http://example.com")
+
+        def fake_urlopen(req, timeout=30):
+            raise RuntimeError("unexpected crash")
+
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        resp = client.status()
+        assert not resp.success
+        assert resp.status_code == 0
+
+    def test_push_with_token(self, monkeypatch):
+        import json
+        from lab_system.app.sync.api_client import APIClient, SyncPayload
+        client = APIClient()
+        client.enable("http://example.com", token="secret")
+
+        class FakeResp:
+            status = 200
+
+            def read(self):
+                return json.dumps({"synced": True}).encode()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                pass
+
+        monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=30: FakeResp())
+        payload = SyncPayload(entries=[{"id": 1}], device_id="dev1", branch_id="br1")
+        resp = client.push(payload)
+        assert resp.success
+        assert resp.data == {"synced": True}
+
+    def test_pull_with_params(self, monkeypatch):
+        import json
+        from lab_system.app.sync.api_client import APIClient
+        client = APIClient()
+        client.enable("http://example.com")
+
+        class FakeResp:
+            status = 200
+
+            def read(self):
+                return json.dumps({"entries": []}).encode()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                pass
+
+        monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=30: FakeResp())
+        resp = client.pull(since="2024-01-01", device_id="dev1")
+        assert resp.success
+        assert resp.data == {"entries": []}
+
+
 class TestConflictResolution:
     def test_server_wins_default(self):
         from lab_system.app.sync.service import SyncQueueEntry, SyncService
@@ -237,3 +388,40 @@ class TestConflictResolution:
         resolution = svc.resolve_conflict(entry, remote, local)
         assert resolution.resolved
         assert resolution.merged == remote
+
+    def test_last_writer_wins_with_timestamps(self):
+        from lab_system.app.sync.service import SyncQueueEntry, SyncService
+        svc = SyncService()
+        entry = SyncQueueEntry(id=1, entity_type='receipts', entity_id=1, action='update')
+        remote = {'name': 'server', 'updated_at': '2024-01-01 00:00:00'}
+        local = {'name': 'local', 'updated_at': '2024-06-01 00:00:00'}
+        resolution = svc.resolve_conflict(entry, remote, local)
+        assert resolution.resolved
+        assert resolution.strategy == 'last-writer-wins'
+        assert resolution.merged == local
+
+    def test_server_wins_when_local_older(self):
+        from lab_system.app.sync.service import SyncQueueEntry, SyncService
+        svc = SyncService()
+        entry = SyncQueueEntry(id=1, entity_type='receipts', entity_id=1, action='update')
+        remote = {'name': 'server', 'updated_at': '2024-06-01 00:00:00'}
+        local = {'name': 'local', 'updated_at': '2024-01-01 00:00:00'}
+        resolution = svc.resolve_conflict(entry, remote, local)
+        assert resolution.resolved
+        assert resolution.strategy == 'server-wins'
+        assert resolution.merged == remote
+
+    def test_get_health_disabled(self):
+        from lab_system.app.sync.service import SyncService
+        svc = SyncService()
+        health = svc.get_health()
+        assert not health['enabled']
+        assert health['healthy']
+
+    def test_get_health_with_pending(self):
+        from lab_system.app.sync.service import SyncService
+        svc = SyncService()
+        svc.enqueue('receipts', 1, 'create', '{}')
+        health = svc.get_health()
+        assert not health['healthy']
+        assert health['pending'] == 1

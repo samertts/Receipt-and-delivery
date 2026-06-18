@@ -1,7 +1,29 @@
+import json
 import secrets
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+_SECRET_KEY_FILE = Path(__file__).resolve().parent.parent.parent / '.generated_secret_key.json'
+
+
+def _load_or_persist_secret_key() -> str:
+    """Load persisted auto-generated key, or generate and persist one."""
+    if _SECRET_KEY_FILE.exists():
+        try:
+            data = json.loads(_SECRET_KEY_FILE.read_text())
+            if isinstance(data, dict) and 'secret_key' in data:
+                return data['secret_key']
+        except (json.JSONDecodeError, OSError):
+            pass
+    key = secrets.token_hex(32)
+    try:
+        _SECRET_KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _SECRET_KEY_FILE.write_text(json.dumps({'secret_key': key}))
+    except OSError:
+        pass
+    return key
 
 
 def _read_app_version() -> str:
@@ -17,7 +39,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     secret_key: str = ""
-    access_token_expire_minutes: int = 120
+    access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
     algorithm: str = "HS256"
 
@@ -52,7 +74,8 @@ class Settings(BaseSettings):
     @property
     def effective_secret_key(self) -> str:
         if not self.secret_key or self.secret_key == "change-me":
-            return secrets.token_hex(32)
+            # Persist auto-generated key so it survives restarts
+            return _load_or_persist_secret_key()
         return self.secret_key
 
     @property

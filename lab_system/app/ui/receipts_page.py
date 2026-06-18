@@ -26,6 +26,7 @@ from lab_system.app.services.receipt_service import (
 from lab_system.app.ui.page_header import PageHeader
 from lab_system.app.ui.receipt_detail_dialog import ReceiptDetailDialog
 from lab_system.app.ui.receipt_dialog import ReceiptDialog
+from lab_system.app.utils.constants import TABLE_STYLE
 
 PAGE_SIZE = 50
 
@@ -112,6 +113,7 @@ class ReceiptsPage(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSortingEnabled(True)
+        self.table.setStyleSheet(TABLE_STYLE)
         self.layout().addWidget(self.table)
 
         pagination = QHBoxLayout()
@@ -288,7 +290,7 @@ class ReceiptsPage(QWidget):
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
-            set_receipt_status(receipt_id, new_status)
+            set_receipt_status(receipt_id, new_status, user=self.current_user)
             log_action(
                 self.current_user["id"],
                 f"receipt_{new_status.lower()}",
@@ -305,7 +307,7 @@ class ReceiptsPage(QWidget):
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
-            hard_delete_receipt(receipt_id)
+            hard_delete_receipt(receipt_id, user=self.current_user)
             log_action(
                 self.current_user["id"],
                 "receipt_deleted",

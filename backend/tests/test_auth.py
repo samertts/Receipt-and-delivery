@@ -1,6 +1,11 @@
 from app.services.security import create_access_token, hash_password, verify_password
 
 
+def _unwrap(body: dict) -> dict:
+    """Extract data from response envelope."""
+    return body.get("data", body)
+
+
 class TestPasswordHashing:
     def test_hash_and_verify(self):
         hashed = hash_password("Test@1234")
@@ -45,7 +50,7 @@ class TestLoginAPI:
             json={"username": "testuser", "password": "Test@1234"},
         )
         assert response.status_code == 200
-        data = response.json()
+        data = _unwrap(response.json())
         assert "access_token" in data
         assert data["token_type"] == "bearer"
 
@@ -81,7 +86,7 @@ class TestRefreshToken:
             json={"username": "refreshuser", "password": "Test@1234"},
         )
         assert login_resp.status_code == 200
-        refresh_token = login_resp.json()["refresh_token"]
+        refresh_token = _unwrap(login_resp.json())["refresh_token"]
         assert refresh_token
 
         refresh_resp = client.post(
@@ -89,7 +94,7 @@ class TestRefreshToken:
             json={"refresh_token": refresh_token},
         )
         assert refresh_resp.status_code == 200
-        data = refresh_resp.json()
+        data = _unwrap(refresh_resp.json())
         assert "access_token" in data
         assert "refresh_token" in data
 
@@ -133,7 +138,7 @@ class TestChangePassword:
             "/api/auth/login",
             json={"username": "changepw", "password": "Old@1234"},
         )
-        token = login_resp.json()["access_token"]
+        token = _unwrap(login_resp.json())["access_token"]
 
         response = client.post(
             "/api/auth/change-password",

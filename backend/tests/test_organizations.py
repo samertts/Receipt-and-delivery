@@ -1,3 +1,7 @@
+def _unwrap(body: dict) -> dict:
+    return body.get("data", body)
+
+
 class TestOrganizations:
     def test_create_organization(self, client, admin_token):
         response = client.post(
@@ -12,7 +16,7 @@ class TestOrganizations:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 201
-        data = response.json()
+        data = _unwrap(response.json())
         assert data["name"] == "مختبر بغداد المركزي"
         assert data["code"] == "BGD-001"
 

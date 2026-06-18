@@ -1,8 +1,11 @@
+import json
 from datetime import datetime
 from pathlib import Path
 
 from lab_system.app.audit.logger import log_action
+from lab_system.app.auth.permissions import with_permission
 from lab_system.app.database import db as _db
+from lab_system.app.sync.service import sync_service
 
 
 def next_receipt_no():
@@ -19,7 +22,8 @@ def next_receipt_no():
     return f"LAB-{year}-{seq:06d}"
 
 
-def create_receipt(data, items, user_id):
+@with_permission('receipts.create')
+def create_receipt(data, items, user_id, user=None):
     for i in items:
         total = int(i["total_count"])
         valid = int(i["valid_count"])
@@ -74,6 +78,7 @@ def create_receipt(data, items, user_id):
                     i["notes"],
                 ),
             )
+    sync_service.enqueue('receipts', rid, 'create', json.dumps({'receipt_no': no}))
     return rid, no
 
 
@@ -103,7 +108,8 @@ def get_receipt(receipt_id):
     return dict(r), [dict(i) for i in items], [dict(a) for a in atts]
 
 
-def update_receipt(receipt_id, data, items):
+@with_permission('receipts.update')
+def update_receipt(receipt_id, data, items, user=None):
     for i in items:
         total = int(i["total_count"])
         valid = int(i["valid_count"])
@@ -154,16 +160,20 @@ def update_receipt(receipt_id, data, items):
                     i["notes"],
                 ),
             )
+    sync_service.enqueue('receipts', receipt_id, 'update', '')
 
 
-def soft_delete_receipt(receipt_id, user_id=None):
+@with_permission('receipts.delete')
+def soft_delete_receipt(receipt_id, user_id=None, user=None):
     now = datetime.now().isoformat(timespec="seconds")
     with _db.get_conn() as conn:
         conn.execute("UPDATE receipts SET deleted_at=? WHERE id=?", (now, receipt_id))
     log_action(user_id, 'soft_delete', f'Receipt {receipt_id}')
+    sync_service.enqueue('receipts', receipt_id, 'update', '{"deleted": true}')
 
 
-def hard_delete_receipt(receipt_id, user_id=None):
+@with_permission('receipts.delete')
+def hard_delete_receipt(receipt_id, user_id=None, user=None):
     with _db.get_conn() as conn:
         atts = conn.execute(
             "SELECT file_path, thumbnail_path FROM attachments WHERE receipt_id=?",
@@ -181,10 +191,12 @@ def hard_delete_receipt(receipt_id, user_id=None):
                     Path(p).unlink(missing_ok=True)
                 except Exception:
                     pass
+    sync_service.enqueue('receipts', receipt_id, 'delete', json.dumps({'receipt_id': receipt_id}))
     log_action(user_id, 'hard_delete', f'Receipt {receipt_id}')
 
 
-def restore_receipt(receipt_id, user_id=None):
+@with_permission('receipts.restore')
+def restore_receipt(receipt_id, user_id=None, user=None):
     with _db.get_conn() as conn:
         conn.execute("UPDATE receipts SET deleted_at=NULL WHERE id=?", (receipt_id,))
     log_action(user_id, 'restore', f'Receipt {receipt_id}')
@@ -217,7 +229,8 @@ def _record_receipt_history(conn, receipt_id, field_name, old_value, new_value, 
     )
 
 
-def change_receipt_status(receipt_id, new_status, user_id=None):
+@with_permission('receipts.update')
+def change_receipt_status(receipt_id, new_status, user_id=None, user=None):
     with _db.get_conn() as conn:
         row = conn.execute(
             "SELECT status, receipt_no FROM receipts WHERE id=?", (receipt_id,),
@@ -291,7 +304,8 @@ def get_receipt_history(receipt_id):
     return [dict(r) for r in rows]
 
 
-def set_receipt_status(receipt_id, new_status, user_id=None):
+@with_permission('receipts.update')
+def set_receipt_status(receipt_id, new_status, user_id=None, user=None):
     """Direct status update (skips transition validation)."""
     with _db.get_conn() as conn:
         row = conn.execute(

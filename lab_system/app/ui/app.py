@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QStackedWidget,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -66,6 +67,12 @@ class ChangePasswordDialog(QDialog):
         save_btn.clicked.connect(self._save)
         layout.addRow(save_btn)
 
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.reject()
+        else:
+            super().keyPressEvent(event)
+
     def _save(self):
         if self.new_password.text() != self.confirm_password.text():
             QMessageBox.warning(self, "خطأ", "كلمتا المرور غير متطابقتين")
@@ -114,7 +121,9 @@ class LoginWindow(QDialog):
         layout.addWidget(submit)
 
     def keyPressEvent(self, event):
-        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+        if event.key() == Qt.Key_Escape:
+            self.reject()
+        elif event.key() in (Qt.Key_Return, Qt.Key_Enter):
             self._login()
         else:
             super().keyPressEvent(event)
@@ -131,6 +140,79 @@ class LoginWindow(QDialog):
         except Exception as exc:
             log_action("unknown", "login_error", str(exc))
             QMessageBox.warning(self, "خطأ", f"حدث خطأ غير متوقع: {exc}")
+
+
+class AboutDialog(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("حول النظام")
+        self.setLayoutDirection(Qt.RightToLeft)
+        self.setFixedSize(500, 400)
+        layout = QVBoxLayout(self)
+
+        title = QLabel(APP_NAME)
+        title.setStyleSheet("font-size:20px;font-weight:700;color:#2563EB;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        tabs = QTabWidget()
+        about_tab = QWidget()
+        about_layout = QVBoxLayout(about_tab)
+        try:
+            from lab_system.app.settings.config import STORAGE_DIR
+            version_path = STORAGE_DIR.parent.parent / "VERSION"
+            ver = version_path.read_text().strip() if version_path.exists() else "1.2.0-dev"
+        except Exception:
+            ver = "1.2.0-dev"
+        for text in [
+            f"الإصدار: {ver}",
+            "نظام إدارة استلام وتسليم العينات المخبرية",
+            "لجنة الصحة العراقية - دائرة المختبرات",
+            "",
+            "© 2026 جميع الحقوق محفوظة",
+            "",
+            "تم التطوير باستخدام:",
+            "• PySide6 لواجهة المستخدم",
+            "• FastAPI لخدمات الويب",
+            "• SQLite / PostgreSQL لقواعد البيانات",
+        ]:
+            lbl = QLabel(text)
+            lbl.setStyleSheet("font-size:12pt;")
+            about_layout.addWidget(lbl)
+        about_layout.addStretch()
+
+        sys_tab = QWidget()
+        sys_layout = QVBoxLayout(sys_tab)
+        import platform
+        import sys as _sys
+        for label, value in [
+            ("نظام التشغيل", platform.platform()),
+            ("بايثون", _sys.version.split()[0]),
+            ("المعالج", platform.machine()),
+            ("المستخدم", platform.node()),
+        ]:
+            row = QHBoxLayout()
+            lbl = QLabel(f"{label}:")
+            lbl.setStyleSheet("font-weight:600;")
+            val = QLabel(value)
+            row.addWidget(lbl)
+            row.addWidget(val, 1)
+            sys_layout.addLayout(row)
+        sys_layout.addStretch()
+
+        tabs.addTab(about_tab, "حول")
+        tabs.addTab(sys_tab, "معلومات النظام")
+        layout.addWidget(tabs)
+
+        close_btn = QPushButton("إغلاق")
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.accept()
+        else:
+            super().keyPressEvent(event)
 
 
 class MainWindow(QMainWindow):
@@ -152,7 +234,7 @@ class MainWindow(QMainWindow):
         self.sidebar.page_changed.connect(self._on_page_change)
 
         page_map = {
-            "dashboard": DashboardPage(user, auth_service=auth_service),
+            "dashboard": DashboardPage(user, auth_service=auth_service, navigate_cb=self._navigate_to),
             "receipts": ReceiptsPage(user),
             "orgs": OrgPage(user),
             "samples": ReceiptsPage(user),
@@ -194,6 +276,11 @@ class MainWindow(QMainWindow):
         self._session_timer.timeout.connect(self._check_session)
         self._session_timer.start(SESSION_CHECK_INTERVAL)
 
+        from lab_system.app.sync.service import sync_service
+        self._sync_timer = QTimer()
+        self._sync_timer.timeout.connect(sync_service.sync_pending)
+        self._sync_timer.start(60000)
+
         self._setup_shortcuts()
 
     def _setup_shortcuts(self):
@@ -211,6 +298,31 @@ class MainWindow(QMainWindow):
         new_action.setShortcut(QKeySequence.New)
         new_action.triggered.connect(self._new_item)
         self.addAction(new_action)
+
+        help_action = QAction("مساعدة", self)
+        help_action.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_H))
+        help_action.triggered.connect(self._show_about)
+        self.addAction(help_action)
+
+        dash_action = QAction("لوحة القيادة", self)
+        dash_action.setShortcut(QKeySequence(Qt.ALT | Qt.Key_1))
+        dash_action.triggered.connect(lambda: self._navigate_to("dashboard"))
+        self.addAction(dash_action)
+
+        receipts_action = QAction("الإيصالات", self)
+        receipts_action.setShortcut(QKeySequence(Qt.ALT | Qt.Key_2))
+        receipts_action.triggered.connect(lambda: self._navigate_to("receipts"))
+        self.addAction(receipts_action)
+
+        orgs_action = QAction("الجهات", self)
+        orgs_action.setShortcut(QKeySequence(Qt.ALT | Qt.Key_3))
+        orgs_action.triggered.connect(lambda: self._navigate_to("orgs"))
+        self.addAction(orgs_action)
+
+        users_action = QAction("المستخدمين", self)
+        users_action.setShortcut(QKeySequence(Qt.ALT | Qt.Key_4))
+        users_action.triggered.connect(lambda: self._navigate_to("users"))
+        self.addAction(users_action)
 
     def _refresh_current(self):
         page = self.pages.currentWidget()
@@ -240,6 +352,16 @@ class MainWindow(QMainWindow):
         if self.auth:
             self.auth.touch_activity()
 
+    def _show_about(self):
+        dlg = AboutDialog()
+        dlg.exec()
+
+    def _navigate_to(self, key):
+        """Public navigation helper, used by quick action callbacks."""
+        if key in self.page_keys:
+            self._on_page_change(key)
+            self.sidebar.set_active(key)
+
     def _check_session(self):
         if not self.auth:
             return
@@ -257,6 +379,7 @@ QMainWindow::separator {{ background: {THEME['border']}; width: 1px; }}
 QPushButton {{ background-color: {THEME['primary']}; color: white; border: none; border-radius: 6px; padding: 8px 20px; min-height: 38px; font-size: 12pt; font-weight: 600; }}
 QPushButton:hover {{ background-color: #0B3D6B; }}
 QPushButton:pressed {{ background-color: #092D4F; }}
+QPushButton:focus {{ outline: 2px solid {THEME['primary']}; outline-offset: 2px; }}
 QPushButton:disabled {{ background-color: #CBD5E1; color: #94A3B8; }}
 
 QLineEdit {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; font-size: 12pt; }}
@@ -283,6 +406,9 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 
 QDateEdit {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; }}
 QDateEdit:focus {{ border: 2px solid {THEME['primary']}; }}
+
+QSpinBox {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; }}
+QSpinBox:focus {{ border: 2px solid {THEME['primary']}; }}
 
 QGroupBox {{ font-weight: bold; border: 1px solid {THEME['border']}; border-radius: 8px; margin-top: 12px; padding-top: 16px; }}
 QGroupBox::title {{ subcontrol-origin: margin; left: 12px; padding: 0 6px; }}

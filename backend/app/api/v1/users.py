@@ -1,20 +1,17 @@
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from app.api.container_deps import get_user_service
 from app.api.deps import require_permission
-from app.core.audit import log_audit
-from app.core.exceptions import ConflictError, NotFoundError, ValidationError
-from app.core.security import validate_password_strength
+from app.core.response_envelope import paginated_response
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import UserCreate, UserResponse, UserUpdate
-from app.services.security import hash_password
 
 router = APIRouter(prefix="/users", tags=["المستخدمين"])
 
 
-@router.get("", response_model=list[UserResponse])
+@router.get("")
 def list_users(
     page: int = Query(1, ge=1),
     limit: int = Query(20, le=100),
@@ -22,14 +19,13 @@ def list_users(
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("view_users")),
 ):
-    query = db.query(User)
-    if role:
-        query = query.filter(User.role == role)
-    total_count = query.count()
-    items = query.order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
-    return JSONResponse(
-        content=[UserResponse.model_validate(u).model_dump(mode="json") for u in items],
-        headers={"X-Total-Count": str(total_count)},
+    svc = get_user_service(db)
+    items, total = svc.list_users(page=page, limit=limit, role=role)
+    return paginated_response(
+        items=[UserResponse.model_validate(u).model_dump(mode="json") for u in items],
+        total=total,
+        page=page,
+        per_page=limit,
     )
 
 
@@ -40,32 +36,15 @@ def create_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("manage_users")),
 ):
-    existing = db.query(User).filter(User.username == payload.username).first()
-    if existing:
-        raise ConflictError("اسم المستخدم موجود مسبقاً")
-
-    error = validate_password_strength(payload.password)
-    if error:
-        raise ValidationError(error)
-
-    user = User(
+    svc = get_user_service(db)
+    return svc.create_user(
         username=payload.username,
         full_name=payload.full_name,
-        password_hash=hash_password(payload.password),
+        password=payload.password,
         role=payload.role,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
-    log_audit(
-        user_id=str(current_user.id),
-        action_type="user_created",
         request=request,
-        details=f"إنشاء مستخدم: {user.username} ({user.role})",
-        db=db,
+        current_user=current_user,
     )
-    return user
 
 
 @router.get("/{user_id}", response_model=UserResponse)
@@ -74,10 +53,8 @@ def get_user(
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("view_users")),
 ):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise NotFoundError("المستخدم غير موجود")
-    return user
+    svc = get_user_service(db)
+    return svc.get_user(user_id)
 
 
 @router.put("/{user_id}", response_model=UserResponse)
@@ -88,31 +65,15 @@ def update_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("manage_users")),
 ):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise NotFoundError("المستخدم غير موجود")
-
-    if payload.full_name is not None:
-        user.full_name = payload.full_name
-    if payload.role is not None:
-        user.role = payload.role
-    if payload.password:
-        error = validate_password_strength(payload.password)
-        if error:
-            raise ValidationError(error)
-        user.password_hash = hash_password(payload.password)
-
-    db.commit()
-    db.refresh(user)
-
-    log_audit(
-        user_id=str(current_user.id),
-        action_type="user_updated",
+    svc = get_user_service(db)
+    return svc.update_user(
+        user_id,
+        full_name=payload.full_name,
+        role=payload.role,
+        password=payload.password,
         request=request,
-        details=f"تحديث مستخدم: {user.username}",
-        db=db,
+        current_user=current_user,
     )
-    return user
 
 
 @router.delete("/{user_id}", status_code=204)
@@ -122,19 +83,5 @@ def delete_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("manage_users")),
 ):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise NotFoundError("المستخدم غير موجود")
-    if str(user.id) == str(current_user.id):
-        raise ValidationError("لا يمكن حذف المستخدم الحالي")
-
-    db.delete(user)
-    db.commit()
-
-    log_audit(
-        user_id=str(current_user.id),
-        action_type="user_deleted",
-        request=request,
-        details=f"حذف مستخدم: {user.username}",
-        db=db,
-    )
+    svc = get_user_service(db)
+    svc.delete_user(user_id, request=request, current_user=current_user)

@@ -195,7 +195,7 @@ for idx in indexes:
     print(f"  {idx['sql']}")
 
 table_info = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()
-print(f"\nROW COUNTS:")
+print("\nROW COUNTS:")
 for t in table_info:
     name = t["name"]
     if not name.startswith("sqlite") and not name.endswith("_fts") and not name.endswith("_fts_data") and not name.endswith("_fts_idx") and not name.endswith("_fts_config") and not name.endswith("_fts_docsize"):

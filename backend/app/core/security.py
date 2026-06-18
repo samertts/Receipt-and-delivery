@@ -92,7 +92,6 @@ api_rate_limiter = MemoryRateLimiter(max_requests=100, window_seconds=60)
 try:
     redis_url = getattr(settings, "redis_url", "")
     if redis_url:
-        import redis as _redis
         login_rate_limiter = RedisRateLimiter(
             max_requests=settings.rate_limit_login_max,
             window_seconds=settings.rate_limit_login_window,

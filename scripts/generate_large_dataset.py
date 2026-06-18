@@ -100,7 +100,7 @@ def generate(db_path: str) -> dict:
         org_ids.append(cur.lastrowid)
     conn.commit()
 
-    print(f"[3/6] Inserting transaction_types & sample_types ...")
+    print("[3/6] Inserting transaction_types & sample_types ...")
     for name in TX_TYPES:
         cur.execute("INSERT OR IGNORE INTO transaction_types(name) VALUES(?)", (name,))
     tx_type_ids = [r["id"] for r in cur.execute("SELECT id FROM transaction_types").fetchall()]
@@ -170,7 +170,7 @@ def generate(db_path: str) -> dict:
         conn.commit()
         print(f"   receipts {batch_start+1}–{batch_end} / {NUM_RECEIPTS}  (items: ~{items_count})")
 
-    print(f"[6/6] Rebuilding FTS indexes ...")
+    print("[6/6] Rebuilding FTS indexes ...")
     cur.execute("DELETE FROM receipts_fts;")
     cur.execute(
         "INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name) SELECT id, receipt_no, sender_name, receiver_name FROM receipts WHERE deleted_at IS NULL OR deleted_at = ''"

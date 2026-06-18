@@ -10,6 +10,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+from lab_system.app.auth.permissions import with_permission
 from lab_system.app.database import db as _db
 from lab_system.app.database.db import rebuild_fts
 from lab_system.app.settings.config import DB_PATH, STORAGE_DIR
@@ -92,7 +93,8 @@ def _checkpoint_wal():
         pass
 
 
-def restore_from_backup(backup_path: Path | str) -> dict:
+@with_permission('backup.restore')
+def restore_from_backup(backup_path: Path | str, user=None) -> dict:
     """Restore the production database from a verified backup file."""
     backup_path = _validate_path_in_dir(Path(backup_path), BACKUP_DIR)
     result = {"success": False, "error": None, "restored_path": None}
@@ -128,7 +130,8 @@ def restore_from_backup(backup_path: Path | str) -> dict:
     return result
 
 
-def delete_backup(backup_path: Path | str) -> dict:
+@with_permission('backup.delete')
+def delete_backup(backup_path: Path | str, user=None) -> dict:
     """Remove a backup file from disk and its database record."""
     result = {"success": False, "error": None}
     backup_path = Path(backup_path)
@@ -200,7 +203,8 @@ def enforce_retention(max_backups=30) -> int:
     return deleted
 
 
-def validate_recovery(backup_path: Path | str) -> dict:
+@with_permission('backup.verify')
+def validate_recovery(backup_path: Path | str, user=None) -> dict:
     """Validate that a backup can be restored successfully (dry run)."""
     backup_path = _validate_path_in_dir(Path(backup_path), BACKUP_DIR)
     result = {"valid": False, "checks": []}
@@ -257,7 +261,8 @@ def detect_corruption() -> dict:
     return result
 
 
-def attempt_recovery() -> dict:
+@with_permission('backup.restore')
+def attempt_recovery(user=None) -> dict:
     """Attempt to recover the database from WAL or latest backup."""
     result = {"success": False, "actions": []}
 

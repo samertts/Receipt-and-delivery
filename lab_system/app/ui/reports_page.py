@@ -28,6 +28,7 @@ from lab_system.app.services.report_service import (
     sample_summary,
 )
 from lab_system.app.ui.notifications import toast
+from lab_system.app.utils.constants import TABLE_STYLE
 from lab_system.app.ui.page_header import PageHeader
 
 
@@ -118,6 +119,7 @@ class ReportsPage(QWidget):
         self.samples_table.setSortingEnabled(True)
         self.samples_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.samples_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.samples_table.setStyleSheet(TABLE_STYLE)
         self.layout().addWidget(self.samples_table)
 
     def _date_from(self):

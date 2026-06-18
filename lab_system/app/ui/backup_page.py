@@ -1,5 +1,4 @@
 
-import shutil
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -16,11 +15,11 @@ from PySide6.QtWidgets import (
 
 from lab_system.app.auth.permissions import check_permission
 from lab_system.app.audit.logger import log_action
-from lab_system.app.database import db as _db
+from lab_system.app.services.backup_listing_service import BackupListingService
 from lab_system.app.services.backup_service import create_backup
 from lab_system.app.services.recovery_service import verify_backup
-from lab_system.app.settings.config import DB_PATH
 from lab_system.app.ui.notifications import toast
+from lab_system.app.utils.constants import TABLE_STYLE
 from lab_system.app.ui.page_header import PageHeader
 
 
@@ -28,6 +27,7 @@ class BackupPage(QWidget):
     def __init__(self, current_user) -> None:
         super().__init__()
         self.current_user = current_user
+        self._listing_svc = BackupListingService()
         self.setLayout(QVBoxLayout(self))
         self.setLayoutDirection(Qt.RightToLeft)
 
@@ -48,6 +48,7 @@ class BackupPage(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSortingEnabled(True)
+        self.table.setStyleSheet(TABLE_STYLE)
         self.layout().addWidget(self.table)
 
         self.refresh()
@@ -56,7 +57,7 @@ class BackupPage(QWidget):
         check_permission(self.current_user, 'backup.create')
         from pathlib import Path
         try:
-            path = create_backup(user_id=self.current_user.get("id"))
+            path = create_backup(user_id=self.current_user.get("id"), user=self.current_user)
             log_action(
                 self.current_user["id"],
                 "backup_created",
@@ -68,10 +69,7 @@ class BackupPage(QWidget):
             )
 
     def refresh(self):
-        with _db.get_conn() as conn:
-            rows = conn.execute(
-                "SELECT * FROM backups ORDER BY id DESC",
-            ).fetchall()
+        rows = self._listing_svc.list_backups()
         self.table.setRowCount(len(rows))
         for i, r in enumerate(rows):
             self.table.setItem(i, 0, QTableWidgetItem(r["backup_file"]))
@@ -99,9 +97,10 @@ class BackupPage(QWidget):
             self.table.setCellWidget(i, 3, actions_widget)
 
     def _verify(self, backup_path):
+        check_permission(self.current_user, 'backup.verify')
         result = verify_backup(backup_path)
         if result["valid"]:
-            toast(self, "تم إنشاء النسخة الاحتياطية", "success")
+            toast(self, "النسخة سليمة", "success")
         else:
             QMessageBox.warning(
                 self, "تحقق", f"النسخة تالفة: {result.get('error', 'خطأ غير معروف')}",
@@ -124,13 +123,16 @@ class BackupPage(QWidget):
             result = verify_backup(backup_path)
             if not result.get("valid"):
                 raise ValueError(f"النسخة تالفة: {result.get('error', 'خطأ غير معروف')}")
-            shutil.copy2(src, DB_PATH)
+            from lab_system.app.services.recovery_service import restore_from_backup
+            result = restore_from_backup(backup_path)
+            if not result.get("success"):
+                raise RuntimeError(result.get("error", "فشلت الاستعادة"))
             log_action(
                 self.current_user["id"],
                 "backup_restored",
                 f"استعادة من: {Path(backup_path).name}",
             )
-            toast(self, "تم التحقق بنجاح", "success")
+            toast(self, "تمت الاستعادة بنجاح", "success")
         except Exception as e:
             QMessageBox.warning(
                 self, "خطأ", f"فشلت الاستعادة: {e}",
@@ -150,4 +152,5 @@ class BackupPage(QWidget):
                 valid += 1
             else:
                 invalid += 1
-        toast(self, "تمت الاستعادة بنجاح", "success")
+        s = f"صحيح: {valid}, تالف: {invalid}" if invalid else f"جميع النسخ سليمة ({valid})"
+        toast(self, s, "success" if invalid == 0 else "warning")

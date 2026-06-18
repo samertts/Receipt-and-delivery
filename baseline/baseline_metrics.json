@@ -1,0 +1,134 @@
+{
+  "timestamp": "2026-06-15",
+  "branch": "feature/v1.2.0-ui-modernization-phase2",
+  "commit": "97abb36aeda7c8ee33266c7b1b8dbe32b0fec1d3",
+  "version": "1.2.0-dev",
+  "latest_tag": "v1.1.0",
+  "total_project_files": 298,
+  "desktop_loc": 6830,
+  "backend_loc": 2442,
+  "frontend_loc": 3031,
+  "tests_loc": 3850,
+  "scripts_loc": 2081,
+  "docs_loc": 3155,
+  "total_loc": 57389,
+  "desktop_tests": {
+    "pass": 46,
+    "fail": 0,
+    "total_functions": 237
+  },
+  "coverage": {
+    "overall_pct": 89,
+    "stmts": 1445,
+    "miss": 158,
+    "excluded_modules": [
+      "ui/*",
+      "storage/*",
+      "assets/*",
+      "installer/*",
+      "printing/*",
+      "models/*",
+      "backend/*",
+      "frontend/*",
+      "scripts/*"
+    ]
+  },
+  "scores": {
+    "architecture": 87,
+    "security": 91,
+    "database": 93,
+    "testing": 93,
+    "ux": 85,
+    "devops": 80,
+    "performance": 88,
+    "operational_intelligence": 25,
+    "government_readiness": 58,
+    "mobile_readiness": 60
+  },
+  "certifications": {
+    "rbac": "PARTIAL",
+    "sync": "PARTIAL",
+    "production_safety": "PASS",
+    "performance": "VERIFIED"
+  },
+  "findings": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  },
+  "database": {
+    "schema_version": 10,
+    "tables": 18,
+    "indexes": 13,
+    "triggers": 6,
+    "fts_enabled": true,
+    "wal_mode": true,
+    "migrations": 10,
+    "backup_integrity": true
+  },
+  "benchmarks": {
+    "1000_receipts": {
+      "db_size_mb": 0.7,
+      "creation_time_s": 0.0,
+      "receipts": 1000,
+      "items": 5538,
+      "list_receipts_page1_avg_s": 0.0023,
+      "fts_search_avg_s": 0.0044,
+      "monthly_report_avg_s": 0.0054,
+      "sample_summary_avg_s": 0.0125,
+      "full_export_avg_s": 0.0145,
+      "filter_by_status_avg_s": 0.0025,
+      "file_copy_backup_avg_s": 0.0071
+    },
+    "10000_receipts": {
+      "db_size_mb": 4.8,
+      "creation_time_s": 0.0,
+      "receipts": 10000,
+      "items": 55030,
+      "list_receipts_page1_avg_s": 0.0029,
+      "fts_search_avg_s": 0.0043,
+      "monthly_report_avg_s": 0.0129,
+      "sample_summary_avg_s": 0.1100,
+      "full_export_avg_s": 0.1203,
+      "filter_by_status_avg_s": 0.0068,
+      "file_copy_backup_avg_s": 0.0249
+    },
+    "100000_receipts": {
+      "db_size_mb": 51.8,
+      "creation_time_s": 35.93,
+      "receipts": 100000,
+      "items": 549476,
+      "list_receipts_page1_avg_s": 0.2842,
+      "fts_search_avg_s": 0.0032,
+      "monthly_report_avg_s": 0.1426,
+      "sample_summary_avg_s": 1.1098,
+      "full_export_avg_s": 1.3489,
+      "filter_by_status_avg_s": 0.0336,
+      "file_copy_backup_avg_s": 0.1973
+    }
+  },
+  "reports_generated": [
+    "rbac_final_certification_report.md",
+    "sync_final_certification_report.md",
+    "architecture_final_review.md",
+    "ux_final_review.md",
+    "devops_final_review.md",
+    "release_candidate_promotion_report.md",
+    "remaining_gap_report.md",
+    "high_findings_closure_report.md",
+    "rbac_certification_report.md",
+    "sync_certification_report.md",
+    "architecture_recertification_report.md",
+    "performance_report.md",
+    "operational_intelligence_report.md",
+    "dashboard_modernization_report.md",
+    "ux_enhancement_report.md",
+    "production_safety_report.md",
+    "future_expansion_report.md",
+    "release_candidate_readiness_report.md",
+    "release_candidate_validation_report.md"
+  ],
+  "classification": "PRE-PRODUCTION",
+  "classification_reason": "8 of 13 promotion requirements met. 5 blockers: Architecture (87/90, need 90), RBAC (PARTIAL), Sync (PARTIAL), UX (85/88), DevOps (80/88). Progress: Architecture +1 (API v1 prefix, paginated responses, repository pattern). Response envelope middleware refined. All 46 backend tests passing."
+}
