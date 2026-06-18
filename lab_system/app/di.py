@@ -57,38 +57,6 @@ def reset_container() -> None:
     _container = None
 
 
-def _register_defaults(container: Container) -> None:
-    from lab_system.app.database import db as _db
-    from lab_system.app.database.repository import BaseRepository
-
-    from lab_system.app.services.receipt_service import (
-        ReceiptService,
-    )
-    from lab_system.app.services.user_service import (
-        UserService,
-    )
-    from lab_system.app.services.report_service import (
-        ReportService,
-    )
-    from lab_system.app.services.recovery_service import (
-        RecoveryService,
-    )
-    from lab_system.app.services.backup_service import (
-        BackupService,
-    )
-
-    container.register("db", lambda c: _db)
-    container.register("base_repository", lambda c: BaseRepository())
-
-    container.register("receipt_service", lambda c: ReceiptService(c.resolve("db")))
-    container.register("user_service", lambda c: UserService(c.resolve("db")))
-    container.register("org_service", lambda c: OrgService(c.resolve("db")))
-    container.register("report_service", lambda c: ReportService(c.resolve("db")))
-    container.register("recovery_service", lambda c: RecoveryService(c.resolve("db")))
-    container.register("backup_service", lambda c: BackupService(c.resolve("db")))
-    container.register("catalog_service", lambda c: CatalogService(c.resolve("db")))
-
-
 class OrgService:
     def __init__(self, db):
         self._db = db
@@ -236,3 +204,26 @@ class SettingsService:
         repo = BaseRepository()
         rows = repo.fetch_all("SELECT key, value FROM settings")
         return {r[0]: r[1] for r in rows}
+
+
+def _register_defaults(container: Container) -> None:
+    from lab_system.app.database import db as _db
+    from lab_system.app.database.repository import BaseRepository
+
+    from lab_system.app.services.receipt_service import (
+        ReceiptService,
+    )
+    from lab_system.app.services.user_service import (
+        UserService,
+    )
+
+    container.register("db", lambda c: _db)
+    container.register("base_repository", lambda c: BaseRepository())
+
+    container.register("receipt_service", lambda c: ReceiptService(c.resolve("db")))
+    container.register("user_service", lambda c: UserService(c.resolve("db")))
+    container.register("org_service", lambda c: OrgService(c.resolve("db")))
+    container.register("report_service", lambda c: ReportService(c.resolve("db")))
+    container.register("recovery_service", lambda c: RecoveryService(c.resolve("db")))
+    container.register("backup_service", lambda c: BackupService(c.resolve("db")))
+    container.register("catalog_service", lambda c: CatalogService(c.resolve("db")))

@@ -8,6 +8,8 @@ No external dependencies required.
 from __future__ import annotations
 
 import json
+import random
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -85,45 +87,56 @@ class APIClient:
         if data is not None:
             body = json.dumps(data).encode("utf-8")
 
-        req = urllib.request.Request(url, data=body, headers=headers, method=method)
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                resp_body = resp.read().decode("utf-8")
+        max_retries = 3
+        for attempt in range(max_retries):
+            req = urllib.request.Request(url, data=body, headers=headers, method=method)
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    resp_body = resp.read().decode("utf-8")
+                    resp_data: dict[str, Any] = {}
+                    if resp_body:
+                        resp_data = json.loads(resp_body)
+                    return SyncResponse(
+                        success=True,
+                        status_code=resp.status,
+                        message="OK",
+                        data=resp_data,
+                    )
+            except urllib.error.HTTPError as e:
+                if e.code >= 500 and attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) + random.uniform(0, 1)
+                    time.sleep(wait_time)
+                    continue
+                resp_body = e.read().decode("utf-8", errors="replace")
                 resp_data: dict[str, Any] = {}
                 if resp_body:
-                    resp_data = json.loads(resp_body)
+                    try:
+                        resp_data = json.loads(resp_body)
+                    except json.JSONDecodeError:
+                        resp_data = {"raw": resp_body}
                 return SyncResponse(
-                    success=True,
-                    status_code=resp.status,
-                    message="OK",
+                    success=False,
+                    status_code=e.code,
+                    message=resp_data.get("detail", str(e)),
                     data=resp_data,
                 )
-        except urllib.error.HTTPError as e:
-            resp_body = e.read().decode("utf-8", errors="replace")
-            resp_data: dict[str, Any] = {}
-            if resp_body:
-                try:
-                    resp_data = json.loads(resp_body)
-                except json.JSONDecodeError:
-                    resp_data = {"raw": resp_body}
-            return SyncResponse(
-                success=False,
-                status_code=e.code,
-                message=resp_data.get("detail", str(e)),
-                data=resp_data,
-            )
-        except urllib.error.URLError as e:
-            return SyncResponse(
-                success=False,
-                status_code=0,
-                message=f"Connection failed: {e.reason}",
-            )
-        except Exception as e:
-            return SyncResponse(
-                success=False,
-                status_code=0,
-                message=str(e),
-            )
+            except urllib.error.URLError as e:
+                if attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) + random.uniform(0, 1)
+                    time.sleep(wait_time)
+                    continue
+                return SyncResponse(
+                    success=False,
+                    status_code=0,
+                    message=f"Connection failed: {e.reason}",
+                )
+            except Exception as e:
+                return SyncResponse(
+                    success=False,
+                    status_code=0,
+                    message=str(e),
+                )
+        return SyncResponse(success=False, status_code=0, message="Max retries exceeded")
 
 
 api_client = APIClient()

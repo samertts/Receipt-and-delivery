@@ -39,8 +39,12 @@ class TransactionService:
         items = payload.get("items", [])
         self._validate_item_counts(items)
 
-        txn = self.repo.create(
-            transaction_no=self._generate_transaction_no(payload["transaction_type"]),
+        # Generate transaction number
+        transaction_no = self._generate_transaction_no(payload["transaction_type"])
+        
+        # Create transaction object
+        txn = Transaction(
+            transaction_no=transaction_no,
             transaction_type=payload["transaction_type"],
             sender_organization_id=payload["sender_organization_id"],
             receiver_organization_id=payload["receiver_organization_id"],
@@ -56,7 +60,9 @@ class TransactionService:
             status=payload.get("status", "draft"),
             created_by=str(current_user.id) if current_user else "",
         )
-
+        self.db.add(txn)
+        self.db.flush()  # Get the ID without committing
+        
         for item_data in items:
             item = TransactionItem(
                 transaction_id=str(txn.id),
@@ -70,6 +76,7 @@ class TransactionService:
                 notes=item_data.get("notes", item_data.notes if hasattr(item_data, "notes") else ""),
             )
             self.db.add(item)
+        
         self.db.commit()
         self.db.refresh(txn)
 

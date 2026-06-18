@@ -1,3 +1,5 @@
+from sqlalchemy import func
+
 from app.models.audit_log import AuditLog
 from app.models.organization import Organization
 from app.models.sync_log import SyncLog
@@ -5,6 +7,11 @@ from app.models.transaction import Transaction
 from app.models.transaction_item import TransactionItem as TransactionItem  # noqa: F401
 from app.models.user import User
 from app.repositories.base import BaseRepository
+
+
+def escape_like(value: str) -> str:
+    """Escape special characters for SQL LIKE patterns."""
+    return value.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
 
 
 class UserRepository(BaseRepository[User]):
@@ -30,12 +37,20 @@ class TransactionRepository(BaseRepository[Transaction]):
         limit: int = 20,
         status: str = "",
         search: str = "",
+        institution_id: str = "",
     ) -> tuple[list[Transaction], int]:
         query = self.db.query(Transaction)
         if status:
             query = query.filter(Transaction.status == status)
         if search:
-            query = query.filter(Transaction.transaction_no.ilike(f"%{search}%"))
+            search_term = f"%{escape_like(search)}%"
+            query = query.filter(Transaction.transaction_no.ilike(search_term, escape='\\'))
+        if institution_id:
+            # Filter by institution through organization relationships
+            query = query.filter(
+                (Transaction.sender_organization_id == institution_id) |
+                (Transaction.receiver_organization_id == institution_id)
+            )
         total = query.count()
         items = (
             query.order_by(Transaction.created_at.desc())

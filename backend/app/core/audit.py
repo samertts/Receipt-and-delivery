@@ -1,3 +1,4 @@
+import threading
 from typing import Optional
 
 from app.core.logging import logger
@@ -5,6 +6,8 @@ from app.db.session import SessionLocal
 from app.models.audit_log import AuditLog
 from fastapi import Request
 from sqlalchemy.orm import Session
+
+_audit_lock = threading.Lock()
 
 
 def _get_prev_hash(db: Session) -> str:
@@ -39,17 +42,18 @@ def log_audit(
         db = SessionLocal()
         close_db = True
     try:
-        prev_hash = _get_prev_hash(db)
-        audit = AuditLog(
-            user_id=user_id,
-            action_type=action_type,
-            ip_address=ip_address,
-            details=details,
-            changes_json=changes_json,
-            prev_hash=prev_hash,
-        )
-        db.add(audit)
-        db.commit()
+        with _audit_lock:
+            prev_hash = _get_prev_hash(db)
+            audit = AuditLog(
+                user_id=user_id,
+                action_type=action_type,
+                ip_address=ip_address,
+                details=details,
+                changes_json=changes_json,
+                prev_hash=prev_hash,
+            )
+            db.add(audit)
+            db.commit()
         logger.info(
             f"Audit: {action_type} by user {user_id}",
             extra={"user_id": user_id, "ip_address": ip_address, "action": action_type},

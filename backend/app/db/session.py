@@ -23,5 +23,8 @@ def get_db():
         db.close()
 
 
+# TODO: Initialize Alembic for database migrations
+# Run: alembic init alembic
+# Then create initial migration: alembic revision --autogenerate -m "initial"
 def init_db():
     Base.metadata.create_all(bind=engine)

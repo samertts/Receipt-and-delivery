@@ -80,7 +80,10 @@ class Settings(BaseSettings):
 
     @property
     def origin_list(self) -> list[str]:
-        return [o.strip() for o in self.allowed_origins.split(",") if o.strip()] or ["*"]
+        origins = [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+        if not origins:
+            raise ValueError("ALLOWED_ORIGINS must be configured")
+        return origins
 
 
 settings = Settings()

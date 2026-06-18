@@ -1,6 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.container_deps import get_sync_service
@@ -12,19 +13,31 @@ from app.models.user import User
 router = APIRouter(prefix="/sync", tags=["المزامنة"])
 
 
+class SyncEntry(BaseModel):
+    entity_type: str = Field(..., max_length=50)
+    entity_id: int
+    action: str = Field(..., pattern="^(create|update|delete)$")
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class SyncPushRequest(BaseModel):
+    entries: list[SyncEntry] = Field(..., max_length=1000)
+    device_id: str = Field(default="", max_length=100)
+    branch_id: str = Field(default="", max_length=100)
+
+
 @router.post("/push")
 def sync_push(
-    payload: dict[str, Any],
-    request: Any,
+    request: SyncPushRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("sync_data")),
 ):
     svc = get_sync_service(db)
     data = svc.push(
-        entries=payload.get("entries", []),
-        device_id=payload.get("device_id", ""),
-        branch_id=payload.get("branch_id", ""),
-        request=request,
+        entries=[entry.model_dump() for entry in request.entries],
+        device_id=request.device_id,
+        branch_id=request.branch_id,
+        request=None,
         current_user=current_user,
     )
     return wrap_response(

@@ -2,6 +2,9 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authApi } from '../api'
 
+// SECURITY NOTE: Tokens are stored in localStorage which is vulnerable to XSS.
+// TODO: Migrate to httpOnly cookies set by the server.
+// For now, ensure CSP headers are set to mitigate XSS risks.
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
   const token = ref(localStorage.getItem('access_token') || '')

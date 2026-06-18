@@ -74,20 +74,9 @@ readiness.__exclude_from_envelope__ = True
 
 @router.get("/version")
 def version():
-    try:
-        fastapi_ver = _pkg_version("fastapi")
-    except Exception:
-        fastapi_ver = "unknown"
-    try:
-        sqlalchemy_ver = _pkg_version("sqlalchemy")
-    except Exception:
-        sqlalchemy_ver = "unknown"
     return {
         "app_name": settings.app_name,
         "app_version": settings.app_version,
-        "python": __import__("sys").version,
-        "fastapi": fastapi_ver,
-        "sqlalchemy": sqlalchemy_ver,
         "timestamp": _utcnow(),
     }
 

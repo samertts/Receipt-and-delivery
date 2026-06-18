@@ -1,4 +1,7 @@
+import hashlib
 import json
+import logging
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -7,19 +10,64 @@ from lab_system.app.auth.permissions import with_permission
 from lab_system.app.database import db as _db
 from lab_system.app.sync.service import sync_service
 
+logger = logging.getLogger(__name__)
 
-def next_receipt_no():
+
+def _compute_hash(file_path: str) -> str:
+    """Compute SHA-256 hash of a file."""
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
+
+
+def next_receipt_no(conn=None):
     year = datetime.now().year
-    with _db.get_conn() as conn:
-        row = conn.execute(
-            "SELECT receipt_no FROM receipts WHERE receipt_no LIKE ? ORDER BY id DESC LIMIT 1",
-            (f"LAB-{year}-%",),
+    if conn is None:
+        with _db.get_conn() as conn:
+            return next_receipt_no(conn)
+    
+    # Ensure meta table exists
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """)
+    
+    meta_key = f"last_receipt_no_{year}"
+    
+    # Use immediate transaction to prevent race condition
+    cursor = conn.cursor()
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+        row = cursor.execute(
+            "SELECT value FROM meta WHERE key=?",
+            (meta_key,),
         ).fetchone()
-    if row:
-        seq = int(row["receipt_no"].split("-")[-1]) + 1
-    else:
-        seq = 1
-    return f"LAB-{year}-{seq:06d}"
+        if row:
+            last_no = int(row[0])
+        else:
+            # Initialize with max from receipts table
+            max_row = cursor.execute(
+                "SELECT receipt_no FROM receipts WHERE receipt_no LIKE ? ORDER BY receipt_no DESC LIMIT 1",
+                (f"LAB-{year}-%",),
+            ).fetchone()
+            if max_row:
+                last_no = int(max_row[0].split("-")[-1])
+            else:
+                last_no = 0
+        new_no = last_no + 1
+        cursor.execute(
+            "INSERT OR REPLACE INTO meta(key, value) VALUES(?, ?)",
+            (meta_key, str(new_no)),
+        )
+        conn.commit()
+        return f"LAB-{year}-{new_no:06d}"
+    except Exception:
+        conn.rollback()
+        raise
 
 
 @with_permission('receipts.create')
@@ -33,7 +81,7 @@ def create_receipt(data, items, user_id, user=None):
         if total != valid + damaged + rejected + non_conf:
             raise ValueError("Invalid item totals")
     with _db.get_conn() as conn:
-        no = next_receipt_no()
+        no = next_receipt_no(conn)
         cur = conn.execute(
             """INSERT INTO receipts(receipt_no,tx_type_id,sender_org_id,receiver_org_id,
                 sender_name,receiver_name,sender_job_title,receiver_job_title,
@@ -106,6 +154,27 @@ def get_receipt(receipt_id):
             "SELECT * FROM attachments WHERE receipt_id=?", (receipt_id,),
         ).fetchall()
     return dict(r), [dict(i) for i in items], [dict(a) for a in atts]
+
+
+def get_attachment(attachment_id: int) -> dict:
+    """Get attachment with hash verification."""
+    conn = _db.get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM attachments WHERE id = ?", (attachment_id,))
+    att = cursor.fetchone()
+    if not att:
+        return None
+    
+    # Verify file integrity
+    file_path = att["file_path"]
+    if os.path.exists(file_path):
+        actual_hash = _compute_hash(file_path)
+        if actual_hash != att["file_hash"]:
+            logger.warning(f"Attachment {attachment_id} hash mismatch: expected {att['file_hash']}, got {actual_hash}")
+    else:
+        logger.warning(f"Attachment {attachment_id} file missing: {file_path}")
+    
+    return dict(att)
 
 
 @with_permission('receipts.update')
@@ -306,7 +375,7 @@ def get_receipt_history(receipt_id):
 
 @with_permission('receipts.update')
 def set_receipt_status(receipt_id, new_status, user_id=None, user=None):
-    """Direct status update (skips transition validation)."""
+    """Direct status update with transition validation."""
     with _db.get_conn() as conn:
         row = conn.execute(
             "SELECT status FROM receipts WHERE id=?", (receipt_id,),
@@ -316,6 +385,7 @@ def set_receipt_status(receipt_id, new_status, user_id=None, user=None):
         old_status = row['status']
         if old_status == new_status:
             return
+        validate_status_transition(old_status, new_status)
         conn.execute("UPDATE receipts SET status=? WHERE id=?", (new_status, receipt_id))
         _record_receipt_history(
             conn, receipt_id, 'status', old_status, new_status, user_id,

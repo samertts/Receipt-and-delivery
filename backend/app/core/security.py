@@ -30,15 +30,28 @@ def validate_password_strength(password: str) -> Optional[str]:
 
 
 class MemoryRateLimiter:
+    """
+    SECURITY NOTE: Rate limiter state is lost on restart.
+    TODO: Implement Redis-backed or database-backed rate limiting for production.
+    For now, the in-memory limiter provides basic protection.
+    """
     def __init__(self, max_requests: int = 10, window_seconds: int = 60) -> None:
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self.requests: dict[str, list[float]] = defaultdict(list)
+        self._cleanup_counter = 0
 
     def is_rate_limited(self, key: str) -> bool:
         now = time.time()
-        window_start = now - self.window_seconds
-        self.requests[key] = [t for t in self.requests[key] if t > window_start]
+        self.requests[key] = [t for t in self.requests[key] if now - t < self.window_seconds]
+
+        # Periodic cleanup every 1000 requests
+        self._cleanup_counter += 1
+        if self._cleanup_counter >= 1000:
+            self._cleanup_counter = 0
+            cutoff = now - self.window_seconds
+            self.requests = {k: v for k, v in self.requests.items() if v and v[-1] > cutoff}
+
         if len(self.requests[key]) >= self.max_requests:
             return True
         self.requests[key].append(now)
@@ -106,7 +119,7 @@ except (ImportError, Exception) as e:
 
 
 async def rate_limit_middleware(request: Request, call_next):
-    if os.environ.get("TESTING") or settings.debug:
+    if os.environ.get("TESTING"):
         return await call_next(request)
 
     client_ip = request.client.host if request.client else "unknown"

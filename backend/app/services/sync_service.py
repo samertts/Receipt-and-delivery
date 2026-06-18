@@ -29,20 +29,50 @@ class SyncService:
         current_user: User | None = None,
     ) -> dict[str, Any]:
         accepted = 0
+        conflicts = []
         for entry in entries:
             action = entry.get("action", "")
             if action not in SYNC_ACTIONS:
                 continue
-            sync_entry = SyncLog(
-                entity_type=entry.get("entity_type", ""),
-                entity_id=entry.get("entity_id", 0),
-                action=action,
-                payload=entry.get("payload", ""),
-                device_id=device_id,
-                branch_id=branch_id,
-            )
-            self.db.add(sync_entry)
-            accepted += 1
+            
+            entity_type = entry.get("entity_type", "")
+            entity_id = entry.get("entity_id", 0)
+            payload = entry.get("payload", "")
+            
+            # Check for existing sync log for this entity
+            existing = self.db.query(SyncLog).filter(
+                SyncLog.entity_type == entity_type,
+                SyncLog.entity_id == entity_id
+            ).first()
+            
+            if existing:
+                # Last-writer-wins conflict resolution
+                entry_timestamp = entry.get("timestamp", "")
+                existing_timestamp = existing.synced_at.isoformat() if existing.synced_at else ""
+                if entry_timestamp and existing_timestamp and entry_timestamp > existing_timestamp:
+                    existing.payload = payload
+                    existing.synced_at = datetime.utcnow()
+                    existing.device_id = device_id
+                    existing.branch_id = branch_id
+                    accepted += 1
+                else:
+                    conflicts.append({
+                        "entity_type": entity_type,
+                        "entity_id": entity_id,
+                        "action": action,
+                    })
+            else:
+                # New entry
+                sync_entry = SyncLog(
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    action=action,
+                    payload=payload,
+                    device_id=device_id,
+                    branch_id=branch_id,
+                )
+                self.db.add(sync_entry)
+                accepted += 1
 
         if accepted:
             self.db.commit()
@@ -55,7 +85,12 @@ class SyncService:
             db=self.db,
         )
 
-        return {"accepted": accepted, "device_id": device_id, "branch_id": branch_id}
+        return {
+            "accepted": accepted,
+            "conflicts": len(conflicts),
+            "device_id": device_id,
+            "branch_id": branch_id,
+        }
 
     def pull(
         self,

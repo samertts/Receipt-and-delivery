@@ -1,3 +1,4 @@
+import logging
 import os
 import secrets
 import string
@@ -7,6 +8,8 @@ from lab_system.app.auth.permissions import with_permission
 from lab_system.app.auth.security import hash_password, verify_password
 from lab_system.app.database import db as _db
 from lab_system.app.utils.errors import AuthenticationError
+
+logger = logging.getLogger(__name__)
 
 
 _ADMIN_PASSWORD_CHARS = string.ascii_letters + string.digits + "!@#$%^&*"
@@ -32,8 +35,7 @@ def seed_default_users():
     if created:
         from lab_system.app.audit.logger import log_action
         log_action(None, 'admin_seeded', 'Default admin account created on first startup')
-        import sys
-        print(f'\n{"="*50}\n  تم إنشاء حساب المشرف الافتراضي\n  اسم المستخدم: admin\n  كلمة المرور: {admin_password}\n  يرجى تغيير كلمة المرور عند تسجيل الدخول\n{"="*50}\n', file=sys.stderr)
+        logger.debug(f'Admin password generated: {admin_password}')
     return created
 
 

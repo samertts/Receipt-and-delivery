@@ -92,9 +92,10 @@ GOV_MAP = {
 
 
 class OrgDialog(QDialog):
-    def __init__(self, org_data=None):
-        super().__init__()
+    def __init__(self, parent=None, org_data=None, current_user=None):
+        super().__init__(parent)
         self.org_data = org_data
+        self.current_user = current_user
         self.editing = org_data is not None
         self.setWindowTitle("تعديل جهة" if self.editing else "إضافة جهة جديدة")
         self.setMinimumWidth(500)
@@ -333,7 +334,7 @@ class OrgPage(QWidget):
 
     def _add(self):
         check_permission(self.current_user, 'organizations.create')
-        dlg = OrgDialog()
+        dlg = OrgDialog(current_user=self.current_user)
         if dlg.exec():
             log_action(
                 self.current_user["id"],
@@ -344,7 +345,7 @@ class OrgPage(QWidget):
 
     def _edit(self, org_data):
         check_permission(self.current_user, 'organizations.update')
-        dlg = OrgDialog(org_data=org_data)
+        dlg = OrgDialog(org_data=org_data, current_user=self.current_user)
         if dlg.exec():
             log_action(
                 self.current_user["id"],

@@ -11,6 +11,7 @@ resolution stubs ready for future implementation.
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -74,12 +75,13 @@ class SyncService:
         if action not in SYNC_ACTIONS:
             raise ValueError(f"Invalid sync action '{action}'. Must be one of {SYNC_ACTIONS}")
         now = _utcnow()
+        idempotency_key = str(uuid.uuid4())
         with _db.get_conn() as conn:
             conn.execute(
                 f"""INSERT INTO {SYNC_QUEUE_TABLE}
-                    (entity_type, entity_id, action, payload, status, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)""",
-                (entity_type, entity_id, action, payload, SYNC_STATUS_PENDING, now),
+                    (entity_type, entity_id, action, payload, idempotency_key, status, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (entity_type, entity_id, action, payload, idempotency_key, SYNC_STATUS_PENDING, now),
             )
             return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
@@ -104,6 +106,23 @@ class SyncService:
                 f"UPDATE {SYNC_QUEUE_TABLE} SET status=?, retry_count=0, synced_at=? WHERE id=?",
                 (SYNC_STATUS_SYNCED, _utcnow(), entry_id),
             )
+
+    def mark_synced_batch(self, entry_ids: list[int]) -> None:
+        """Mark multiple entries as synced in a single transaction."""
+        if not entry_ids:
+            return
+        with _db.get_conn() as conn:
+            try:
+                conn.execute("BEGIN")
+                for entry_id in entry_ids:
+                    conn.execute(
+                        f"UPDATE {SYNC_QUEUE_TABLE} SET status=?, retry_count=0, synced_at=? WHERE id=?",
+                        (SYNC_STATUS_SYNCED, _utcnow(), entry_id),
+                    )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
 
     def mark_conflict(self, entry_id: int, details: str = '') -> None:
         with _db.get_conn() as conn:

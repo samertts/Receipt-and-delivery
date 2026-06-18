@@ -2,12 +2,12 @@ import hashlib
 import shutil
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from lab_system.app.settings.config import CONFIG
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 SCHEMA = '''
 PRAGMA foreign_keys = ON;
@@ -136,6 +136,7 @@ CREATE TABLE IF NOT EXISTS sync_queue (
  entity_id INTEGER NOT NULL,
  action TEXT NOT NULL CHECK(action IN ('create','update','delete')),
  payload TEXT DEFAULT '',
+ idempotency_key TEXT DEFAULT '',
  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','synced','conflict','failed')),
  retry_count INTEGER NOT NULL DEFAULT 0,
  created_at TEXT NOT NULL,
@@ -154,24 +155,26 @@ CREATE INDEX IF NOT EXISTS idx_receipt_items_receipt_id ON receipt_items(receipt
 CREATE VIRTUAL TABLE IF NOT EXISTS receipts_fts USING fts5(receipt_no, sender_name, receiver_name, content='receipts', content_rowid='id');
 CREATE VIRTUAL TABLE IF NOT EXISTS organizations_fts USING fts5(name, code, content='organizations', content_rowid='id');
 CREATE TRIGGER IF NOT EXISTS receipts_ai AFTER INSERT ON receipts BEGIN
-    INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name)
+    INSERT OR REPLACE INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name)
     VALUES (NEW.id, NEW.receipt_no, NEW.sender_name, NEW.receiver_name);
 END;
 CREATE TRIGGER IF NOT EXISTS receipts_ad AFTER DELETE ON receipts BEGIN
-    SELECT 1; -- no-op: FTS content-sync DELETE bug on SQLite<3.39
+    DELETE FROM receipts_fts WHERE rowid = OLD.id;
 END;
 CREATE TRIGGER IF NOT EXISTS receipts_au AFTER UPDATE ON receipts BEGIN
+    DELETE FROM receipts_fts WHERE rowid = OLD.id;
     INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name)
     VALUES (NEW.id, NEW.receipt_no, NEW.sender_name, NEW.receiver_name);
 END;
 CREATE TRIGGER IF NOT EXISTS organizations_ai AFTER INSERT ON organizations BEGIN
-    INSERT INTO organizations_fts(rowid, name, code)
+    INSERT OR REPLACE INTO organizations_fts(rowid, name, code)
     VALUES (NEW.id, NEW.name, NEW.code);
 END;
 CREATE TRIGGER IF NOT EXISTS organizations_ad AFTER DELETE ON organizations BEGIN
-    SELECT 1; -- no-op: FTS content-sync DELETE bug on SQLite<3.39
+    DELETE FROM organizations_fts WHERE rowid = OLD.id;
 END;
 CREATE TRIGGER IF NOT EXISTS organizations_au AFTER UPDATE ON organizations BEGIN
+    DELETE FROM organizations_fts WHERE rowid = OLD.id;
     INSERT INTO organizations_fts(rowid, name, code)
     VALUES (NEW.id, NEW.name, NEW.code);
 END;
@@ -287,29 +290,31 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         # FTS sync triggers
         conn.executescript("""
             CREATE TRIGGER IF NOT EXISTS receipts_ai AFTER INSERT ON receipts BEGIN
-                INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name)
+                INSERT OR REPLACE INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name)
                 VALUES (NEW.id, NEW.receipt_no, NEW.sender_name, NEW.receiver_name);
             END;
 
             CREATE TRIGGER IF NOT EXISTS receipts_ad AFTER DELETE ON receipts BEGIN
-                SELECT 1; -- no-op: FTS content-sync DELETE bug on SQLite<3.39
+                DELETE FROM receipts_fts WHERE rowid = OLD.id;
             END;
 
             CREATE TRIGGER IF NOT EXISTS receipts_au AFTER UPDATE ON receipts BEGIN
+                DELETE FROM receipts_fts WHERE rowid = OLD.id;
                 INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name)
                 VALUES (NEW.id, NEW.receipt_no, NEW.sender_name, NEW.receiver_name);
             END;
 
             CREATE TRIGGER IF NOT EXISTS organizations_ai AFTER INSERT ON organizations BEGIN
-                INSERT INTO organizations_fts(rowid, name, code)
+                INSERT OR REPLACE INTO organizations_fts(rowid, name, code)
                 VALUES (NEW.id, NEW.name, NEW.code);
             END;
 
             CREATE TRIGGER IF NOT EXISTS organizations_ad AFTER DELETE ON organizations BEGIN
-                SELECT 1; -- no-op: FTS content-sync DELETE bug on SQLite<3.39
+                DELETE FROM organizations_fts WHERE rowid = OLD.id;
             END;
 
             CREATE TRIGGER IF NOT EXISTS organizations_au AFTER UPDATE ON organizations BEGIN
+                DELETE FROM organizations_fts WHERE rowid = OLD.id;
                 INSERT INTO organizations_fts(rowid, name, code)
                 VALUES (NEW.id, NEW.name, NEW.code);
             END;
@@ -350,6 +355,11 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         if 'prev_hash' not in _table_columns(conn, 'audit_logs'):
             conn.execute("ALTER TABLE audit_logs ADD COLUMN prev_hash TEXT DEFAULT ''")
         _record_migration(conn, 'v10_audit_integrity', 'add prev_hash column for audit chain integrity')
+
+    if current < 11:
+        if 'idempotency_key' not in _table_columns(conn, 'sync_queue'):
+            conn.execute("ALTER TABLE sync_queue ADD COLUMN idempotency_key TEXT DEFAULT ''")
+        _record_migration(conn, 'v11_sync_idempotency', 'add idempotency_key column to sync_queue')
 
 
 def _recreate_table_with_fk(conn: sqlite3.Connection, table: str) -> None:
@@ -445,9 +455,17 @@ def _record_migration(conn: sqlite3.Connection, migration_key: str, payload: str
 def _acquire_migration_lock(conn: sqlite3.Connection) -> None:
     now = datetime.now().isoformat(timespec='seconds')
     conn.execute("INSERT OR IGNORE INTO migration_lock(id, is_locked, owner, updated_at) VALUES(1, 0, '', ?)", (now,))
-    row = conn.execute("SELECT is_locked FROM migration_lock WHERE id=1").fetchone()
+    row = conn.execute("SELECT is_locked, updated_at FROM migration_lock WHERE id=1").fetchone()
     if row and int(row[0]) == 1:
-        raise RuntimeError('Migration lock is active; aborting concurrent migration.')
+        updated_at = row[1]
+        if updated_at:
+            lock_time = datetime.fromisoformat(updated_at)
+            if datetime.now() - lock_time > timedelta(minutes=5):
+                conn.execute("UPDATE migration_lock SET is_locked=0, owner='', updated_at=? WHERE id=1", (now,))
+            else:
+                raise RuntimeError('Migration lock is active; aborting concurrent migration.')
+        else:
+            raise RuntimeError('Migration lock is active; aborting concurrent migration.')
     conn.execute("UPDATE migration_lock SET is_locked=1, owner='init_db', updated_at=? WHERE id=1", (now,))
 
 

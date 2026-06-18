@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1 import audit, auth, health, organizations, sync, transactions, users
+from app.api.v1 import audit, auth, attachments, health, organizations, reports, sync, transactions, users
 from app.core.config import settings
 from app.core.exceptions import AppException
 from app.core.logging import logger, setup_logging
@@ -133,6 +133,8 @@ app.include_router(organizations.router, prefix="/api")
 app.include_router(transactions.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 app.include_router(sync.router, prefix="/api")
+app.include_router(attachments.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
@@ -140,5 +142,7 @@ app.include_router(organizations.router, prefix="/api/v1")
 app.include_router(transactions.router, prefix="/api/v1")
 app.include_router(audit.router, prefix="/api/v1")
 app.include_router(sync.router, prefix="/api/v1")
+app.include_router(attachments.router, prefix="/api/v1")
+app.include_router(reports.router, prefix="/api/v1")
 app.include_router(health.router, prefix="/api")
 app.include_router(health.router, prefix="/api/v1")

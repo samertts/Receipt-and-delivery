@@ -117,6 +117,21 @@ class OrganizationService:
         org = self.repo.get(org_id)
         if not org:
             raise NotFoundError("المؤسسة غير موجودة")
+        
+        # Check for associated transactions
+        from app.models.transaction import Transaction
+        from sqlalchemy import or_
+        
+        has_transactions = self.db.query(Transaction).filter(
+            or_(
+                Transaction.sender_organization_id == org_id,
+                Transaction.receiver_organization_id == org_id,
+            )
+        ).first()
+        
+        if has_transactions:
+            raise ConflictError("Cannot delete organization with associated transactions")
+        
         self.repo.delete(org_id)
 
         log_audit(
