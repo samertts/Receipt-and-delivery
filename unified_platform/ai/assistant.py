@@ -13,8 +13,10 @@ from typing import Any
 
 from unified_platform.ai import AIRecommendation, AIRecommendationType
 from unified_platform.ai.capabilities import (
+    ArchitectureAnalyzer,
     BackupRecommender,
     CapacityPlanner,
+    DeploymentReadinessAnalyzer,
     ErrorAnalyzer,
     LogAnalyzer,
     PerformanceRecommender,
@@ -22,6 +24,7 @@ from unified_platform.ai.capabilities import (
     RiskPredictor,
     RootCauseAnalyzer,
     SecurityRecommender,
+    TechnicalDebtAnalyzer,
 )
 
 
@@ -53,7 +56,7 @@ class AIAnalysisReport:
 
 
 class AIAssistant:
-    """AI Operations Assistant with 9 analysis capabilities."""
+    """AI Operations Assistant with 12 analysis capabilities."""
 
     def __init__(self) -> None:
         self._error_analyzer = ErrorAnalyzer()
@@ -65,6 +68,9 @@ class AIAssistant:
         self._recovery_recommender = RecoveryRecommender()
         self._capacity_planner = CapacityPlanner()
         self._risk_predictor = RiskPredictor()
+        self._architecture_analyzer = ArchitectureAnalyzer()
+        self._technical_debt_analyzer = TechnicalDebtAnalyzer()
+        self._deployment_readiness_analyzer = DeploymentReadinessAnalyzer()
         self._history: list[AIAnalysisReport] = []
 
     def analyze_errors(self, errors: list[dict[str, Any]]) -> AIRecommendation:
@@ -94,6 +100,15 @@ class AIAssistant:
     def analyze_risks(self, metrics: dict[str, Any]) -> AIRecommendation:
         return self._risk_predictor.analyze(metrics)
 
+    def analyze_architecture(self, metrics: dict[str, Any]) -> AIRecommendation:
+        return self._architecture_analyzer.analyze(metrics)
+
+    def analyze_technical_debt(self, metrics: dict[str, Any]) -> AIRecommendation:
+        return self._technical_debt_analyzer.analyze(metrics)
+
+    def analyze_deployment_readiness(self, metrics: dict[str, Any]) -> AIRecommendation:
+        return self._deployment_readiness_analyzer.analyze(metrics)
+
     def full_analysis(
         self,
         errors: list[dict[str, Any]] | None = None,
@@ -103,8 +118,11 @@ class AIAssistant:
         backup_metrics: dict[str, Any] | None = None,
         recovery_metrics: dict[str, Any] | None = None,
         capacity_metrics: dict[str, Any] | None = None,
+        architecture_metrics: dict[str, Any] | None = None,
+        technical_debt_metrics: dict[str, Any] | None = None,
+        deployment_readiness_metrics: dict[str, Any] | None = None,
     ) -> AIAnalysisReport:
-        """Run all 9 analysis capabilities and generate a combined report."""
+        """Run all 12 analysis capabilities and generate a combined report."""
         recommendations: list[AIRecommendation] = []
 
         if errors:
@@ -121,6 +139,12 @@ class AIAssistant:
             recommendations.append(self.analyze_recovery(recovery_metrics))
         if capacity_metrics:
             recommendations.append(self.analyze_capacity(capacity_metrics))
+        if architecture_metrics:
+            recommendations.append(self.analyze_architecture(architecture_metrics))
+        if technical_debt_metrics:
+            recommendations.append(self.analyze_technical_debt(technical_debt_metrics))
+        if deployment_readiness_metrics:
+            recommendations.append(self.analyze_deployment_readiness(deployment_readiness_metrics))
 
         # Always run root cause and risk prediction
         all_metrics = {}

@@ -462,3 +462,190 @@ class RiskPredictor:
             suggested_actions=[f"Mitigate: {r}" for r in risks if r != "No significant risks detected"],
             risk_level=risk_level,
         )
+
+
+class ArchitectureAnalyzer:
+    """Analyzes architecture health."""
+
+    def analyze(self, metrics: dict[str, Any]) -> AIRecommendation:
+        issues: list[str] = []
+        evidence: list[str] = []
+
+        service_count = metrics.get("service_count", 0)
+        circular_deps = metrics.get("circular_dependencies", 0)
+        api_version_count = metrics.get("api_version_count", 0)
+        contract_violations = metrics.get("contract_violations", 0)
+        module_count = metrics.get("module_count", 0)
+        shared_coverage = metrics.get("shared_component_coverage", 0.0)
+
+        if circular_deps > 0:
+            issues.append(f"Circular dependencies detected: {circular_deps}")
+            evidence.append(f"Circular deps: {circular_deps}")
+        if contract_violations > 0:
+            issues.append(f"Contract violations found: {contract_violations}")
+            evidence.append(f"Contract violations: {contract_violations}")
+        if shared_coverage < 0.5:
+            issues.append(f"Shared component coverage critically low: {shared_coverage*100:.1f}%")
+            evidence.append(f"Shared coverage: {shared_coverage*100:.1f}%")
+        elif shared_coverage < 0.8:
+            issues.append(f"Shared component coverage below ideal: {shared_coverage*100:.1f}%")
+            evidence.append(f"Shared coverage: {shared_coverage*100:.1f}%")
+        if api_version_count > 3:
+            issues.append(f"Multiple API versions maintained: {api_version_count}")
+            evidence.append(f"API versions: {api_version_count}")
+
+        evidence.append(f"Services: {service_count}, Modules: {module_count}")
+
+        if not issues:
+            issues.append("Architecture health is acceptable")
+            evidence.append("All architecture checks passed")
+
+        risk_level = "critical" if circular_deps > 0 or contract_violations > 0 else "high" if len(issues) > 2 else "medium"
+
+        return AIRecommendation(
+            recommendation_id="ARCH-001",
+            type=AIRecommendationType.ARCHITECTURE,
+            title=f"Architecture analysis: {len(issues)} findings",
+            summary=f"Identified {len(issues)} architecture issues",
+            explanation=f"Architecture analysis identified {len(issues)} areas for improvement.",
+            evidence=evidence,
+            confidence=ConfidenceLevel.HIGH,
+            suggested_actions=[f"Address: {i}" for i in issues if i != "Architecture health is acceptable"],
+            risk_level=risk_level,
+        )
+
+
+class TechnicalDebtAnalyzer:
+    """Analyzes technical debt."""
+
+    def analyze(self, metrics: dict[str, Any]) -> AIRecommendation:
+        issues: list[str] = []
+        evidence: list[str] = []
+
+        total_debt = metrics.get("total_debt_items", 0)
+        critical_debt = metrics.get("critical_debt", 0)
+        high_debt = metrics.get("high_debt", 0)
+        debt_age_days = metrics.get("debt_age_days", 0)
+        remediation_rate = metrics.get("remediation_rate", 0.0)
+
+        if critical_debt > 0:
+            issues.append(f"Critical debt items: {critical_debt}")
+            evidence.append(f"Critical debt: {critical_debt}")
+        if high_debt > 5:
+            issues.append(f"High debt items elevated: {high_debt}")
+            evidence.append(f"High debt: {high_debt}")
+        elif high_debt > 0:
+            issues.append(f"High debt items present: {high_debt}")
+            evidence.append(f"High debt: {high_debt}")
+        if debt_age_days > 90:
+            issues.append(f"Debt aging critically high: {debt_age_days} days")
+            evidence.append(f"Debt age: {debt_age_days} days")
+        elif debt_age_days > 30:
+            issues.append(f"Debt aging above ideal: {debt_age_days} days")
+            evidence.append(f"Debt age: {debt_age_days} days")
+        if remediation_rate < 0.3:
+            issues.append(f"Remediation rate critically low: {remediation_rate*100:.1f}%")
+            evidence.append(f"Remediation rate: {remediation_rate*100:.1f}%")
+        elif remediation_rate < 0.5:
+            issues.append(f"Remediation rate below ideal: {remediation_rate*100:.1f}%")
+            evidence.append(f"Remediation rate: {remediation_rate*100:.1f}%")
+
+        evidence.append(f"Total debt items: {total_debt}")
+
+        if not issues:
+            issues.append("Technical debt is within acceptable limits")
+            evidence.append("All debt metrics acceptable")
+
+        risk_level = "critical" if critical_debt > 0 else "high" if high_debt > 5 else "medium"
+
+        return AIRecommendation(
+            recommendation_id="TD-001",
+            type=AIRecommendationType.TECHNICAL_DEBT,
+            title=f"Technical debt analysis: {len(issues)} findings",
+            summary=f"Identified {len(issues)} debt concerns",
+            explanation=f"Technical debt analysis identified {len(issues)} areas requiring attention.",
+            evidence=evidence,
+            confidence=ConfidenceLevel.HIGH,
+            suggested_actions=[f"Address: {i}" for i in issues if i != "Technical debt is within acceptable limits"],
+            risk_level=risk_level,
+        )
+
+
+class DeploymentReadinessAnalyzer:
+    """Analyzes deployment readiness."""
+
+    def analyze(self, metrics: dict[str, Any]) -> AIRecommendation:
+        blockers: list[str] = []
+        evidence: list[str] = []
+
+        tests_passing = metrics.get("tests_passing", True)
+        lint_clean = metrics.get("lint_clean", True)
+        coverage = metrics.get("coverage_percent", 100.0)
+        security_clear = metrics.get("security_clear", True)
+        backup_verified = metrics.get("backup_verified", True)
+        recovery_tested = metrics.get("recovery_tested", True)
+        rollback_available = metrics.get("rollback_available", True)
+
+        if not tests_passing:
+            blockers.append("Tests not passing")
+            evidence.append("Tests: FAILING")
+        else:
+            evidence.append("Tests: passing")
+
+        if not lint_clean:
+            blockers.append("Lint errors present")
+            evidence.append("Lint: DIRTY")
+        else:
+            evidence.append("Lint: clean")
+
+        if coverage < 70:
+            blockers.append(f"Coverage critically low: {coverage:.1f}%")
+            evidence.append(f"Coverage: {coverage:.1f}%")
+        elif coverage < 90:
+            blockers.append(f"Coverage below threshold: {coverage:.1f}%")
+            evidence.append(f"Coverage: {coverage:.1f}%")
+        else:
+            evidence.append(f"Coverage: {coverage:.1f}%")
+
+        if not security_clear:
+            blockers.append("Security findings present")
+            evidence.append("Security: FINDINGS")
+        else:
+            evidence.append("Security: clear")
+
+        if not backup_verified:
+            blockers.append("Backup not verified")
+            evidence.append("Backup: UNVERIFIED")
+        else:
+            evidence.append("Backup: verified")
+
+        if not recovery_tested:
+            blockers.append("Recovery not tested")
+            evidence.append("Recovery: UNTESTED")
+        else:
+            evidence.append("Recovery: tested")
+
+        if not rollback_available:
+            blockers.append("Rollback not available")
+            evidence.append("Rollback: UNAVAILABLE")
+        else:
+            evidence.append("Rollback: available")
+
+        if not blockers:
+            blockers.append("System is ready for deployment")
+            evidence.append("All deployment checks passed")
+
+        actual_blockers = [b for b in blockers if b != "System is ready for deployment"]
+        risk_level = "critical" if len(actual_blockers) > 2 else "high" if len(actual_blockers) > 0 else "low"
+
+        return AIRecommendation(
+            recommendation_id="DR-001",
+            type=AIRecommendationType.DEPLOYMENT_READINESS,
+            title=f"Deployment readiness: {len(blockers)} blockers",
+            summary=f"Identified {len(blockers)} deployment blockers",
+            explanation=f"Deployment analysis identified {len(blockers)} issues blocking safe deployment.",
+            evidence=evidence,
+            confidence=ConfidenceLevel.HIGH,
+            suggested_actions=[f"Fix: {b}" for b in blockers if b != "System is ready for deployment"],
+            risk_level=risk_level,
+        )

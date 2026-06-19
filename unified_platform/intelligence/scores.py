@@ -577,3 +577,190 @@ class PerformanceScoreCalculator:
             details=details,
             recommendations=recommendations,
         )
+
+
+# ============================================================================
+# User Experience Score Calculator
+# ============================================================================
+
+class UserExperienceScoreCalculator:
+    """Calculates user experience score."""
+
+    def calculate(
+        self,
+        response_time_ms: float = 0.0,
+        error_rate_percent: float = 0.0,
+        task_completion_rate: float = 0.0,
+        user_satisfaction: float = 0.0,
+        load_time_ms: float = 0.0,
+    ) -> ScoreResult:
+        score = 100.0
+        details: dict[str, Any] = {}
+        recommendations: list[str] = []
+
+        # Response time impact (max -25 points)
+        if response_time_ms > 2000:
+            score -= 25
+            recommendations.append("Response time critically high: >2000ms")
+        elif response_time_ms > 1000:
+            score -= 15
+            recommendations.append("Response time high: >1000ms")
+        elif response_time_ms > 500:
+            score -= 5
+            recommendations.append("Response time above ideal 500ms")
+        details["response_time_ms"] = response_time_ms
+
+        # Error rate impact (max -25 points)
+        if error_rate_percent > 10:
+            score -= 25
+            recommendations.append("Error rate critically high: >10%")
+        elif error_rate_percent > 5:
+            score -= 15
+            recommendations.append("Error rate high: >5%")
+        elif error_rate_percent > 1:
+            score -= 5
+            recommendations.append("Error rate above ideal 1%")
+        details["error_rate_percent"] = error_rate_percent
+
+        # Task completion rate impact (max -20 points)
+        if task_completion_rate < 0.5:
+            score -= 20
+            recommendations.append("Task completion rate critically low: <50%")
+        elif task_completion_rate < 0.7:
+            score -= 12
+            recommendations.append("Task completion rate low: <70%")
+        elif task_completion_rate < 0.9:
+            score -= 5
+            recommendations.append("Task completion rate below ideal 90%")
+        details["task_completion_rate"] = task_completion_rate
+
+        # User satisfaction impact (max -15 points)
+        if user_satisfaction < 2.0:
+            score -= 15
+            recommendations.append("User satisfaction critically low: <2.0")
+        elif user_satisfaction < 3.0:
+            score -= 10
+            recommendations.append("User satisfaction low: <3.0")
+        elif user_satisfaction < 4.0:
+            score -= 5
+            recommendations.append("User satisfaction below ideal 4.0")
+        details["user_satisfaction"] = user_satisfaction
+
+        # Load time impact (max -15 points)
+        if load_time_ms > 5000:
+            score -= 15
+            recommendations.append("Load time critically high: >5000ms")
+        elif load_time_ms > 3000:
+            score -= 10
+            recommendations.append("Load time high: >3000ms")
+        elif load_time_ms > 2000:
+            score -= 5
+            recommendations.append("Load time above ideal 2000ms")
+        details["load_time_ms"] = load_time_ms
+
+        score = max(0.0, score)
+
+        return ScoreResult(
+            category="user_experience",
+            score=score,
+            level=_score_level(score),
+            message=f"User Experience: {score:.1f}/100",
+            details=details,
+            recommendations=recommendations,
+        )
+
+
+# ============================================================================
+# Deployment Score Calculator
+# ============================================================================
+
+class DeploymentScoreCalculator:
+    """Calculates deployment readiness score."""
+
+    def calculate(
+        self,
+        test_pass_rate: float = 1.0,
+        coverage_percent: float = 100.0,
+        lint_errors: int = 0,
+        security_findings_high: int = 0,
+        security_findings_critical: int = 0,
+        rollback_available: bool = True,
+        deployment_history_success_rate: float = 1.0,
+    ) -> ScoreResult:
+        score = 100.0
+        details: dict[str, Any] = {}
+        recommendations: list[str] = []
+
+        # Test pass rate impact (max -20 points)
+        if test_pass_rate < 0.8:
+            score -= 20
+            recommendations.append(f"Test pass rate critically low: {test_pass_rate*100:.1f}%")
+        elif test_pass_rate < 0.95:
+            score -= 10
+            recommendations.append(f"Test pass rate below 95%: {test_pass_rate*100:.1f}%")
+        elif test_pass_rate < 1.0:
+            score -= 3
+        details["test_pass_rate"] = test_pass_rate
+
+        # Coverage impact (max -15 points)
+        if coverage_percent < 50:
+            score -= 15
+            recommendations.append(f"Coverage critically low: {coverage_percent:.1f}%")
+        elif coverage_percent < 70:
+            score -= 10
+            recommendations.append(f"Coverage low: {coverage_percent:.1f}%")
+        elif coverage_percent < 90:
+            score -= 5
+            recommendations.append(f"Coverage below ideal 90%: {coverage_percent:.1f}%")
+        details["coverage_percent"] = coverage_percent
+
+        # Lint errors impact (max -15 points)
+        if lint_errors > 20:
+            score -= 15
+            recommendations.append(f"Lint errors critically high: {lint_errors}")
+        elif lint_errors > 10:
+            score -= 10
+            recommendations.append(f"Lint errors high: {lint_errors}")
+        elif lint_errors > 0:
+            score -= 5
+            recommendations.append(f"Lint errors present: {lint_errors}")
+        details["lint_errors"] = lint_errors
+
+        # Security findings impact (max -25 points)
+        if security_findings_critical > 0:
+            score -= 25
+            recommendations.append(f"Critical security findings: {security_findings_critical}")
+        elif security_findings_high > 0:
+            score -= 15
+            recommendations.append(f"High security findings: {security_findings_high}")
+        details["security_findings_high"] = security_findings_high
+        details["security_findings_critical"] = security_findings_critical
+
+        # Rollback availability impact (max -10 points)
+        if not rollback_available:
+            score -= 10
+            recommendations.append("Rollback capability not available")
+        details["rollback_available"] = rollback_available
+
+        # Deployment history success rate impact (max -15 points)
+        if deployment_history_success_rate < 0.8:
+            score -= 15
+            recommendations.append(f"Deployment history success rate critically low: {deployment_history_success_rate*100:.1f}%")
+        elif deployment_history_success_rate < 0.9:
+            score -= 10
+            recommendations.append(f"Deployment history success rate low: {deployment_history_success_rate*100:.1f}%")
+        elif deployment_history_success_rate < 0.95:
+            score -= 5
+            recommendations.append(f"Deployment history success rate below ideal 95%: {deployment_history_success_rate*100:.1f}%")
+        details["deployment_history_success_rate"] = deployment_history_success_rate
+
+        score = max(0.0, score)
+
+        return ScoreResult(
+            category="deployment",
+            score=score,
+            level=_score_level(score),
+            message=f"Deployment: {score:.1f}/100",
+            details=details,
+            recommendations=recommendations,
+        )

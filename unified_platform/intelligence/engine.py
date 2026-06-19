@@ -14,6 +14,7 @@ from typing import Any
 from unified_platform.intelligence.scores import (
     BackupScoreCalculator,
     DataIntegrityScoreCalculator,
+    DeploymentScoreCalculator,
     HealthScoreCalculator,
     PerformanceScoreCalculator,
     RecoveryScoreCalculator,
@@ -22,12 +23,13 @@ from unified_platform.intelligence.scores import (
     ScoreResult,
     SecurityScoreCalculator,
     SyncScoreCalculator,
+    UserExperienceScoreCalculator,
 )
 
 
 @dataclass
 class IntelligenceReport:
-    """Aggregated intelligence report with all 8 scores."""
+    """Aggregated intelligence report with all 10 scores."""
     health: ScoreResult
     reliability: ScoreResult
     security: ScoreResult
@@ -36,6 +38,8 @@ class IntelligenceReport:
     synchronization: ScoreResult
     data_integrity: ScoreResult
     performance: ScoreResult
+    user_experience: ScoreResult
+    deployment: ScoreResult
     overall_score: float = 0.0
     overall_level: ScoreLevel = ScoreLevel.GOOD
     critical_recommendations: list[str] = field(default_factory=list)
@@ -51,6 +55,8 @@ class IntelligenceReport:
             self.synchronization.score,
             self.data_integrity.score,
             self.performance.score,
+            self.user_experience.score,
+            self.deployment.score,
         ]
         self.overall_score = sum(scores) / len(scores)
         if self.overall_score >= 90:
@@ -67,7 +73,7 @@ class IntelligenceReport:
         # Collect all critical recommendations
         for score in [self.health, self.reliability, self.security, self.backup,
                       self.recovery, self.synchronization, self.data_integrity,
-                      self.performance]:
+                      self.performance, self.user_experience, self.deployment]:
             if score.level in (ScoreLevel.CRITICAL, ScoreLevel.LOW):
                 self.critical_recommendations.extend(score.recommendations)
 
@@ -84,6 +90,8 @@ class IntelligenceEngine:
         self._sync_calc = SyncScoreCalculator()
         self._integrity_calc = DataIntegrityScoreCalculator()
         self._performance_calc = PerformanceScoreCalculator()
+        self._ux_calc = UserExperienceScoreCalculator()
+        self._deployment_calc = DeploymentScoreCalculator()
         self._history: list[IntelligenceReport] = []
 
     def generate_report(
@@ -140,6 +148,20 @@ class IntelligenceEngine:
         p99_response_ms: float = 0.0,
         throughput_per_sec: float = 0.0,
         cache_hit_rate: float = 0.0,
+        # User experience params
+        response_time_ms: float = 0.0,
+        error_rate_percent: float = 0.0,
+        task_completion_rate: float = 0.0,
+        user_satisfaction: float = 0.0,
+        load_time_ms: float = 0.0,
+        # Deployment params
+        test_pass_rate: float = 1.0,
+        coverage_percent: float = 100.0,
+        lint_errors: int = 0,
+        security_findings_high: int = 0,
+        security_findings_critical: int = 0,
+        rollback_available: bool = True,
+        deployment_history_success_rate: float = 1.0,
     ) -> IntelligenceReport:
         """Generate a full intelligence report."""
         health = self._health_calc.calculate(
@@ -210,6 +232,24 @@ class IntelligenceEngine:
             cache_hit_rate=cache_hit_rate,
         )
 
+        user_experience = self._ux_calc.calculate(
+            response_time_ms=response_time_ms,
+            error_rate_percent=error_rate_percent,
+            task_completion_rate=task_completion_rate,
+            user_satisfaction=user_satisfaction,
+            load_time_ms=load_time_ms,
+        )
+
+        deployment = self._deployment_calc.calculate(
+            test_pass_rate=test_pass_rate,
+            coverage_percent=coverage_percent,
+            lint_errors=lint_errors,
+            security_findings_high=security_findings_high,
+            security_findings_critical=security_findings_critical,
+            rollback_available=rollback_available,
+            deployment_history_success_rate=deployment_history_success_rate,
+        )
+
         report = IntelligenceReport(
             health=health,
             reliability=reliability,
@@ -219,6 +259,8 @@ class IntelligenceEngine:
             synchronization=synchronization,
             data_integrity=data_integrity,
             performance=performance,
+            user_experience=user_experience,
+            deployment=deployment,
         )
 
         self._history.append(report)
@@ -254,6 +296,8 @@ class IntelligenceEngine:
                 "synchronization": {"score": latest.synchronization.score, "level": latest.synchronization.level.value},
                 "data_integrity": {"score": latest.data_integrity.score, "level": latest.data_integrity.level.value},
                 "performance": {"score": latest.performance.score, "level": latest.performance.level.value},
+                "user_experience": {"score": latest.user_experience.score, "level": latest.user_experience.level.value},
+                "deployment": {"score": latest.deployment.score, "level": latest.deployment.level.value},
             },
             "critical_recommendations": latest.critical_recommendations,
             "report_count": len(self._history),

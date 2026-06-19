@@ -23,6 +23,9 @@ class AIRecommendationType(Enum):
     RECOVERY = "recovery"
     CAPACITY = "capacity"
     RISK_PREDICTION = "risk_prediction"
+    ARCHITECTURE = "architecture"
+    TECHNICAL_DEBT = "technical_debt"
+    DEPLOYMENT_READINESS = "deployment_readiness"
 
 
 class ConfidenceLevel(Enum):
