@@ -5,8 +5,6 @@ import sqlite3
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -15,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 ADMIN_USER = {"id": 1, "username": "admin", "role": "Admin", "status": "Active"}
 
 # Save the ORIGINAL db_path at import time, before any test can modify it
-import lab_system.app.settings.config as _cfg
+import lab_system.app.settings.config as _cfg  # noqa: E402
 _ORIGINAL_DB_PATH = _cfg.CONFIG.db_path
 
 
@@ -273,7 +271,6 @@ class TestRecoveryServiceCoverage:
             _validate_path_in_dir(f, d)
 
     def test_detect_corruption(self, fresh_db):
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import detect_corruption
         with _patch_db(fresh_db):
             result = detect_corruption()
@@ -317,7 +314,6 @@ class TestRecoveryServiceCoverage:
 class TestDatabaseModuleCoverage:
     def test_init_db(self, fresh_db):
         import lab_system.app.database.db as db_mod
-        from lab_system.app.settings import config as cfg_mod
         with _patch_db(fresh_db):
             db_mod.init_db()
             conn = sqlite3.connect(str(fresh_db))
@@ -672,7 +668,6 @@ class TestUserServiceCoverage:
 
 class TestAttachmentManagerCoverage:
     def test_save_attachment(self, fresh_db_with_data, tmp_path):
-        import lab_system.app.services.receipt_service as rs_mod
         with _patch_db(fresh_db_with_data):
             f = tmp_path / "test.pdf"
             f.write_bytes(b"%PDF-1.4 fake pdf content for testing")

@@ -260,7 +260,7 @@ class TestMissingWALFile:
 
         # Verify - committed data should survive, DB should remain accessible
         conn2 = sqlite3.connect(str(fresh_db))
-        row = conn2.execute("SELECT value FROM meta WHERE key='committed'").fetchone()
+        _row = conn2.execute("SELECT value FROM meta WHERE key='committed'").fetchone()
         count = conn2.execute("SELECT COUNT(*) FROM meta").fetchone()[0]
         conn2.close()
         assert count >= 0, "Database should remain accessible after WAL deletion"
@@ -291,7 +291,7 @@ class TestMissingIndexes:
         conn.commit()
 
         # Verify indexes are gone
-        remaining = conn.execute(
+        _remaining = conn.execute(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND sql IS NOT NULL"
         ).fetchone()[0]
 
@@ -329,7 +329,7 @@ class TestMissingIndexes:
         rows = conn.execute(
             "SELECT r.* FROM receipts r JOIN receipt_items ri ON r.id = ri.receipt_id"
         ).fetchall()
-        elapsed = time.time() - start
+        _elapsed = time.time() - start
 
         conn.close()
         assert len(rows) > 0, "Queries should work without indexes"
@@ -729,9 +729,9 @@ class TestDatabaseLockHandling:
                 "INSERT INTO meta(key, value) VALUES('lock_test2', 'waiting')"
             )
             conn2.commit()
-            wait_result = "succeeded"
+            _wait_result = "succeeded"
         except sqlite3.OperationalError as e:
-            wait_result = f"failed: {e}"
+            _wait_result = f"failed: {e}"
         elapsed = time.time() - start
 
         conn.commit()
@@ -860,7 +860,7 @@ class TestTransactionIsolation:
         conn2.commit()
 
         # Now conn1 SHOULD see it (in WAL, after snapshot refresh)
-        count3 = conn1.execute("SELECT COUNT(*) FROM meta").fetchone()[0]
+        _count3 = conn1.execute("SELECT COUNT(*) FROM meta").fetchone()[0]
 
         conn1.close()
         conn2.close()
@@ -1104,7 +1104,7 @@ class TestFTSRebuild:
             conn.execute("DELETE FROM receipts_fts")
             conn.commit()
 
-            count_after_corrupt = conn.execute(
+            _count_after_corrupt = conn.execute(
                 "SELECT COUNT(*) FROM receipts_fts"
             ).fetchone()[0]
 
