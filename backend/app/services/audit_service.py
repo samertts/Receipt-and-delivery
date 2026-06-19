@@ -18,4 +18,6 @@ class AuditService:
         limit: int = 50,
         action_type: str = "",
     ) -> tuple[list, int]:
-        return self.repo.list_with_filters(page=page, limit=limit, action_type=action_type)
+        return self.repo.list_with_filters(
+            page=page, limit=limit, action_type=action_type
+        )

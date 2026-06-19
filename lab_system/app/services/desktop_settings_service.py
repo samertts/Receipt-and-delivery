@@ -15,7 +15,9 @@ class DesktopSettingsService:
         return row["value"] if row else default
 
     def set(self, key: str, value: str) -> None:
-        self._repo.execute("INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)", (key, value))
+        self._repo.execute(
+            "INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)", (key, value)
+        )
 
     def get_all(self) -> dict[str, str]:
         result = {}

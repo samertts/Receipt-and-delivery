@@ -33,31 +33,31 @@ async def upload_attachment(
     transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
     if not transaction:
         raise HTTPException(status_code=404, detail="المعاملة غير موجودة")
-    
+
     # Validate file type
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="نوع الملف غير مدعوم")
-    
+
     # Read file content
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="حجم الملف يتجاوز 50 ميغابايت")
-    
+
     # Generate unique filename
     file_ext = ALLOWED_TYPES[file.content_type]
     storage_name = f"{uuid.uuid4()}{file_ext}"
-    
+
     # Create upload directory if it doesn't exist
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    
+
     # Save file
     file_path = os.path.join(UPLOAD_DIR, storage_name)
     with open(file_path, "wb") as f:
         f.write(content)
-    
+
     # Compute hash
     sha256_hash = hashlib.sha256(content).hexdigest()
-    
+
     # Create database record
     attachment = Attachment(
         transaction_id=transaction_id,
@@ -71,7 +71,7 @@ async def upload_attachment(
     db.add(attachment)
     db.commit()
     db.refresh(attachment)
-    
+
     return {
         "id": str(attachment.id),
         "original_name": attachment.original_name,
@@ -89,13 +89,21 @@ async def download_attachment(
     attachment = db.query(Attachment).filter(Attachment.id == attachment_id).first()
     if not attachment:
         raise HTTPException(status_code=404, detail="المرفق غير موجود")
-    
-    if not os.path.exists(attachment.path):
+
+    from pathlib import Path
+
+    resolved_path = Path(attachment.path).resolve()
+    upload_dir = Path("uploads/attachments").resolve()
+    if not str(resolved_path).startswith(str(upload_dir)):
+        raise HTTPException(status_code=403, detail="مرفوض")
+
+    if not resolved_path.exists():
         raise HTTPException(status_code=404, detail="ملف المرفق غير موجود")
-    
+
     from fastapi.responses import FileResponse
+
     return FileResponse(
-        path=attachment.path,
+        path=str(resolved_path),
         filename=attachment.original_name,
         media_type=attachment.content_type,
     )

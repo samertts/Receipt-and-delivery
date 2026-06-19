@@ -19,7 +19,12 @@ def _create_test_db():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
 
-    schema = open(os.path.join(os.path.dirname(__file__), "..", "lab_system", "app", "database", "db.py"), "r").read()
+    schema = open(
+        os.path.join(
+            os.path.dirname(__file__), "..", "lab_system", "app", "database", "db.py"
+        ),
+        "r",
+    ).read()
     # Extract SCHEMA variable
     exec(schema, globals_ := {})
 
@@ -69,10 +74,18 @@ class TestReceiptService:
         import pytest
 
         from lab_system.app.services.receipt_service import create_receipt
+
         bad = [
-            {"sample_type_id": 1, "total_count": 10, "valid_count": 8,
-             "damaged_count": 1, "rejected_count": 0, "non_conforming_count": 0,
-             "transport_condition": "Good", "notes": ""},
+            {
+                "sample_type_id": 1,
+                "total_count": 10,
+                "valid_count": 8,
+                "damaged_count": 1,
+                "rejected_count": 0,
+                "non_conforming_count": 0,
+                "transport_condition": "Good",
+                "notes": "",
+            },
         ]
         with pytest.raises(ValueError, match="Invalid item totals"):
             create_receipt({}, bad, 1, user=ADMIN_USER)
@@ -84,6 +97,7 @@ class TestOrganizationService:
             list_organizations,
             upsert_organization,
         )
+
         # Test won't fully execute due to DB dependency
         # but we can verify the functions exist
         assert callable(list_organizations)

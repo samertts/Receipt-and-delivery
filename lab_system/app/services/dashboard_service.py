@@ -25,7 +25,8 @@ class DashboardService:
                 "SELECT COUNT(*) FROM receipts WHERE date(created_at) >= ?", (week_ago,)
             ),
             "month_count": self._repo.count(
-                "SELECT COUNT(*) FROM receipts WHERE date(created_at) >= ?", (month_ago,)
+                "SELECT COUNT(*) FROM receipts WHERE date(created_at) >= ?",
+                (month_ago,),
             ),
             "pending": self._repo.count(
                 "SELECT COUNT(*) FROM receipts WHERE status = 'Draft'"

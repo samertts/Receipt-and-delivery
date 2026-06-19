@@ -104,7 +104,7 @@ class APIClient:
                     )
             except urllib.error.HTTPError as e:
                 if e.code >= 500 and attempt < max_retries - 1:
-                    wait_time = (2 ** attempt) + random.uniform(0, 1)
+                    wait_time = (2**attempt) + random.uniform(0, 1)
                     time.sleep(wait_time)
                     continue
                 resp_body = e.read().decode("utf-8", errors="replace")
@@ -122,7 +122,7 @@ class APIClient:
                 )
             except urllib.error.URLError as e:
                 if attempt < max_retries - 1:
-                    wait_time = (2 ** attempt) + random.uniform(0, 1)
+                    wait_time = (2**attempt) + random.uniform(0, 1)
                     time.sleep(wait_time)
                     continue
                 return SyncResponse(
@@ -136,7 +136,9 @@ class APIClient:
                     status_code=0,
                     message=str(e),
                 )
-        return SyncResponse(success=False, status_code=0, message="Max retries exceeded")
+        return SyncResponse(
+            success=False, status_code=0, message="Max retries exceeded"
+        )
 
 
 api_client = APIClient()

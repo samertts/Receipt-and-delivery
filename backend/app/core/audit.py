@@ -68,14 +68,20 @@ def log_audit(
 
 
 def verify_audit_chain(db: Session) -> tuple[bool, int, str]:
-    entries = db.query(AuditLog).order_by(AuditLog.created_at.asc(), AuditLog.id.asc()).all()
+    entries = (
+        db.query(AuditLog).order_by(AuditLog.created_at.asc(), AuditLog.id.asc()).all()
+    )
     for i, entry in enumerate(entries):
         expected_prev = ""
         if i > 0:
             prev = entries[i - 1]
             expected_prev = AuditLog.compute_hash(
-                str(prev.id), prev.user_id, prev.action_type,
-                prev.ip_address, prev.details, prev.prev_hash or "",
+                str(prev.id),
+                prev.user_id,
+                prev.action_type,
+                prev.ip_address,
+                prev.details,
+                prev.prev_hash or "",
             )
         if (entry.prev_hash or "") != expected_prev:
             return False, i, f"Hash mismatch at row {entry.id}"

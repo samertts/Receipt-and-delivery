@@ -16,10 +16,15 @@ logger = setup_file_logging(STORAGE_DIR / "logs", "INFO")
 
 
 EXPECTED_INDEXES = {
-    "idx_receipts_no", "idx_receipts_created", "idx_org_code",
-    "idx_items_sample", "idx_users_username",
-    "idx_receipts_deleted", "idx_receipts_status_created",
-    "idx_sync_status", "idx_sync_entity",
+    "idx_receipts_no",
+    "idx_receipts_created",
+    "idx_org_code",
+    "idx_items_sample",
+    "idx_users_username",
+    "idx_receipts_deleted",
+    "idx_receipts_status_created",
+    "idx_sync_status",
+    "idx_sync_entity",
     "idx_login_attempts_user",
 }
 
@@ -33,12 +38,18 @@ def check_indexes() -> dict:
         conn = sqlite3.connect(str(db_path))
         conn.execute("PRAGMA busy_timeout = 3000;")
         try:
-            rows = conn.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL;").fetchall()
+            rows = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL;"
+            ).fetchall()
             present = {row[0] for row in rows}
             missing = EXPECTED_INDEXES - present
         finally:
             conn.close()
-        return {"ok": len(missing) == 0, "present": sorted(present), "missing": sorted(missing)}
+        return {
+            "ok": len(missing) == 0,
+            "present": sorted(present),
+            "missing": sorted(missing),
+        }
     except Exception as e:
         return {"ok": False, "errors": [str(e)]}
 
@@ -83,9 +94,19 @@ def check_integrity() -> dict:
 def check_folders() -> dict:
     """Verify all required storage folders exist, create if missing."""
     required = [
-        "database", "attachments", "logs", "backups", "exports",
-        "settings", "templates", "recovery", "diagnostics",
-        "migrations", "updates", "temp", "receipts",
+        "database",
+        "attachments",
+        "logs",
+        "backups",
+        "exports",
+        "settings",
+        "templates",
+        "recovery",
+        "diagnostics",
+        "migrations",
+        "updates",
+        "temp",
+        "receipts",
     ]
     created = []
     missing = []
@@ -105,6 +126,7 @@ def check_network(host: str = "https://google.com", timeout: int = 5) -> dict:
     result = {"reachable": False, "latency_ms": 0, "error": ""}
     try:
         import time
+
         start = time.time()
         req = urllib.request.Request(host, method="HEAD")
         with urllib.request.urlopen(req, timeout=timeout):

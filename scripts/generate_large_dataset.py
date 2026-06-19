@@ -29,23 +29,66 @@ NUM_RECEIPTS = 10_000
 # items will be ~10 per receipt
 
 GOVERNORATES = [
-    "بغداد", "نينوى", "البصرة", "أربيل", "كركوك", "النجف", "كربلاء",
-    "السليمانية", "دهوك", "بابل", "ميسان", "القادسية", "واسط",
-    "صلاح الدين", "الأنبار", "المثنى", "ذي قار", "حلبجة",
+    "بغداد",
+    "نينوى",
+    "البصرة",
+    "أربيل",
+    "كركوك",
+    "النجف",
+    "كربلاء",
+    "السليمانية",
+    "دهوك",
+    "بابل",
+    "ميسان",
+    "القادسية",
+    "واسط",
+    "صلاح الدين",
+    "الأنبار",
+    "المثنى",
+    "ذي قار",
+    "حلبجة",
 ]
 
 ORG_TYPES = [
-    "Public Health Laboratory", "Hospital Laboratory", "Private Laboratory",
-    "Blood Bank", "Research Center",
+    "Public Health Laboratory",
+    "Hospital Laboratory",
+    "Private Laboratory",
+    "Blood Bank",
+    "Research Center",
 ]
 
-STATUSES = ["Draft", "Approved", "Approved", "Approved", "Rejected", "Archived", "Cancelled"]
+STATUSES = [
+    "Draft",
+    "Approved",
+    "Approved",
+    "Approved",
+    "Rejected",
+    "Archived",
+    "Cancelled",
+]
 USER_ROLES = ["Admin", "Supervisor", "User", "Auditor"]
 
 IRAQI_NAMES = [
-    "أحمد", "علي", "محمد", "حسن", "حسين", "مصطفى", "عبدالله", "كريم",
-    "جعفر", "مهدي", "هادي", "عباس", "نور", "زهراء", "فاطمة", "مريم",
-    "سارة", "رقية", "زينب", "خديجة",
+    "أحمد",
+    "علي",
+    "محمد",
+    "حسن",
+    "حسين",
+    "مصطفى",
+    "عبدالله",
+    "كريم",
+    "جعفر",
+    "مهدي",
+    "هادي",
+    "عباس",
+    "نور",
+    "زهراء",
+    "فاطمة",
+    "مريم",
+    "سارة",
+    "رقية",
+    "زينب",
+    "خديجة",
 ]
 
 SAMPLE_NAMES = [
@@ -89,13 +132,20 @@ def generate(db_path: str) -> dict:
     print(f"[2/6] Inserting {NUM_ORGS} organizations ...")
     org_ids = []
     for i in range(NUM_ORGS):
-        name = f"مختبر {i+1:03d}"
-        code = f"LAB-{i+1:05d}"
+        name = f"مختبر {i + 1:03d}"
+        code = f"LAB-{i + 1:05d}"
         org_type = random.choice(ORG_TYPES)
         gov = random.choice(GOVERNORATES)
         cur.execute(
             "INSERT INTO organizations(name, code, org_type, governorate, address, phone, status) VALUES(?,?,?,?,?,?,'Active')",
-            (name, code, org_type, gov, gov, f"+964{random.randint(7000000000, 7999999999)}"),
+            (
+                name,
+                code,
+                org_type,
+                gov,
+                gov,
+                f"+964{random.randint(7000000000, 7999999999)}",
+            ),
         )
         org_ids.append(cur.lastrowid)
     conn.commit()
@@ -103,20 +153,24 @@ def generate(db_path: str) -> dict:
     print("[3/6] Inserting transaction_types & sample_types ...")
     for name in TX_TYPES:
         cur.execute("INSERT OR IGNORE INTO transaction_types(name) VALUES(?)", (name,))
-    tx_type_ids = [r["id"] for r in cur.execute("SELECT id FROM transaction_types").fetchall()]
+    tx_type_ids = [
+        r["id"] for r in cur.execute("SELECT id FROM transaction_types").fetchall()
+    ]
     for name, cat in SAMPLE_NAMES:
         cur.execute(
             "INSERT OR IGNORE INTO sample_types(name, category, status) VALUES(?,?,'Active')",
             (name, cat),
         )
-    sample_type_ids = [r["id"] for r in cur.execute("SELECT id FROM sample_types").fetchall()]
+    sample_type_ids = [
+        r["id"] for r in cur.execute("SELECT id FROM sample_types").fetchall()
+    ]
     conn.commit()
 
     print(f"[4/6] Inserting {NUM_USERS} users ...")
     user_ids = []
     for i in range(NUM_USERS):
         full_name = f"{random.choice(IRAQI_NAMES)} {random.choice(IRAQI_NAMES)}"
-        username = f"user_{i+1:03d}"
+        username = f"user_{i + 1:03d}"
         role = random.choice(USER_ROLES)
         inst = random.choice(org_ids)
         now = datetime.now().isoformat(timespec="seconds")
@@ -139,7 +193,7 @@ def generate(db_path: str) -> dict:
         items_batch = []
         for r in range(batch_start, batch_end):
             created = _ts(date_start, date_end)
-            receipt_no = f"REC-{r+1:06d}"
+            receipt_no = f"REC-{r + 1:06d}"
             tx_id = random.choice(tx_type_ids)
             snd = random.choice(org_ids)
             rcv = random.choice(org_ids)
@@ -161,14 +215,18 @@ def generate(db_path: str) -> dict:
                 damaged = random.randint(0, max(0, total - valid))
                 rejected = random.randint(0, max(0, total - valid - damaged))
                 non_conf = random.randint(0, max(0, total - valid - damaged - rejected))
-                items_batch.append((rid, st_id, total, valid, damaged, rejected, non_conf))
+                items_batch.append(
+                    (rid, st_id, total, valid, damaged, rejected, non_conf)
+                )
                 items_count += 1
         cur.executemany(
             "INSERT INTO receipt_items(receipt_id, sample_type_id, total_count, valid_count, damaged_count, rejected_count, non_conforming_count) VALUES(?,?,?,?,?,?,?)",
             items_batch,
         )
         conn.commit()
-        print(f"   receipts {batch_start+1}–{batch_end} / {NUM_RECEIPTS}  (items: ~{items_count})")
+        print(
+            f"   receipts {batch_start + 1}–{batch_end} / {NUM_RECEIPTS}  (items: ~{items_count})"
+        )
 
     print("[6/6] Rebuilding FTS indexes ...")
     cur.execute("DELETE FROM receipts_fts;")
@@ -196,5 +254,7 @@ def generate(db_path: str) -> dict:
 if __name__ == "__main__":
     db_path = sys.argv[1] if len(sys.argv) > 1 else "/tmp/lab_large_dataset.db"
     result = generate(db_path)
-    print(f"\nDone! Generated {result['receipts']} receipts, {result['items']} items in {result['elapsed_seconds']}s")
+    print(
+        f"\nDone! Generated {result['receipts']} receipts, {result['items']} items in {result['elapsed_seconds']}s"
+    )
     print(f"Database: {result['db_path']}")

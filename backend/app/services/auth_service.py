@@ -28,7 +28,9 @@ class AuthService:
         self.db = db
         self.user_repo = UserRepository(db)
 
-    def login(self, username: str, password: str, request: Any = None) -> dict[str, Any]:
+    def login(
+        self, username: str, password: str, request: Any = None
+    ) -> dict[str, Any]:
         user = self.user_repo.find_by_username(username)
         if not user or not verify_password(password, user.password_hash):
             log_audit(
@@ -135,14 +137,23 @@ class AuthService:
         )
 
     def _token_blacklisted(self, token: str) -> bool:
-        return self.db.query(BlacklistedToken).filter(
-            BlacklistedToken.token == token,
-        ).first() is not None
+        return (
+            self.db.query(BlacklistedToken)
+            .filter(
+                BlacklistedToken.token == token,
+            )
+            .first()
+            is not None
+        )
 
     def _blacklist_token(self, token: str, expires_at: datetime | None = None) -> None:
-        existing = self.db.query(BlacklistedToken).filter(
-            BlacklistedToken.token == token,
-        ).first()
+        existing = (
+            self.db.query(BlacklistedToken)
+            .filter(
+                BlacklistedToken.token == token,
+            )
+            .first()
+        )
         if existing:
             return
         if expires_at is None:
@@ -174,10 +185,14 @@ class AuthService:
     @staticmethod
     def purge_expired_blacklisted_tokens(db: Session) -> int:
         now = datetime.now(timezone.utc)
-        deleted = db.query(BlacklistedToken).filter(
-            BlacklistedToken.expires_at.isnot(None),
-            BlacklistedToken.expires_at < now,
-        ).delete(synchronize_session=False)
+        deleted = (
+            db.query(BlacklistedToken)
+            .filter(
+                BlacklistedToken.expires_at.isnot(None),
+                BlacklistedToken.expires_at < now,
+            )
+            .delete(synchronize_session=False)
+        )
         if deleted:
             db.commit()
         return deleted

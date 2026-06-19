@@ -28,7 +28,9 @@ class UserService:
         filters = {}
         if role:
             filters["role"] = role
-        return self.repo.list(page=page, limit=limit, filters=filters, order_by="created_at", desc=True)
+        return self.repo.list(
+            page=page, limit=limit, filters=filters, order_by="created_at", desc=True
+        )
 
     def create_user(
         self,
@@ -82,7 +84,12 @@ class UserService:
         if not user:
             raise NotFoundError("المستخدم غير موجود")
 
-        if current_user and str(user.id) == str(current_user.id) and role is not None and role != current_user.role:
+        if (
+            current_user
+            and str(user.id) == str(current_user.id)
+            and role is not None
+            and role != current_user.role
+        ):
             raise ValidationError("لا يمكن تغيير صلاحية المستخدم الحالي")
 
         update_kwargs = {}
@@ -121,7 +128,11 @@ class UserService:
             raise ValidationError("لا يمكن حذف المستخدم الحالي")
 
         if user.role == "admin":
-            admin_count = self.db.query(User).filter(User.role == "admin", User.status == "active").count()
+            admin_count = (
+                self.db.query(User)
+                .filter(User.role == "admin", User.status == "active")
+                .count()
+            )
             if admin_count <= 1:
                 raise ValidationError("لا يمكن حذف آخر مدير نظام")
 

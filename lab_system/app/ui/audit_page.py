@@ -23,11 +23,15 @@ class AuditPage(QWidget):
         header = PageHeader("سجل التدقيق", "جميع عمليات النظام المسجلة")
         self.layout().addWidget(header)
 
-        header.add_action("تحديث", self.refresh, variant="secondary", tooltip="تحديث (F5)")
+        header.add_action(
+            "تحديث", self.refresh, variant="secondary", tooltip="تحديث (F5)"
+        )
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["الوقت", "المستخدم", "الإجراء", "الجهاز", "التفاصيل"])
+        self.table.setHorizontalHeaderLabels(
+            ["الوقت", "المستخدم", "الإجراء", "الجهاز", "التفاصيل"]
+        )
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setAlternatingRowColors(True)

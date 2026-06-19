@@ -54,7 +54,7 @@ class SettingsPage(QWidget):
         return labels.get(key, key)
 
     def _save(self):
-        check_permission(self.current_user, 'settings.update')
+        check_permission(self.current_user, "settings.update")
         settings = {key: inp.text() for key, inp in self.fields.items()}
         self._settings_svc.set_all(settings)
         log_action(self.current_user["id"], "settings_updated", "تحديث إعدادات النظام")

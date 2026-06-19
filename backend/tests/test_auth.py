@@ -26,6 +26,7 @@ class TestTokenCreation:
 
     def test_token_with_refresh(self):
         from app.services.security import create_refresh_token
+
         token = create_refresh_token(sub="admin")
         assert isinstance(token, str)
         assert len(token) > 20

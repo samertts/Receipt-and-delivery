@@ -10,7 +10,9 @@ from app.models.common import TimestampMixin, UUIDMixin
 class TransactionItem(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "transaction_items"
 
-    transaction_id: Mapped[str] = mapped_column(ForeignKey("transactions.id"), index=True)
+    transaction_id: Mapped[str] = mapped_column(
+        ForeignKey("transactions.id"), index=True
+    )
     sample_type: Mapped[str] = mapped_column(String(80), index=True)
     total_count: Mapped[int] = mapped_column(Integer)
     valid_count: Mapped[int] = mapped_column(Integer)
@@ -21,6 +23,6 @@ class TransactionItem(UUIDMixin, TimestampMixin, Base):
     notes: Mapped[str] = mapped_column(Text, default="")
 
     transaction: Mapped["Transaction"] = relationship(  # noqa: F821
-        "Transaction", back_populates="items",
+        "Transaction",
+        back_populates="items",
     )
-

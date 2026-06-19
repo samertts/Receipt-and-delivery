@@ -72,7 +72,9 @@ def build_schema_for_version(version):
     # Apply migrations that were present at this version
     # Version N should have migrations v1 through vN applied
     if version >= 2:
-        schema += "ALTER TABLE receipts ADD COLUMN additional_comments TEXT DEFAULT '';\n"
+        schema += (
+            "ALTER TABLE receipts ADD COLUMN additional_comments TEXT DEFAULT '';\n"
+        )
     if version >= 3:
         schema += "ALTER TABLE attachments ADD COLUMN thumbnail_path TEXT DEFAULT '';\n"
     if version >= 5:
@@ -189,101 +191,208 @@ for target in range(1, _db.SCHEMA_VERSION):
         conn.executescript(build_schema_for_version(target))
 
         # Insert test data
-        conn.execute("INSERT INTO organizations(name, code, status) VALUES('Test Org', 'TST-001', 'Active')")
-        conn.execute("INSERT INTO users(full_name, username, password_hash, role, institution_id, status) VALUES('Test User', 'testuser', 'hash', 'User', 1, 'Active')")
+        conn.execute(
+            "INSERT INTO organizations(name, code, status) VALUES('Test Org', 'TST-001', 'Active')"
+        )
+        conn.execute(
+            "INSERT INTO users(full_name, username, password_hash, role, institution_id, status) VALUES('Test User', 'testuser', 'hash', 'User', 1, 'Active')"
+        )
         conn.execute("INSERT INTO transaction_types(name) VALUES('Test Type')")
-        conn.execute("INSERT INTO sample_types(name, status) VALUES('Test Sample', 'Active')")
-        conn.execute("INSERT INTO receipts(receipt_no, tx_type_id, sender_org_id, receiver_org_id, sender_name, receiver_name, created_at, status, created_by) VALUES('TEST-001',1,1,1,'Sender','Receiver','2024-01-01T00:00:00','Draft',1)")
-        conn.execute("INSERT INTO receipt_items(receipt_id, sample_type_id, total_count, valid_count, damaged_count, rejected_count, non_conforming_count) VALUES(1,1,100,90,5,3,2)")
-        conn.execute("INSERT INTO attachments(receipt_id, file_path, file_type, file_hash, file_size, category, created_at) VALUES(1,'/tmp/test.pdf','pdf','hash123',1000,'document','2024-01-01T00:00:00')")
+        conn.execute(
+            "INSERT INTO sample_types(name, status) VALUES('Test Sample', 'Active')"
+        )
+        conn.execute(
+            "INSERT INTO receipts(receipt_no, tx_type_id, sender_org_id, receiver_org_id, sender_name, receiver_name, created_at, status, created_by) VALUES('TEST-001',1,1,1,'Sender','Receiver','2024-01-01T00:00:00','Draft',1)"
+        )
+        conn.execute(
+            "INSERT INTO receipt_items(receipt_id, sample_type_id, total_count, valid_count, damaged_count, rejected_count, non_conforming_count) VALUES(1,1,100,90,5,3,2)"
+        )
+        conn.execute(
+            "INSERT INTO attachments(receipt_id, file_path, file_type, file_hash, file_size, category, created_at) VALUES(1,'/tmp/test.pdf','pdf','hash123',1000,'document','2024-01-01T00:00:00')"
+        )
 
         if target >= 2:
-            conn.execute("UPDATE receipts SET additional_comments = 'v2_test' WHERE id=1")
+            conn.execute(
+                "UPDATE receipts SET additional_comments = 'v2_test' WHERE id=1"
+            )
         if target >= 3:
-            conn.execute("UPDATE attachments SET thumbnail_path = '/tmp/thumb.jpg' WHERE id=1")
+            conn.execute(
+                "UPDATE attachments SET thumbnail_path = '/tmp/thumb.jpg' WHERE id=1"
+            )
         if target >= 5:
-            conn.execute("INSERT INTO sync_queue(entity_type, entity_id, action, created_at) VALUES('receipt',1,'create','2024-01-01T00:00:00')")
+            conn.execute(
+                "INSERT INTO sync_queue(entity_type, entity_id, action, created_at) VALUES('receipt',1,'create','2024-01-01T00:00:00')"
+            )
         if target >= 6:
-            conn.execute("INSERT INTO login_attempts(username, success, attempted_at) VALUES('testuser',1,'2024-01-01T00:00:00')")
+            conn.execute(
+                "INSERT INTO login_attempts(username, success, attempted_at) VALUES('testuser',1,'2024-01-01T00:00:00')"
+            )
         if target >= 8:
-            conn.execute("INSERT INTO receipt_history(receipt_id, field_name, old_value, new_value, changed_by, changed_at) VALUES(1,'status','Draft','Approved',1,'2024-01-01T00:00:00')")
+            conn.execute(
+                "INSERT INTO receipt_history(receipt_id, field_name, old_value, new_value, changed_by, changed_at) VALUES(1,'status','Draft','Approved',1,'2024-01-01T00:00:00')"
+            )
 
         # Set version metadata to target
-        conn.execute("INSERT INTO meta(key,value) VALUES('schema_version',?)", (str(target),))
-        conn.execute("INSERT INTO schema_version(id,version,app_version,updated_at) VALUES(1,?,?,'2024-01-01T00:00:00')", (target, '0.0.0'))
+        conn.execute(
+            "INSERT INTO meta(key,value) VALUES('schema_version',?)", (str(target),)
+        )
+        conn.execute(
+            "INSERT INTO schema_version(id,version,app_version,updated_at) VALUES(1,?,?,'2024-01-01T00:00:00')",
+            (target, "0.0.0"),
+        )
         conn.commit()
         conn.close()
 
         # Run init_db to upgrade to current
         orig_path = _db.CONFIG.db_path
-        object.__setattr__(_db.CONFIG, 'db_path', Path(db_path))
+        object.__setattr__(_db.CONFIG, "db_path", Path(db_path))
         try:
             _db.init_db()
         finally:
-            object.__setattr__(_db.CONFIG, 'db_path', orig_path)
+            object.__setattr__(_db.CONFIG, "db_path", orig_path)
 
         # Verify
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON;")
 
-        schema_ver = conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
-        ok(schema_ver and int(schema_ver[0]) == _db.SCHEMA_VERSION, f"{label}: schema_version = {_db.SCHEMA_VERSION}")
+        schema_ver = conn.execute(
+            "SELECT value FROM meta WHERE key='schema_version'"
+        ).fetchone()
+        ok(
+            schema_ver and int(schema_ver[0]) == _db.SCHEMA_VERSION,
+            f"{label}: schema_version = {_db.SCHEMA_VERSION}",
+        )
 
-        tables = {r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' AND name NOT LIKE '_new%'").fetchall()}
-        want = {'meta','organizations','users','transaction_types','sample_types','templates','receipts','receipt_items','attachments','settings','schema_version','migration_history','migration_lock','backups','audit_logs','login_attempts','sync_queue','receipt_history'}
+        tables = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' AND name NOT LIKE '_new%'"
+            ).fetchall()
+        }
+        want = {
+            "meta",
+            "organizations",
+            "users",
+            "transaction_types",
+            "sample_types",
+            "templates",
+            "receipts",
+            "receipt_items",
+            "attachments",
+            "settings",
+            "schema_version",
+            "migration_history",
+            "migration_lock",
+            "backups",
+            "audit_logs",
+            "login_attempts",
+            "sync_queue",
+            "receipt_history",
+        }
         for t in want:
             ok(t in tables, f"{label}: table '{t}'")
 
-        rc = col_set(conn, 'receipts')
-        ok('additional_comments' in rc, f"{label}: receipts.additional_comments")
-        ok('deleted_at' in rc, f"{label}: receipts.deleted_at")
-        ok('password_changed_at' in col_set(conn, 'users'), f"{label}: users.password_changed_at")
-        ok('thumbnail_path' in col_set(conn, 'attachments'), f"{label}: attachments.thumbnail_path")
+        rc = col_set(conn, "receipts")
+        ok("additional_comments" in rc, f"{label}: receipts.additional_comments")
+        ok("deleted_at" in rc, f"{label}: receipts.deleted_at")
+        ok(
+            "password_changed_at" in col_set(conn, "users"),
+            f"{label}: users.password_changed_at",
+        )
+        ok(
+            "thumbnail_path" in col_set(conn, "attachments"),
+            f"{label}: attachments.thumbnail_path",
+        )
 
-        fts = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%_fts'").fetchall()}
-        ok('receipts_fts' in fts, f"{label}: receipts_fts")
-        ok('organizations_fts' in fts, f"{label}: organizations_fts")
+        fts = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%_fts'"
+            ).fetchall()
+        }
+        ok("receipts_fts" in fts, f"{label}: receipts_fts")
+        ok("organizations_fts" in fts, f"{label}: organizations_fts")
 
-        idx = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL").fetchall()}
-        for ix in ['idx_sync_status','idx_sync_entity','idx_login_attempts_user','idx_receipts_no','idx_receipts_created','idx_items_sample','idx_org_code','idx_users_username','idx_receipts_status_created']:
+        idx = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL"
+            ).fetchall()
+        }
+        for ix in [
+            "idx_sync_status",
+            "idx_sync_entity",
+            "idx_login_attempts_user",
+            "idx_receipts_no",
+            "idx_receipts_created",
+            "idx_items_sample",
+            "idx_org_code",
+            "idx_users_username",
+            "idx_receipts_status_created",
+        ]:
             ok(ix in idx, f"{label}: index {ix}")
 
-        trig = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='trigger'").fetchall()}
-        for t in ['receipts_ai','receipts_ad','receipts_au','organizations_ai','organizations_ad','organizations_au']:
+        trig = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='trigger'"
+            ).fetchall()
+        }
+        for t in [
+            "receipts_ai",
+            "receipts_ad",
+            "receipts_au",
+            "organizations_ai",
+            "organizations_ad",
+            "organizations_au",
+        ]:
             ok(t in trig, f"{label}: trigger {t}")
 
-        org = conn.execute("SELECT name FROM organizations WHERE code='TST-001'").fetchone()
-        ok(org and org['name'] == 'Test Org', f"{label}: org data preserved")
+        org = conn.execute(
+            "SELECT name FROM organizations WHERE code='TST-001'"
+        ).fetchone()
+        ok(org and org["name"] == "Test Org", f"{label}: org data preserved")
 
-        rec = conn.execute("SELECT receipt_no FROM receipts WHERE receipt_no='TEST-001'").fetchone()
+        rec = conn.execute(
+            "SELECT receipt_no FROM receipts WHERE receipt_no='TEST-001'"
+        ).fetchone()
         ok(rec is not None, f"{label}: receipt data preserved")
 
-        item = conn.execute("SELECT total_count FROM receipt_items WHERE receipt_id=1").fetchone()
-        ok(item and item['total_count'] == 100, f"{label}: item data preserved")
+        item = conn.execute(
+            "SELECT total_count FROM receipt_items WHERE receipt_id=1"
+        ).fetchone()
+        ok(item and item["total_count"] == 100, f"{label}: item data preserved")
 
         if target >= 2:
-            comments = conn.execute("SELECT additional_comments FROM receipts WHERE id=1").fetchone()
-            ok(comments and comments[0] == 'v2_test', f"{label}: additional_comments data preserved")
+            comments = conn.execute(
+                "SELECT additional_comments FROM receipts WHERE id=1"
+            ).fetchone()
+            ok(
+                comments and comments[0] == "v2_test",
+                f"{label}: additional_comments data preserved",
+            )
 
         jm = conn.execute("PRAGMA journal_mode").fetchone()
-        ok(jm and jm[0] in ('wal', 'delete'), f"{label}: WAL mode")
+        ok(jm and jm[0] in ("wal", "delete"), f"{label}: WAL mode")
 
         fk = conn.execute("PRAGMA foreign_keys").fetchone()
         ok(fk and fk[0] == 1, f"{label}: foreign_keys ON")
 
-        lock = conn.execute("SELECT is_locked FROM migration_lock WHERE id=1").fetchone()
-        ok(lock and lock['is_locked'] == 0, f"{label}: migration lock released")
+        lock = conn.execute(
+            "SELECT is_locked FROM migration_lock WHERE id=1"
+        ).fetchone()
+        ok(lock and lock["is_locked"] == 0, f"{label}: migration lock released")
 
         conn.close()
         Path(db_path).unlink(missing_ok=True)
-        for s in ('-wal', '-shm'):
+        for s in ("-wal", "-shm"):
             Path(db_path + s).unlink(missing_ok=True)
 
     except Exception as e:
         errors.append(f"{label}: {e}")
         import traceback
+
         traceback.print_exc()
 
 elapsed = time.time() - start

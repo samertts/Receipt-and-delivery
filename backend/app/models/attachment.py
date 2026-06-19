@@ -10,7 +10,9 @@ from app.models.common import TimestampMixin, UUIDMixin
 class Attachment(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "attachments"
 
-    transaction_id: Mapped[str] = mapped_column(ForeignKey("transactions.id"), index=True)
+    transaction_id: Mapped[str] = mapped_column(
+        ForeignKey("transactions.id"), index=True
+    )
     original_name: Mapped[str] = mapped_column(String(255))
     storage_name: Mapped[str] = mapped_column(String(255), unique=True)
     content_type: Mapped[str] = mapped_column(String(100))
@@ -19,6 +21,6 @@ class Attachment(UUIDMixin, TimestampMixin, Base):
     path: Mapped[str] = mapped_column(String(255))
 
     transaction: Mapped["Transaction"] = relationship(  # noqa: F821
-        "Transaction", back_populates="attachments",
+        "Transaction",
+        back_populates="attachments",
     )
-

@@ -26,7 +26,10 @@ def list_organizations(
     svc = get_organization_service(db)
     items, total = svc.list_organizations(page=page, limit=limit)
     return paginated_response(
-        items=[OrganizationResponse.model_validate(o).model_dump(mode="json") for o in items],
+        items=[
+            OrganizationResponse.model_validate(o).model_dump(mode="json")
+            for o in items
+        ],
         total=total,
         page=page,
         per_page=limit,

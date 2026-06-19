@@ -124,15 +124,21 @@ class TestTransactionDeepUpdate:
             transaction_type="Test",
             sender_organization_id="00000000-0000-0000-0000-000000000001",
             receiver_organization_id="00000000-0000-0000-0000-000000000002",
-            sender_name="S", receiver_name="R",
-            transaction_date="2026-06-01", status="draft",
+            sender_name="S",
+            receiver_name="R",
+            transaction_date="2026-06-01",
+            status="draft",
         )
         db.add(txn)
         db.flush()
         item = TransactionItem(
-            transaction_id=str(txn.id), sample_type="Serum",
-            total_count=5, valid_count=5, damaged_count=0,
-            rejected_count=0, nonconforming_count=0,
+            transaction_id=str(txn.id),
+            sample_type="Serum",
+            total_count=5,
+            valid_count=5,
+            damaged_count=0,
+            rejected_count=0,
+            nonconforming_count=0,
             transport_condition="",
         )
         db.add(item)
@@ -163,15 +169,21 @@ class TestTransactionDeepUpdate:
             transaction_type="Test",
             sender_organization_id="00000000-0000-0000-0000-000000000001",
             receiver_organization_id="00000000-0000-0000-0000-000000000002",
-            sender_name="S", receiver_name="R",
-            transaction_date="2026-06-01", status="draft",
+            sender_name="S",
+            receiver_name="R",
+            transaction_date="2026-06-01",
+            status="draft",
         )
         db.add(txn)
         db.flush()
         item = TransactionItem(
-            transaction_id=str(txn.id), sample_type="Serum",
-            total_count=5, valid_count=5, damaged_count=0,
-            rejected_count=0, nonconforming_count=0,
+            transaction_id=str(txn.id),
+            sample_type="Serum",
+            total_count=5,
+            valid_count=5,
+            damaged_count=0,
+            rejected_count=0,
+            nonconforming_count=0,
             transport_condition="",
         )
         db.add(item)

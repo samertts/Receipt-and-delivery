@@ -21,7 +21,7 @@ class LoadingOverlay(QWidget):
         layout.setAlignment(Qt.AlignCenter)
         self._label = QLabel(text)
         self._label.setStyleSheet(f"""
-            color: {THEME['primary']}; font-size: 14pt;
+            color: {THEME["primary"]}; font-size: 14pt;
             font-weight: 600; background: transparent;
         """)
         self._label.setAlignment(Qt.AlignCenter)
@@ -53,7 +53,7 @@ class LoadingOverlay(QWidget):
         p.translate(center)
         p.rotate(self._angle)
 
-        colors = [THEME['primary'], THEME['secondary'], THEME['success']]
+        colors = [THEME["primary"], THEME["secondary"], THEME["success"]]
         for i, color_str in enumerate(colors):
             p.setBrush(QColor(color_str))
             p.setPen(Qt.NoPen)

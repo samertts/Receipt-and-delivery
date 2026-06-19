@@ -35,6 +35,7 @@ class MemoryRateLimiter:
     TODO: Implement Redis-backed or database-backed rate limiting for production.
     For now, the in-memory limiter provides basic protection.
     """
+
     def __init__(self, max_requests: int = 10, window_seconds: int = 60) -> None:
         self.max_requests = max_requests
         self.window_seconds = window_seconds
@@ -43,14 +44,18 @@ class MemoryRateLimiter:
 
     def is_rate_limited(self, key: str) -> bool:
         now = time.time()
-        self.requests[key] = [t for t in self.requests[key] if now - t < self.window_seconds]
+        self.requests[key] = [
+            t for t in self.requests[key] if now - t < self.window_seconds
+        ]
 
         # Periodic cleanup every 1000 requests
         self._cleanup_counter += 1
         if self._cleanup_counter >= 1000:
             self._cleanup_counter = 0
             cutoff = now - self.window_seconds
-            self.requests = {k: v for k, v in self.requests.items() if v and v[-1] > cutoff}
+            self.requests = {
+                k: v for k, v in self.requests.items() if v and v[-1] > cutoff
+            }
 
         if len(self.requests[key]) >= self.max_requests:
             return True
@@ -68,13 +73,22 @@ class RedisRateLimiter:
         if self._redis is None:
             try:
                 import redis as _redis
-                redis_url = settings.redis_url if hasattr(settings, "redis_url") else "redis://localhost:6379/0"
+
+                redis_url = (
+                    settings.redis_url
+                    if hasattr(settings, "redis_url")
+                    else "redis://localhost:6379/0"
+                )
                 self._redis = _redis.from_url(redis_url, decode_responses=True)
             except ImportError:
-                logger.warning("redis package not installed, falling back to in-memory rate limiter")
+                logger.warning(
+                    "redis package not installed, falling back to in-memory rate limiter"
+                )
                 return False
             except Exception as e:
-                logger.warning(f"Redis connection failed: {e}, falling back to in-memory rate limiter")
+                logger.warning(
+                    f"Redis connection failed: {e}, falling back to in-memory rate limiter"
+                )
                 return False
         return True
 
@@ -119,7 +133,7 @@ except (ImportError, Exception) as e:
 
 
 async def rate_limit_middleware(request: Request, call_next):
-    if os.environ.get("TESTING"):
+    if os.environ.get("RATE_LIMIT_DISABLED"):
         return await call_next(request)
 
     client_ip = request.client.host if request.client else "unknown"
@@ -127,7 +141,8 @@ async def rate_limit_middleware(request: Request, call_next):
     if "/auth/login" in request.url.path:
         if login_rate_limiter.is_rate_limited(client_ip):
             logger.warning(
-                "Rate limit exceeded", extra={"ip_address": client_ip, "path": request.url.path},
+                "Rate limit exceeded",
+                extra={"ip_address": client_ip, "path": request.url.path},
             )
             return JSONResponse(
                 status_code=429,

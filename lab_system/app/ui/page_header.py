@@ -39,7 +39,9 @@ class PageHeader(QWidget):
 
         layout.addLayout(top)
 
-    def add_action(self, text, callback=None, icon=None, variant="primary", tooltip=None):
+    def add_action(
+        self, text, callback=None, icon=None, variant="primary", tooltip=None
+    ):
         btn = QPushButton(text)
         if tooltip:
             btn.setToolTip(tooltip)

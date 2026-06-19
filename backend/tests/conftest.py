@@ -41,7 +41,9 @@ def _get_session_factory():
     global _session_factory_local
     if _session_factory_local is None:
         _session_factory_local = sessionmaker(
-            bind=_get_engine(), autoflush=False, autocommit=False,
+            bind=_get_engine(),
+            autoflush=False,
+            autocommit=False,
         )
     return _session_factory_local
 
@@ -60,6 +62,7 @@ app.dependency_overrides[get_db] = override_get_db
 @pytest.fixture(autouse=True)
 def setup_db():
     from app.core.container import reset_container
+
     reset_container()
     connection = _get_connection()
     Base.metadata.create_all(bind=connection)
@@ -86,7 +89,11 @@ def client() -> Generator:
 
 
 def _extract_token(body: dict) -> str:
-    if "data" in body and isinstance(body["data"], dict) and "access_token" in body["data"]:
+    if (
+        "data" in body
+        and isinstance(body["data"], dict)
+        and "access_token" in body["data"]
+    ):
         return body["data"]["access_token"]
     return body.get("access_token", "")
 

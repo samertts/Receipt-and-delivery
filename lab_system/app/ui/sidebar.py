@@ -25,14 +25,14 @@ from lab_system.app.utils.constants import THEME
 
 SIDEBAR_COLLAPSED = 64
 SIDEBAR_EXPANDED = 260
-SIDEBAR_BG = QColor(THEME['sidebar_bg'])
-SIDEBAR_ITEM_HOVER = QColor(THEME['sidebar_hover'])
-SIDEBAR_ITEM_ACTIVE = QColor(THEME['sidebar_active'])
-SIDEBAR_ACCENT = QColor(THEME['primary'])
-SIDEBAR_TEXT = QColor(THEME['sidebar_text'])
-SIDEBAR_TEXT_ACTIVE = QColor(THEME['sidebar_active_text'])
-SIDEBAR_GROUP_TEXT = QColor(THEME['sidebar_text'])
-SIDEBAR_HEADER_BG = QColor('#0B1628')
+SIDEBAR_BG = QColor(THEME["sidebar_bg"])
+SIDEBAR_ITEM_HOVER = QColor(THEME["sidebar_hover"])
+SIDEBAR_ITEM_ACTIVE = QColor(THEME["sidebar_active"])
+SIDEBAR_ACCENT = QColor(THEME["primary"])
+SIDEBAR_TEXT = QColor(THEME["sidebar_text"])
+SIDEBAR_TEXT_ACTIVE = QColor(THEME["sidebar_active_text"])
+SIDEBAR_GROUP_TEXT = QColor(THEME["sidebar_text"])
+SIDEBAR_HEADER_BG = QColor("#0B1628")
 
 
 class SidebarItem(QWidget):
@@ -171,7 +171,7 @@ class SidebarHeader(QWidget):
             f.setPointSize(11)
             f.setBold(True)
             p.setFont(f)
-            p.setPen(QColor('#FFFFFF'))
+            p.setPen(QColor("#FFFFFF"))
             p.drawText(16, 34, "الاستلام المختبري")
 
             f2 = QFont()
@@ -184,7 +184,7 @@ class SidebarHeader(QWidget):
             f.setPointSize(14)
             f.setBold(True)
             p.setFont(f)
-            p.setPen(QColor('#FFFFFF'))
+            p.setPen(QColor("#FFFFFF"))
             p.drawText(0, 0, self.width(), self.height(), Qt.AlignCenter, "م")
 
         # Toggle button area
@@ -226,9 +226,11 @@ class ModernSidebar(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }"
-                             "QScrollBar:vertical { width: 4px; background: #1E293B; }"
-                             "QScrollBar::handle:vertical { background: #475569; border-radius: 2px; }")
+        scroll.setStyleSheet(
+            "QScrollArea { border: none; background: transparent; }"
+            "QScrollBar:vertical { width: 4px; background: #1E293B; }"
+            "QScrollBar::handle:vertical { background: #475569; border-radius: 2px; }"
+        )
 
         content = QWidget()
         content.setStyleSheet("background: transparent;")
@@ -250,24 +252,36 @@ class ModernSidebar(QWidget):
         }
 
         groups = [
-            ("العمليات", [
-                ("dashboard", "لوحة التحكم", icon_dashboard),
-                ("receipts", "الاستلامات", icon_receipts),
-                ("orgs", "المؤسسات", icon_organizations),
-                ("samples", "العينات", icon_samples),
-            ]),
-            ("الإدارة", [
-                ("users", "المستخدمون", icon_users),
-                ("audit", "سجل التدقيق", icon_audit),
-            ]),
-            ("التقارير", [
-                ("reports", "التقارير", icon_reports),
-                ("statistics", "الإحصائيات", icon_statistics),
-            ]),
-            ("النظام", [
-                ("backup", "النسخ الاحتياطي", icon_backup),
-                ("settings", "الإعدادات", icon_settings),
-            ]),
+            (
+                "العمليات",
+                [
+                    ("dashboard", "لوحة التحكم", icon_dashboard),
+                    ("receipts", "الاستلامات", icon_receipts),
+                    ("orgs", "المؤسسات", icon_organizations),
+                    ("samples", "العينات", icon_samples),
+                ],
+            ),
+            (
+                "الإدارة",
+                [
+                    ("users", "المستخدمون", icon_users),
+                    ("audit", "سجل التدقيق", icon_audit),
+                ],
+            ),
+            (
+                "التقارير",
+                [
+                    ("reports", "التقارير", icon_reports),
+                    ("statistics", "الإحصائيات", icon_statistics),
+                ],
+            ),
+            (
+                "النظام",
+                [
+                    ("backup", "النسخ الاحتياطي", icon_backup),
+                    ("settings", "الإعدادات", icon_settings),
+                ],
+            ),
         ]
 
         from lab_system.app.auth.permissions import check_permission
@@ -277,7 +291,9 @@ class ModernSidebar(QWidget):
             if not first_group:
                 sep = QFrame()
                 sep.setFrameShape(QFrame.HLine)
-                sep.setStyleSheet("background: #334155; max-height: 1px; margin: 4px 16px;")
+                sep.setStyleSheet(
+                    "background: #334155; max-height: 1px; margin: 4px 16px;"
+                )
                 sep.setFixedHeight(1)
                 self._content_layout.addWidget(sep)
             first_group = False

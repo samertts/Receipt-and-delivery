@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.container_deps import get_sync_service
-from app.api.deps import get_current_user, require_permission
+from app.api.deps import require_permission
 from app.core.response_envelope import wrap_response
 from app.db.session import get_db
 from app.models.user import User
@@ -48,7 +48,9 @@ def sync_push(
 
 @router.get("/pull")
 def sync_pull(
-    since: str = Query("", description="ISO timestamp — return entries after this time"),
+    since: str = Query(
+        "", description="ISO timestamp — return entries after this time"
+    ),
     device_id: str = Query("", description="Filter by device ID"),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
@@ -65,7 +67,7 @@ def sync_pull(
 @router.get("/status")
 def sync_status(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("sync_data")),
 ):
     svc = get_sync_service(db)
     data = svc.status()

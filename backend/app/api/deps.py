@@ -38,7 +38,9 @@ def get_current_user(
         raise UnauthorizedError("لم يتم تسجيل الدخول")
     try:
         payload = jwt.decode(
-            token, settings.effective_secret_key, algorithms=[settings.algorithm],
+            token,
+            settings.effective_secret_key,
+            algorithms=[settings.algorithm],
         )
         username: str = payload.get("sub", "")
         if not username:

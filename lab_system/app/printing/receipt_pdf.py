@@ -45,9 +45,11 @@ _ARABIC_FONTS = {
     "ArabicBold": None,
 }
 
+
 def _find_arabic_fonts():
     """Look for common Arabic TTF fonts on the system."""
     from sys import platform as _sys_platform
+
     candidates = [
         "/usr/share/fonts/truetype/amiri/Amiri-Regular.ttf",
         "/usr/share/fonts/truetype/amiri/Amiri-Bold.ttf",
@@ -73,6 +75,7 @@ def _find_arabic_fonts():
                 _ARABIC_FONTS["ArabicBold"] = str(p)
             else:
                 _ARABIC_FONTS["Arabic"] = str(p)
+
 
 _find_arabic_fonts()
 
@@ -107,32 +110,56 @@ def _styles():
     fn = _font_name()
     fnb = _font_name(bold=True)
     return {
-        "title": ParagraphStyle("Title", fontName=fnb, fontSize=16,
-                                alignment=TA_CENTER, spaceAfter=6),
-        "subtitle": ParagraphStyle("Subtitle", fontName=fn, fontSize=10,
-                                   alignment=TA_CENTER, spaceAfter=4,
-                                   textColor=colors.HexColor("#555555")),
-        "meta_key": ParagraphStyle("MetaKey", fontName=fnb, fontSize=9,
-                                   alignment=TA_RIGHT),
-        "meta_val": ParagraphStyle("MetaVal", fontName=fn, fontSize=9,
-                                   alignment=TA_RIGHT),
-        "table_header": ParagraphStyle("TH", fontName=fnb, fontSize=8,
-                                       alignment=TA_CENTER),
-        "table_cell": ParagraphStyle("TC", fontName=fn, fontSize=8,
-                                     alignment=TA_CENTER),
-        "signature": ParagraphStyle("Sig", fontName=fn, fontSize=10,
-                                    alignment=TA_CENTER, spaceBefore=20),
-        "footer": ParagraphStyle("Footer", fontName=fn, fontSize=7,
-                                 alignment=TA_CENTER,
-                                 textColor=colors.HexColor("#999999")),
+        "title": ParagraphStyle(
+            "Title", fontName=fnb, fontSize=16, alignment=TA_CENTER, spaceAfter=6
+        ),
+        "subtitle": ParagraphStyle(
+            "Subtitle",
+            fontName=fn,
+            fontSize=10,
+            alignment=TA_CENTER,
+            spaceAfter=4,
+            textColor=colors.HexColor("#555555"),
+        ),
+        "meta_key": ParagraphStyle(
+            "MetaKey", fontName=fnb, fontSize=9, alignment=TA_RIGHT
+        ),
+        "meta_val": ParagraphStyle(
+            "MetaVal", fontName=fn, fontSize=9, alignment=TA_RIGHT
+        ),
+        "table_header": ParagraphStyle(
+            "TH", fontName=fnb, fontSize=8, alignment=TA_CENTER
+        ),
+        "table_cell": ParagraphStyle(
+            "TC", fontName=fn, fontSize=8, alignment=TA_CENTER
+        ),
+        "signature": ParagraphStyle(
+            "Sig", fontName=fn, fontSize=10, alignment=TA_CENTER, spaceBefore=20
+        ),
+        "footer": ParagraphStyle(
+            "Footer",
+            fontName=fn,
+            fontSize=7,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor("#999999"),
+        ),
     }
 
 
-def generate_receipt_pdf(receipt_no, institution, tx_type, date_text,
-                         sender_name="", receiver_name="",
-                         sender_org="", receiver_org="",
-                         items=None, notes="", transport_info="",
-                         logo_path=None):
+def generate_receipt_pdf(
+    receipt_no,
+    institution,
+    tx_type,
+    date_text,
+    sender_name="",
+    receiver_name="",
+    sender_org="",
+    receiver_org="",
+    items=None,
+    notes="",
+    transport_info="",
+    logo_path=None,
+):
     """
     Generate a production-quality Arabic governmental receipt PDF.
 
@@ -186,38 +213,51 @@ def generate_receipt_pdf(receipt_no, institution, tx_type, date_text,
 
     # ---- Meta information table ----
     meta_data = [
-        [Paragraph("رقم الإيصال", s["meta_key"]),
-         Paragraph(receipt_no, s["meta_val"])],
-        [Paragraph("نوع المعاملة", s["meta_key"]),
-         Paragraph(tx_type, s["meta_val"])],
-        [Paragraph("الجهة", s["meta_key"]),
-         Paragraph(institution, s["meta_val"])],
-        [Paragraph("التاريخ", s["meta_key"]),
-         Paragraph(date_text, s["meta_val"])],
+        [Paragraph("رقم الإيصال", s["meta_key"]), Paragraph(receipt_no, s["meta_val"])],
+        [Paragraph("نوع المعاملة", s["meta_key"]), Paragraph(tx_type, s["meta_val"])],
+        [Paragraph("الجهة", s["meta_key"]), Paragraph(institution, s["meta_val"])],
+        [Paragraph("التاريخ", s["meta_key"]), Paragraph(date_text, s["meta_val"])],
     ]
     if sender_org:
-        meta_data.append([Paragraph("الجهة المرسلة", s["meta_key"]),
-                          Paragraph(sender_org, s["meta_val"])])
+        meta_data.append(
+            [
+                Paragraph("الجهة المرسلة", s["meta_key"]),
+                Paragraph(sender_org, s["meta_val"]),
+            ]
+        )
     if receiver_org:
-        meta_data.append([Paragraph("الجهة المستقبلة", s["meta_key"]),
-                          Paragraph(receiver_org, s["meta_val"])])
+        meta_data.append(
+            [
+                Paragraph("الجهة المستقبلة", s["meta_key"]),
+                Paragraph(receiver_org, s["meta_val"]),
+            ]
+        )
     if sender_name:
-        meta_data.append([Paragraph("المرسل", s["meta_key"]),
-                          Paragraph(sender_name, s["meta_val"])])
+        meta_data.append(
+            [Paragraph("المرسل", s["meta_key"]), Paragraph(sender_name, s["meta_val"])]
+        )
     if receiver_name:
-        meta_data.append([Paragraph("المستلم", s["meta_key"]),
-                          Paragraph(receiver_name, s["meta_val"])])
+        meta_data.append(
+            [
+                Paragraph("المستلم", s["meta_key"]),
+                Paragraph(receiver_name, s["meta_val"]),
+            ]
+        )
 
     meta_table = Table(meta_data, colWidths=[doc.width * 0.3, doc.width * 0.7])
-    meta_table.setStyle(TableStyle([
-        ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
-        ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#EEEEEE")),
-    ]))
+    meta_table.setStyle(
+        TableStyle(
+            [
+                ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#EEEEEE")),
+            ]
+        )
+    )
     elements.append(meta_table)
     elements.append(Spacer(1, 6 * mm))
 
@@ -226,8 +266,15 @@ def generate_receipt_pdf(receipt_no, institution, tx_type, date_text,
         elements.append(Paragraph("العينات", s["subtitle"]))
         elements.append(Spacer(1, 2 * mm))
 
-        header = ["نوع العينة", "المجموع", "صالح", "تالف", "مرفوض",
-                  "غير مطابق", "حالة النقل"]
+        header = [
+            "نوع العينة",
+            "المجموع",
+            "صالح",
+            "تالف",
+            "مرفوض",
+            "غير مطابق",
+            "حالة النقل",
+        ]
         table_data = [[Paragraph(h, s["table_header"]) for h in header]]
 
         for item in items:
@@ -244,29 +291,49 @@ def generate_receipt_pdf(receipt_no, institution, tx_type, date_text,
 
         # Totals row
         total_row = ["الإجمالي"]
-        for key in ["total_count", "valid_count", "damaged_count",
-                     "rejected_count", "non_conforming_count"]:
+        for key in [
+            "total_count",
+            "valid_count",
+            "damaged_count",
+            "rejected_count",
+            "non_conforming_count",
+        ]:
             total_row.append(str(sum(int(it.get(key, 0)) for it in items)))
         total_row.append("")
         table_data.append([Paragraph(c, s["table_header"]) for c in total_row])
 
-        col_widths = [doc.width * 0.18, doc.width * 0.10, doc.width * 0.10,
-                      doc.width * 0.10, doc.width * 0.10, doc.width * 0.12,
-                      doc.width * 0.20]
+        col_widths = [
+            doc.width * 0.18,
+            doc.width * 0.10,
+            doc.width * 0.10,
+            doc.width * 0.10,
+            doc.width * 0.10,
+            doc.width * 0.12,
+            doc.width * 0.20,
+        ]
         item_table = Table(table_data, colWidths=col_widths, repeatRows=1)
-        item_table.setStyle(TableStyle([
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1D4E89")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E8F0FE")),
-            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#F8FAFC")]),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ]))
+        item_table.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1D4E89")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E8F0FE")),
+                    ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+                    (
+                        "ROWBACKGROUNDS",
+                        (0, 1),
+                        (-1, -2),
+                        [colors.white, colors.HexColor("#F8FAFC")],
+                    ),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ]
+            )
+        )
         elements.append(item_table)
         elements.append(Spacer(1, 4 * mm))
 
@@ -274,7 +341,9 @@ def generate_receipt_pdf(receipt_no, institution, tx_type, date_text,
     if notes:
         elements.append(Paragraph(f"<b>ملاحظات:</b> {notes}", s["meta_val"]))
     if transport_info:
-        elements.append(Paragraph(f"<b>معلومات النقل:</b> {transport_info}", s["meta_val"]))
+        elements.append(
+            Paragraph(f"<b>معلومات النقل:</b> {transport_info}", s["meta_val"])
+        )
 
     elements.append(Spacer(1, 10 * mm))
 
@@ -284,6 +353,7 @@ def generate_receipt_pdf(receipt_no, institution, tx_type, date_text,
         qr_data = f"{receipt_no}|{institution}|{date_text}|{tx_type}"
         qr_img = qrcode.make(qr_data)
         import tempfile
+
         qr_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
         qr_tmp.close()
         qr_path = Path(qr_tmp.name)
@@ -297,6 +367,7 @@ def generate_receipt_pdf(receipt_no, institution, tx_type, date_text,
     # ---- Barcode ----
     try:
         import tempfile
+
         bar_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
         bar_tmp.close()
         bar_path = Path(bar_tmp.name)
@@ -313,14 +384,22 @@ def generate_receipt_pdf(receipt_no, institution, tx_type, date_text,
 
     # ---- Signature section ----
     sig_table = Table(
-        [[Paragraph("توقيع المرسل: _____________", s["signature"]),
-          Paragraph("توقيع المستلم: _____________", s["signature"])]],
+        [
+            [
+                Paragraph("توقيع المرسل: _____________", s["signature"]),
+                Paragraph("توقيع المستلم: _____________", s["signature"]),
+            ]
+        ],
         colWidths=[doc.width * 0.5, doc.width * 0.5],
     )
-    sig_table.setStyle(TableStyle([
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-    ]))
+    sig_table.setStyle(
+        TableStyle(
+            [
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     elements.append(sig_table)
 
     # ---- Footer ----

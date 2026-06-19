@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 def main():
     try:
         from lab_system.app.ui.app import run
+
         run()
     except ImportError as e:
         print(f"Error: Missing dependency - {e}")

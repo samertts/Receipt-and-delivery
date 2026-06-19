@@ -185,13 +185,24 @@ class OrgDialog(QDialog):
             "id": self.org_data["id"] if self.editing else None,
             "name": self.name_input.text().strip(),
             "code": self.code_input.text().strip(),
-            "org_type": ORG_TYPE_MAP.get(self.type_combo.currentText(), self.type_combo.currentText()),
-            "governorate": GOV_MAP.get(self.gov_combo.currentText(), self.gov_combo.currentText()),
+            "org_type": ORG_TYPE_MAP.get(
+                self.type_combo.currentText(), self.type_combo.currentText()
+            ),
+            "governorate": GOV_MAP.get(
+                self.gov_combo.currentText(), self.gov_combo.currentText()
+            ),
             "address": self.address_input.text().strip(),
             "phone": self.phone_input.text().strip(),
             "email": self.email_input.text().strip(),
             "notes": self.notes_input.text().strip(),
-            "status": next((k for k, v in STATUS_MAP.items() if v == self.status_combo.currentText()), self.status_combo.currentText()),
+            "status": next(
+                (
+                    k
+                    for k, v in STATUS_MAP.items()
+                    if v == self.status_combo.currentText()
+                ),
+                self.status_combo.currentText(),
+            ),
             "logo_path": "",
         }
         try:
@@ -211,7 +222,9 @@ class OrgPage(QWidget):
         self._load()
 
     def _build_ui(self):
-        header = PageHeader("إدارة الجهات والمؤسسات", "إضافة وتعديل وإدارة المؤسسات والجهات")
+        header = PageHeader(
+            "إدارة الجهات والمؤسسات", "إضافة وتعديل وإدارة المؤسسات والجهات"
+        )
         self.layout().addWidget(header)
 
         self.search_input = header.add_search("بحث باسم الجهة أو الرمز...")
@@ -220,6 +233,7 @@ class OrgPage(QWidget):
         header.add_action("إضافة جهة", self._add)
 
         from lab_system.app.ui.org_page import ORG_TYPES, STATUS_MAP
+
         filter_row = QHBoxLayout()
         filter_row.setSpacing(8)
 
@@ -291,7 +305,9 @@ class OrgPage(QWidget):
         for i, o in enumerate(filtered):
             od = dict(o)
             eng_type = od.get("org_type", "")
-            ar_type = next((k for k, v in ORG_TYPE_MAP.items() if v == eng_type), eng_type)
+            ar_type = next(
+                (k for k, v in ORG_TYPE_MAP.items() if v == eng_type), eng_type
+            )
             eng_gov = od.get("governorate", "")
             ar_gov = next((k for k, v in GOV_MAP.items() if v == eng_gov), eng_gov)
             eng_status = od.get("status", "")
@@ -305,7 +321,11 @@ class OrgPage(QWidget):
             status_item = QTableWidgetItem(ar_status)
             status_color = QColor("#059669" if eng_status == "Active" else "#6B7280")
             status_item.setForeground(status_color)
-            status_item.setBackground(QColor(status_color.red(), status_color.green(), status_color.blue(), 30))
+            status_item.setBackground(
+                QColor(
+                    status_color.red(), status_color.green(), status_color.blue(), 30
+                )
+            )
             self.table.setItem(i, 6, status_item)
             self.table.setItem(i, 7, QTableWidgetItem(od.get("notes", "")))
 
@@ -325,7 +345,8 @@ class OrgPage(QWidget):
             toggle_btn.setStyleSheet("font-size:10pt;padding:4px;")
             toggle_btn.clicked.connect(
                 lambda _checked, oid=o["id"], s=o["status"]: self._toggle_status(
-                    oid, s,
+                    oid,
+                    s,
                 ),
             )
             actions_layout.addWidget(toggle_btn)
@@ -333,7 +354,7 @@ class OrgPage(QWidget):
             self.table.setCellWidget(i, 8, actions_widget)
 
     def _add(self):
-        check_permission(self.current_user, 'organizations.create')
+        check_permission(self.current_user, "organizations.create")
         dlg = OrgDialog(current_user=self.current_user)
         if dlg.exec():
             log_action(
@@ -344,7 +365,7 @@ class OrgPage(QWidget):
             self._load()
 
     def _edit(self, org_data):
-        check_permission(self.current_user, 'organizations.update')
+        check_permission(self.current_user, "organizations.update")
         dlg = OrgDialog(org_data=org_data, current_user=self.current_user)
         if dlg.exec():
             log_action(
@@ -356,8 +377,10 @@ class OrgPage(QWidget):
 
     def _toggle_status(self, org_id, current_status):
         new_status = "Inactive" if current_status == "Active" else "Active"
-        check_permission(self.current_user, 'organizations.update')
-        upsert_organization({"id": org_id, "status": new_status}, user=self.current_user)
+        check_permission(self.current_user, "organizations.update")
+        upsert_organization(
+            {"id": org_id, "status": new_status}, user=self.current_user
+        )
         log_action(
             self.current_user["id"],
             "org_status_toggled",

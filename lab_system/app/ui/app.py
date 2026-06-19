@@ -82,7 +82,9 @@ class ChangePasswordDialog(QDialog):
             QMessageBox.warning(self, "خطأ", pwd_error)
             return
         try:
-            self.auth.change_password(self.old_password.text(), self.new_password.text())
+            self.auth.change_password(
+                self.old_password.text(), self.new_password.text()
+            )
             toast(self, "تم تغيير كلمة المرور بنجاح", "success")
             self.accept()
         except AuthenticationError as e:
@@ -131,7 +133,8 @@ class LoginWindow(QDialog):
     def _login(self) -> None:
         try:
             self.user = self.auth.login(
-                self.username.text().strip(), self.password.text(),
+                self.username.text().strip(),
+                self.password.text(),
             )
             log_action(self.user["id"], "login_success", "desktop_login")
             self.accept()
@@ -160,8 +163,13 @@ class AboutDialog(QDialog):
         about_layout = QVBoxLayout(about_tab)
         try:
             from lab_system.app.settings.config import STORAGE_DIR
+
             version_path = STORAGE_DIR.parent.parent / "VERSION"
-            ver = version_path.read_text().strip() if version_path.exists() else "1.2.0-dev"
+            ver = (
+                version_path.read_text().strip()
+                if version_path.exists()
+                else "1.2.0-dev"
+            )
         except Exception:
             ver = "1.2.0-dev"
         for text in [
@@ -185,6 +193,7 @@ class AboutDialog(QDialog):
         sys_layout = QVBoxLayout(sys_tab)
         import platform
         import sys as _sys
+
         for label, value in [
             ("نظام التشغيل", platform.platform()),
             ("بايثون", _sys.version.split()[0]),
@@ -234,7 +243,9 @@ class MainWindow(QMainWindow):
         self.sidebar.page_changed.connect(self._on_page_change)
 
         page_map = {
-            "dashboard": DashboardPage(user, auth_service=auth_service, navigate_cb=self._navigate_to),
+            "dashboard": DashboardPage(
+                user, auth_service=auth_service, navigate_cb=self._navigate_to
+            ),
             "receipts": ReceiptsPage(user),
             "orgs": OrgPage(user),
             "samples": ReceiptsPage(user),
@@ -255,7 +266,9 @@ class MainWindow(QMainWindow):
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        scroll_area.setStyleSheet(
+            "QScrollArea { border: none; background: transparent; }"
+        )
 
         panel = QFrame()
         panel.setObjectName("ContentPanel")
@@ -277,6 +290,7 @@ class MainWindow(QMainWindow):
         self._session_timer.start(SESSION_CHECK_INTERVAL)
 
         from lab_system.app.sync.service import sync_service
+
         self._sync_timer = QTimer()
         self._sync_timer.timeout.connect(sync_service.sync_pending)
         self._sync_timer.start(60000)
@@ -368,35 +382,37 @@ class MainWindow(QMainWindow):
         try:
             self.auth.check_session()
         except SessionExpiredError:
-            QMessageBox.warning(self, "انتهت الجلسة", "انتهت صلاحية الجلسة بسبب عدم النشاط")
+            QMessageBox.warning(
+                self, "انتهت الجلسة", "انتهت صلاحية الجلسة بسبب عدم النشاط"
+            )
             self.close()
 
 
 APP_STYLESHEET = f"""
-QMainWindow, QWidget {{ background-color: {THEME['bg']}; color: {THEME['text']}; font-size: 13pt; font-family: 'Segoe UI', 'Tahoma', sans-serif; }}
-QMainWindow::separator {{ background: {THEME['border']}; width: 1px; }}
+QMainWindow, QWidget {{ background-color: {THEME["bg"]}; color: {THEME["text"]}; font-size: 13pt; font-family: 'Segoe UI', 'Tahoma', sans-serif; }}
+QMainWindow::separator {{ background: {THEME["border"]}; width: 1px; }}
 
-QPushButton {{ background-color: {THEME['primary']}; color: white; border: none; border-radius: 6px; padding: 8px 20px; min-height: 38px; font-size: 12pt; font-weight: 600; }}
+QPushButton {{ background-color: {THEME["primary"]}; color: white; border: none; border-radius: 6px; padding: 8px 20px; min-height: 38px; font-size: 12pt; font-weight: 600; }}
 QPushButton:hover {{ background-color: #0B3D6B; }}
 QPushButton:pressed {{ background-color: #092D4F; }}
-QPushButton:focus {{ outline: 2px solid {THEME['primary']}; outline-offset: 2px; }}
+QPushButton:focus {{ outline: 2px solid {THEME["primary"]}; outline-offset: 2px; }}
 QPushButton:disabled {{ background-color: #CBD5E1; color: #94A3B8; }}
 
-QLineEdit {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; font-size: 12pt; }}
-QLineEdit:focus {{ border: 2px solid {THEME['primary']}; background: #FFFFFF; }}
+QLineEdit {{ background: {THEME["panel"]}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; font-size: 12pt; }}
+QLineEdit:focus {{ border: 2px solid {THEME["primary"]}; background: #FFFFFF; }}
 QLineEdit:disabled {{ background: #F1F5F9; color: #94A3B8; }}
 
-QComboBox {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; font-size: 12pt; }}
-QComboBox:focus {{ border: 2px solid {THEME['primary']}; }}
+QComboBox {{ background: {THEME["panel"]}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; font-size: 12pt; }}
+QComboBox:focus {{ border: 2px solid {THEME["primary"]}; }}
 QComboBox::drop-down {{ border: none; width: 30px; }}
 QComboBox::down-arrow {{ image: none; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #64748B; margin-right: 8px; }}
 
-QTableWidget {{ background: {THEME['panel']}; border: 1px solid {THEME['border']}; border-radius: 8px; gridline-color: #F1F5F9; font-size: 11pt; alternate-background-color: {THEME['table_alt']}; }}
+QTableWidget {{ background: {THEME["panel"]}; border: 1px solid {THEME["border"]}; border-radius: 8px; gridline-color: #F1F5F9; font-size: 11pt; alternate-background-color: {THEME["table_alt"]}; }}
 QTableWidget::item {{ padding: 10px 8px; border-bottom: 1px solid #F1F5F9; }}
 QTableWidget::item:selected {{ background: #DBEAFE; color: #1E40AF; font-weight: 600; }}
 QTableWidget::item:hover {{ background: #F1F5F9; }}
 QTableWidget::item:selected:hover {{ background: #BFDBFE; }}
-QHeaderView::section {{ background-color: {THEME['header_bg']}; padding: 12px 8px; border: none; border-bottom: 2px solid {THEME['border']}; font-size: 10pt; font-weight: bold; color: #475569; }}
+QHeaderView::section {{ background-color: {THEME["header_bg"]}; padding: 12px 8px; border: none; border-bottom: 2px solid {THEME["border"]}; font-size: 10pt; font-weight: bold; color: #475569; }}
 
 QScrollArea {{ border: none; background: transparent; }}
 QScrollBar:vertical {{ background: #F1F5F9; width: 8px; border-radius: 4px; }}
@@ -404,17 +420,17 @@ QScrollBar::handle:vertical {{ background: #CBD5E1; border-radius: 4px; min-heig
 QScrollBar::handle:vertical:hover {{ background: #94A3B8; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 
-QDateEdit {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; }}
-QDateEdit:focus {{ border: 2px solid {THEME['primary']}; }}
+QDateEdit {{ background: {THEME["panel"]}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; }}
+QDateEdit:focus {{ border: 2px solid {THEME["primary"]}; }}
 
-QSpinBox {{ background: {THEME['panel']}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; }}
-QSpinBox:focus {{ border: 2px solid {THEME['primary']}; }}
+QSpinBox {{ background: {THEME["panel"]}; border: 1px solid #CBD5E1; border-radius: 6px; min-height: 38px; padding: 4px 12px; }}
+QSpinBox:focus {{ border: 2px solid {THEME["primary"]}; }}
 
-QGroupBox {{ font-weight: bold; border: 1px solid {THEME['border']}; border-radius: 8px; margin-top: 12px; padding-top: 16px; }}
+QGroupBox {{ font-weight: bold; border: 1px solid {THEME["border"]}; border-radius: 8px; margin-top: 12px; padding-top: 16px; }}
 QGroupBox::title {{ subcontrol-origin: margin; left: 12px; padding: 0 6px; }}
 
-#ContentPanel {{ background: {THEME['bg']}; border: none; }}
-#StatCard {{ background: {THEME['panel']}; border: 1px solid {THEME['border']}; border-radius: 12px; padding: 16px; }}
+#ContentPanel {{ background: {THEME["bg"]}; border: none; }}
+#StatCard {{ background: {THEME["panel"]}; border: 1px solid {THEME["border"]}; border-radius: 12px; padding: 16px; }}
 """
 
 
@@ -441,7 +457,11 @@ def run() -> None:
     if auth_service.needs_password_change():
         change = ChangePasswordDialog(auth_service)
         if change.exec() != QDialog.Accepted:
-            QMessageBox.warning(None, "تحذير", "يجب تغيير كلمة المرور الافتراضية قبل متابعة استخدام النظام")
+            QMessageBox.warning(
+                None,
+                "تحذير",
+                "يجب تغيير كلمة المرور الافتراضية قبل متابعة استخدام النظام",
+            )
             return
 
     win = MainWindow(login.user, auth_service=auth_service)

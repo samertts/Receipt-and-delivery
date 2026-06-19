@@ -49,7 +49,9 @@ class UsersPage(QWidget):
         self.setLayout(QVBoxLayout(self))
         self.setLayoutDirection(Qt.RightToLeft)
 
-        header = PageHeader("إدارة المستخدمين والصلاحيات", "إضافة وتعديل وإدارة المستخدمين")
+        header = PageHeader(
+            "إدارة المستخدمين والصلاحيات", "إضافة وتعديل وإدارة المستخدمين"
+        )
         self.layout().addWidget(header)
 
         filter_row = QHBoxLayout()
@@ -118,11 +120,13 @@ class UsersPage(QWidget):
         self.layout().addWidget(self.table)
 
     def _add_user(self):
-        check_permission(self.current_user, 'users.create')
+        check_permission(self.current_user, "users.create")
         username = self.username_input.text().strip()
         full_name = self.fullname_input.text().strip()
         password = self.password_input.text()
-        role = ROLE_MAP.get(self.role_combo.currentText(), self.role_combo.currentText())
+        role = ROLE_MAP.get(
+            self.role_combo.currentText(), self.role_combo.currentText()
+        )
         institution_id = self.institution_combo.currentData()
 
         error = validate_username(username)
@@ -135,7 +139,14 @@ class UsersPage(QWidget):
             return
 
         try:
-            create_user(full_name, username, password, role, institution_id, user=self.current_user)
+            create_user(
+                full_name,
+                username,
+                password,
+                role,
+                institution_id,
+                user=self.current_user,
+            )
             log_action(
                 self.current_user["id"],
                 "user_created",
@@ -159,14 +170,22 @@ class UsersPage(QWidget):
             ud = dict(u)
             self.table.setItem(i, 0, QTableWidgetItem(ud["full_name"]))
             self.table.setItem(i, 1, QTableWidgetItem(ud["username"]))
-            self.table.setItem(i, 2, QTableWidgetItem(ROLE_DISPLAY.get(ud["role"], ud["role"])))
             self.table.setItem(
-                i, 3, QTableWidgetItem(ud.get("institution_name") or "-"),
+                i, 2, QTableWidgetItem(ROLE_DISPLAY.get(ud["role"], ud["role"]))
+            )
+            self.table.setItem(
+                i,
+                3,
+                QTableWidgetItem(ud.get("institution_name") or "-"),
             )
             status_item = QTableWidgetItem(STATUS_MAP.get(ud["status"], ud["status"]))
             status_color = QColor("#059669" if ud["status"] == "Active" else "#6B7280")
             status_item.setForeground(status_color)
-            status_item.setBackground(QColor(status_color.red(), status_color.green(), status_color.blue(), 30))
+            status_item.setBackground(
+                QColor(
+                    status_color.red(), status_color.green(), status_color.blue(), 30
+                )
+            )
             self.table.setItem(i, 4, status_item)
 
             actions_widget = QWidget()
@@ -178,7 +197,8 @@ class UsersPage(QWidget):
                 disable_btn.setStyleSheet("font-size:10pt;padding:4px;")
                 disable_btn.clicked.connect(
                     lambda _, uid=u["id"], uname=u["username"]: self._disable_user(
-                        uid, uname,
+                        uid,
+                        uname,
                     ),
                 )
                 actions_layout.addWidget(disable_btn)
@@ -200,7 +220,7 @@ class UsersPage(QWidget):
             self.table.setCellWidget(i, 5, actions_widget)
 
     def _disable_user(self, user_id, username):
-        check_permission(self.current_user, 'users.update')
+        check_permission(self.current_user, "users.update")
         reply = QMessageBox.question(
             self,
             "تأكيد",
@@ -217,8 +237,9 @@ class UsersPage(QWidget):
             self.refresh()
 
     def _enable_user(self, user_id):
-        check_permission(self.current_user, 'users.update')
+        check_permission(self.current_user, "users.update")
         from lab_system.app.services.user_service import enable_user
+
         enable_user(user_id, user=self.current_user)
         log_action(
             self.current_user["id"],
@@ -228,9 +249,11 @@ class UsersPage(QWidget):
         self.refresh()
 
     def _reset_password_dialog(self, user_id):
-        check_permission(self.current_user, 'users.reset_password')
+        check_permission(self.current_user, "users.reset_password")
         password, ok = QLineEdit.getText(
-            self, "إعادة تعيين كلمة المرور", "كلمة المرور الجديدة:",
+            self,
+            "إعادة تعيين كلمة المرور",
+            "كلمة المرور الجديدة:",
         )
         if ok and password:
             error = validate_password(password)

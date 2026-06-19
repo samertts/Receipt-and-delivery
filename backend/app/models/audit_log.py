@@ -19,7 +19,13 @@ class AuditLog(UUIDMixin, TimestampMixin, Base):
     prev_hash: Mapped[str] = mapped_column(String(64), default="")
 
     @staticmethod
-    def compute_hash(entry_id: str, user_id: str, action_type: str,
-                     ip_address: str, details: str, prev_hash: str) -> str:
+    def compute_hash(
+        entry_id: str,
+        user_id: str,
+        action_type: str,
+        ip_address: str,
+        details: str,
+        prev_hash: str,
+    ) -> str:
         raw = f"{entry_id}|{user_id}|{action_type}|{ip_address}|{details}|{prev_hash}"
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()

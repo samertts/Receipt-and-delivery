@@ -23,6 +23,7 @@ def _setup_env():
 def _patch_config(tmp, db_path):
     import lab_system.app.settings.config as cfg_mod
     import lab_system.app.diagnostics.startup as diag_mod
+
     orig_cfg = cfg_mod.CONFIG
     orig_storage = cfg_mod.STORAGE_DIR
     new_cfg = cfg_mod.AppConfig(
@@ -42,6 +43,7 @@ def _patch_config(tmp, db_path):
 
 def _restore_config(cfg_mod, orig_cfg, orig_storage):
     import lab_system.app.diagnostics.startup as diag_mod
+
     cfg_mod.CONFIG = orig_cfg
     cfg_mod.STORAGE_DIR = orig_storage
     diag_mod.CONFIG = orig_cfg
@@ -53,6 +55,7 @@ class TestStartupDiagnostics:
 
     def teardown_method(self):
         import shutil
+
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _with_env(self):
@@ -62,8 +65,10 @@ class TestStartupDiagnostics:
         cfg_mod, orig_cfg, orig_storage = self._with_env()
         try:
             from lab_system.app.diagnostics.startup import check_indexes
+
             dummy = self.tmp / "nonexistent.db"
             import lab_system.app.diagnostics.startup as diag_mod
+
             new_cfg = cfg_mod.AppConfig(
                 base_dir=cfg_mod.CONFIG.base_dir,
                 app_dir=cfg_mod.CONFIG.app_dir,
@@ -86,6 +91,7 @@ class TestStartupDiagnostics:
         cfg_mod, orig_cfg, orig_storage = self._with_env()
         try:
             from lab_system.app.diagnostics.startup import check_indexes
+
             result = check_indexes()
             assert "ok" in result
             assert "present" in result
@@ -97,6 +103,7 @@ class TestStartupDiagnostics:
         try:
             from lab_system.app.diagnostics.startup import check_indexes
             import lab_system.app.diagnostics.startup as diag_mod
+
             dummy = Path("/nonexistent_dir_xyz_abc123/db.db")
             new_cfg = cfg_mod.AppConfig(
                 base_dir=cfg_mod.CONFIG.base_dir,
@@ -119,6 +126,7 @@ class TestStartupDiagnostics:
         cfg_mod, orig_cfg, orig_storage = self._with_env()
         try:
             from lab_system.app.diagnostics.startup import check_integrity
+
             result = check_integrity()
             assert result["db_ok"] is True
             assert result["wal_ok"] is True
@@ -129,8 +137,10 @@ class TestStartupDiagnostics:
         cfg_mod, orig_cfg, orig_storage = self._with_env()
         try:
             from lab_system.app.diagnostics.startup import check_integrity
+
             dummy = self.tmp / "nope.db"
             import lab_system.app.diagnostics.startup as diag_mod
+
             diag_mod.CONFIG = cfg_mod.AppConfig(
                 base_dir=cfg_mod.CONFIG.base_dir,
                 app_dir=cfg_mod.CONFIG.app_dir,
@@ -150,6 +160,7 @@ class TestStartupDiagnostics:
         cfg_mod, orig_cfg, orig_storage = self._with_env()
         try:
             from lab_system.app.diagnostics.startup import check_folders
+
             result = check_folders()
             assert "created" in result
             assert "missing" in result
@@ -160,6 +171,7 @@ class TestStartupDiagnostics:
         cfg_mod, orig_cfg, orig_storage = self._with_env()
         try:
             from lab_system.app.diagnostics.startup import check_folders
+
             check_folders()
             result = check_folders()
             assert len(result["created"]) == 0
@@ -168,8 +180,12 @@ class TestStartupDiagnostics:
 
     def test_check_network_unreachable(self):
         import unittest.mock as mock
-        with mock.patch('urllib.request.urlopen', side_effect=OSError("no route to host")):
+
+        with mock.patch(
+            "urllib.request.urlopen", side_effect=OSError("no route to host")
+        ):
             from lab_system.app.diagnostics.startup import check_network
+
             result = check_network(host="http://192.0.2.1", timeout=1)
             assert result["reachable"] is False
             assert "error" in result
@@ -178,6 +194,7 @@ class TestStartupDiagnostics:
         cfg_mod, orig_cfg, orig_storage = self._with_env()
         try:
             from lab_system.app.diagnostics.startup import check_config
+
             result = check_config()
             assert "version" in result
             assert "issues" in result
@@ -188,6 +205,7 @@ class TestStartupDiagnostics:
         cfg_mod, orig_cfg, orig_storage = self._with_env()
         try:
             from lab_system.app.diagnostics.startup import run_all_checks
+
             result = run_all_checks()
             assert "timestamp" in result
             assert "integrity" in result
@@ -203,6 +221,7 @@ class TestStartupDiagnostics:
         cfg_mod, orig_cfg, orig_storage = self._with_env()
         try:
             from lab_system.app.diagnostics.startup import self_repair
+
             actions = self_repair()
             assert isinstance(actions, list)
         finally:
@@ -212,6 +231,7 @@ class TestStartupDiagnostics:
         cfg_mod, orig_cfg, orig_storage = self._with_env()
         try:
             from lab_system.app.diagnostics.startup import diagnose_and_report
+
             report = diagnose_and_report()
             assert "Startup Diagnostics" in report
             assert "Database" in report

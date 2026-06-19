@@ -83,9 +83,14 @@ class OrganizationService:
         if name is not None:
             update_kwargs["name"] = name
         if code is not None:
-            existing = self.db.query(Organization).filter(
-                Organization.code == code, Organization.id != org_id,
-            ).first()
+            existing = (
+                self.db.query(Organization)
+                .filter(
+                    Organization.code == code,
+                    Organization.id != org_id,
+                )
+                .first()
+            )
             if existing:
                 raise ConflictError(f"رمز المؤسسة {code} موجود مسبقاً")
             update_kwargs["code"] = code
@@ -117,21 +122,27 @@ class OrganizationService:
         org = self.repo.get(org_id)
         if not org:
             raise NotFoundError("المؤسسة غير موجودة")
-        
+
         # Check for associated transactions
         from app.models.transaction import Transaction
         from sqlalchemy import or_
-        
-        has_transactions = self.db.query(Transaction).filter(
-            or_(
-                Transaction.sender_organization_id == org_id,
-                Transaction.receiver_organization_id == org_id,
+
+        has_transactions = (
+            self.db.query(Transaction)
+            .filter(
+                or_(
+                    Transaction.sender_organization_id == org_id,
+                    Transaction.receiver_organization_id == org_id,
+                )
             )
-        ).first()
-        
+            .first()
+        )
+
         if has_transactions:
-            raise ConflictError("Cannot delete organization with associated transactions")
-        
+            raise ConflictError(
+                "Cannot delete organization with associated transactions"
+            )
+
         self.repo.delete(org_id)
 
         log_audit(

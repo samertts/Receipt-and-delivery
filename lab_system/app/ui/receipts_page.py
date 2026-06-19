@@ -51,10 +51,14 @@ class ReceiptsPage(QWidget):
         self._load()
 
     def _build_ui(self):
-        header = PageHeader("إدارة الإيصالات", "عرض وإضافة وتعديل إيصالات الاستلام والتسليم")
+        header = PageHeader(
+            "إدارة الإيصالات", "عرض وإضافة وتعديل إيصالات الاستلام والتسليم"
+        )
         self.layout().addWidget(header)
 
-        header.add_action("إيصال جديد", self._new_receipt, tooltip="إيصال جديد (Ctrl+N)")
+        header.add_action(
+            "إيصال جديد", self._new_receipt, tooltip="إيصال جديد (Ctrl+N)"
+        )
 
         filter_row = QHBoxLayout()
         filter_row.setSpacing(8)
@@ -176,7 +180,9 @@ class ReceiptsPage(QWidget):
             self.table.setItem(i, 3, QTableWidgetItem(rd["receiver_org"] or ""))
             self.table.setItem(i, 4, QTableWidgetItem(rd["created_at"] or ""))
             status_code = rd["status"]
-            status_color, status_ar = STATUS_STYLES.get(status_code, ("#6B7280", status_code))
+            status_color, status_ar = STATUS_STYLES.get(
+                status_code, ("#6B7280", status_code)
+            )
             item = QTableWidgetItem(status_ar)
             sc = QColor(status_color)
             item.setForeground(sc)
@@ -207,7 +213,8 @@ class ReceiptsPage(QWidget):
                 approve_btn.setStyleSheet("font-size:10pt;padding:4px;")
                 approve_btn.clicked.connect(
                     lambda _checked, rid=r["id"]: self._change_status(
-                        rid, "Approved",
+                        rid,
+                        "Approved",
                     ),
                 )
                 actions_layout.addWidget(approve_btn)
@@ -217,7 +224,8 @@ class ReceiptsPage(QWidget):
                 archive_btn.setStyleSheet("font-size:10pt;padding:4px;")
                 archive_btn.clicked.connect(
                     lambda _checked, rid=r["id"]: self._change_status(
-                        rid, "Archived",
+                        rid,
+                        "Archived",
                     ),
                 )
                 actions_layout.addWidget(archive_btn)
@@ -228,7 +236,8 @@ class ReceiptsPage(QWidget):
                 )
                 cancel_btn.clicked.connect(
                     lambda _checked, rid=r["id"]: self._change_status(
-                        rid, "Cancelled",
+                        rid,
+                        "Cancelled",
                     ),
                 )
                 actions_layout.addWidget(cancel_btn)
@@ -246,7 +255,8 @@ class ReceiptsPage(QWidget):
             self.table.setCellWidget(i, 7, actions_widget)
 
         total_pages = max(
-            1, (self.total_count + PAGE_SIZE - 1) // PAGE_SIZE,
+            1,
+            (self.total_count + PAGE_SIZE - 1) // PAGE_SIZE,
         )
         self.page_label.setText(
             f"الصفحة {self.current_page} من {total_pages} ({self.total_count})",
@@ -255,7 +265,7 @@ class ReceiptsPage(QWidget):
         self.next_btn.setEnabled(self.current_page * PAGE_SIZE < self.total_count)
 
     def _new_receipt(self):
-        check_permission(self.current_user, 'receipts.create')
+        check_permission(self.current_user, "receipts.create")
         dlg = ReceiptDialog(self.current_user)
         if dlg.exec():
             log_action(
@@ -270,7 +280,7 @@ class ReceiptsPage(QWidget):
         dlg.exec()
 
     def _edit_receipt(self, receipt_id):
-        check_permission(self.current_user, 'receipts.update')
+        check_permission(self.current_user, "receipts.update")
         dlg = ReceiptDialog(self.current_user, receipt_id=receipt_id)
         if dlg.exec():
             log_action(
@@ -281,7 +291,7 @@ class ReceiptsPage(QWidget):
             self._load()
 
     def _change_status(self, receipt_id, new_status):
-        check_permission(self.current_user, f'receipts.{new_status.lower()}')
+        check_permission(self.current_user, f"receipts.{new_status.lower()}")
         status_ar = STATUS_STYLES.get(new_status, ("", new_status))[1]
         reply = QMessageBox.question(
             self,
@@ -299,7 +309,7 @@ class ReceiptsPage(QWidget):
             self._load()
 
     def _delete_receipt(self, receipt_id):
-        check_permission(self.current_user, 'receipts.delete')
+        check_permission(self.current_user, "receipts.delete")
         reply = QMessageBox.question(
             self,
             "تأكيد الحذف",

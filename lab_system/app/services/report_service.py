@@ -4,7 +4,7 @@ from pathlib import Path
 from lab_system.app.database import db as _db
 from lab_system.app.settings.config import STORAGE_DIR
 
-EXPORT_DIR = STORAGE_DIR / 'exports'
+EXPORT_DIR = STORAGE_DIR / "exports"
 
 
 def _where_clause(date_from="", date_to=""):
@@ -33,7 +33,8 @@ def receipt_summary(date_from="", date_to="", group_by="day"):
             params,
         ).fetchall()
         total = conn.execute(
-            f"SELECT COUNT(*) c FROM receipts r WHERE {clauses}", params,
+            f"SELECT COUNT(*) c FROM receipts r WHERE {clauses}",
+            params,
         ).fetchone()["c"]
     return {
         "total": total,
@@ -155,24 +156,46 @@ def sample_summary(date_from="", date_to=""):
 
 def export_receipts_csv(file_path, q="", status="", date_from="", date_to=""):
     from lab_system.app.services.receipt_service import list_receipts
+
     rows, _ = list_receipts(
-        q=q, status=status, date_from=date_from, date_to=date_to, page=1, page_size=999999,
+        q=q,
+        status=status,
+        date_from=date_from,
+        date_to=date_to,
+        page=1,
+        page_size=999999,
     )
     path = Path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
-        writer.writerow([
-            "رقم الإيصال", "النوع", "الجهة المرسلة", "الجهة المستقبلة",
-            "اسم المرسل", "اسم المستلم", "التاريخ", "الحالة", "ملاحظات",
-        ])
+        writer.writerow(
+            [
+                "رقم الإيصال",
+                "النوع",
+                "الجهة المرسلة",
+                "الجهة المستقبلة",
+                "اسم المرسل",
+                "اسم المستلم",
+                "التاريخ",
+                "الحالة",
+                "ملاحظات",
+            ]
+        )
         for r in rows:
-            writer.writerow([
-                r["receipt_no"], r["tx_type"],
-                r.get("sender_org", ""), r.get("receiver_org", ""),
-                r.get("sender_name", ""), r.get("receiver_name", ""),
-                r["created_at"], r["status"], r.get("notes", ""),
-            ])
+            writer.writerow(
+                [
+                    r["receipt_no"],
+                    r["tx_type"],
+                    r.get("sender_org", ""),
+                    r.get("receiver_org", ""),
+                    r.get("sender_name", ""),
+                    r.get("receiver_name", ""),
+                    r["created_at"],
+                    r["status"],
+                    r.get("notes", ""),
+                ]
+            )
     return path
 
 
@@ -221,14 +244,23 @@ def export_pdf(file_path, title, headers, data_rows):
     elements.append(Spacer(1, 12))
     table_data = [headers] + [list(map(str, row)) for row in data_rows]
     table = Table(table_data, repeatRows=1)
-    table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4472C4")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#D9E2F3")]),
-    ]))
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4472C4")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 1),
+                    (-1, -1),
+                    [colors.white, colors.HexColor("#D9E2F3")],
+                ),
+            ]
+        )
+    )
     elements.append(table)
     doc.build(elements)
     return path

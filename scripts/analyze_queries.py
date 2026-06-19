@@ -190,16 +190,27 @@ for label, sql in QUERIES.items():
 print(f"\n{'=' * 72}")
 print("INDEX LIST")
 print(f"{'=' * 72}")
-indexes = conn.execute("SELECT name, sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY name").fetchall()
+indexes = conn.execute(
+    "SELECT name, sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY name"
+).fetchall()
 for idx in indexes:
     print(f"  {idx['sql']}")
 
-table_info = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()
+table_info = conn.execute(
+    "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+).fetchall()
 print("\nROW COUNTS:")
 for t in table_info:
     name = t["name"]
-    if not name.startswith("sqlite") and not name.endswith("_fts") and not name.endswith("_fts_data") and not name.endswith("_fts_idx") and not name.endswith("_fts_config") and not name.endswith("_fts_docsize"):
-        cnt = conn.execute(f"SELECT COUNT(*) AS c FROM \"{name}\"").fetchone()["c"]
+    if (
+        not name.startswith("sqlite")
+        and not name.endswith("_fts")
+        and not name.endswith("_fts_data")
+        and not name.endswith("_fts_idx")
+        and not name.endswith("_fts_config")
+        and not name.endswith("_fts_docsize")
+    ):
+        cnt = conn.execute(f'SELECT COUNT(*) AS c FROM "{name}"').fetchone()["c"]
         print(f"  {name}: {cnt:,}")
 
 conn.close()

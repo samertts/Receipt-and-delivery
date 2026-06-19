@@ -41,7 +41,7 @@ STATUS_MAP = {
 
 _SECTION_HEADER = f"""
     QLabel {{
-        font-size: 10pt; font-weight: 700; color: {THEME['primary']};
+        font-size: 10pt; font-weight: 700; color: {THEME["primary"]};
         padding: 2px 0; margin-top: 6px;
     }}
 """
@@ -82,9 +82,9 @@ class ReceiptDialog(QDialog):
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet(f"""
             QTabWidget::pane {{
-                border: 1px solid {THEME['border']};
+                border: 1px solid {THEME["border"]};
                 border-radius: 8px;
-                background: {THEME['panel']};
+                background: {THEME["panel"]};
                 padding: 12px;
             }}
             QTabBar::tab {{
@@ -96,11 +96,11 @@ class ReceiptDialog(QDialog):
                 color: #64748B;
             }}
             QTabBar::tab:selected {{
-                color: {THEME['primary']};
-                border-bottom: 3px solid {THEME['primary']};
+                color: {THEME["primary"]};
+                border-bottom: 3px solid {THEME["primary"]};
             }}
             QTabBar::tab:hover {{
-                color: {THEME['primary']};
+                color: {THEME["primary"]};
             }}
         """)
         main.addWidget(self.tabs)
@@ -116,7 +116,7 @@ class ReceiptDialog(QDialog):
         save_btn = QPushButton("حفظ (Ctrl+S)")
         save_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: {THEME['primary']}; color: white;
+                background-color: {THEME["primary"]}; color: white;
                 border: none; border-radius: 6px;
                 padding: 8px 28px; min-height: 36px;
                 font-size: 12pt; font-weight: 600;
@@ -130,8 +130,8 @@ class ReceiptDialog(QDialog):
         cancel_btn = QPushButton("إلغاء")
         cancel_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: {THEME['panel']}; color: #334155;
-                border: 1px solid {THEME['border']}; border-radius: 6px;
+                background-color: {THEME["panel"]}; color: #334155;
+                border: 1px solid {THEME["border"]}; border-radius: 6px;
                 padding: 8px 28px; min-height: 36px; font-size: 12pt;
             }}
             QPushButton:hover {{ background-color: #F1F5F9; }}
@@ -239,8 +239,8 @@ class ReceiptDialog(QDialog):
         add_btn = QPushButton("+ إضافة عينة")
         add_btn.setStyleSheet(f"""
             QPushButton {{
-                background: {THEME['panel']}; color: {THEME['primary']};
-                border: 2px dashed {THEME['primary']}; border-radius: 8px;
+                background: {THEME["panel"]}; color: {THEME["primary"]};
+                border: 2px dashed {THEME["primary"]}; border-radius: 8px;
                 padding: 10px; font-size: 11pt; font-weight: 600;
                 min-height: 36px;
             }}
@@ -309,7 +309,9 @@ class ReceiptDialog(QDialog):
                 datetime.strptime(receipt["auth_date"], "%Y-%m-%d").date(),
             )
         eng_status = receipt["status"]
-        ar_status = next((k for k, v in STATUS_MAP.items() if v == eng_status), eng_status)
+        ar_status = next(
+            (k for k, v in STATUS_MAP.items() if v == eng_status), eng_status
+        )
         idx = self.status_combo.findText(ar_status)
         if idx >= 0:
             self.status_combo.setCurrentIndex(idx)
@@ -392,10 +394,12 @@ class ReceiptDialog(QDialog):
                     "damaged_count": self.items_table.cellWidget(row, 3).value(),
                     "rejected_count": self.items_table.cellWidget(row, 4).value(),
                     "non_conforming_count": self.items_table.cellWidget(
-                        row, 5,
+                        row,
+                        5,
                     ).value(),
                     "transport_condition": self.items_table.cellWidget(
-                        row, 6,
+                        row,
+                        6,
                     ).text(),
                     "notes": self.items_table.cellWidget(row, 7).text(),
                 },
@@ -429,7 +433,9 @@ class ReceiptDialog(QDialog):
             "notes": self.notes.text().strip(),
             "transport_info": self.transport_info.text().strip(),
             "additional_comments": self.additional_comments.text().strip(),
-            "status": STATUS_MAP.get(self.status_combo.currentText(), self.status_combo.currentText()),
+            "status": STATUS_MAP.get(
+                self.status_combo.currentText(), self.status_combo.currentText()
+            ),
         }
         items = self._collect_item_data()
 
@@ -447,7 +453,9 @@ class ReceiptDialog(QDialog):
             if self.editing:
                 update_receipt(self.receipt_id, data, items, user=self.current_user)
             else:
-                self._rid, self._no = create_receipt(data, items, self.current_user["id"])
+                self._rid, self._no = create_receipt(
+                    data, items, self.current_user["id"]
+                )
             self.accept()
         except ValueError as e:
             QMessageBox.warning(self, "خطأ في البيانات", str(e))

@@ -5,7 +5,9 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-_SECRET_KEY_FILE = Path(__file__).resolve().parent.parent.parent / '.generated_secret_key.json'
+_SECRET_KEY_FILE = (
+    Path(__file__).resolve().parent.parent.parent / ".generated_secret_key.json"
+)
 
 
 def _load_or_persist_secret_key() -> str:
@@ -13,24 +15,24 @@ def _load_or_persist_secret_key() -> str:
     if _SECRET_KEY_FILE.exists():
         try:
             data = json.loads(_SECRET_KEY_FILE.read_text())
-            if isinstance(data, dict) and 'secret_key' in data:
-                return data['secret_key']
+            if isinstance(data, dict) and "secret_key" in data:
+                return data["secret_key"]
         except (json.JSONDecodeError, OSError):
             pass
     key = secrets.token_hex(32)
     try:
         _SECRET_KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
-        _SECRET_KEY_FILE.write_text(json.dumps({'secret_key': key}))
+        _SECRET_KEY_FILE.write_text(json.dumps({"secret_key": key}))
     except OSError:
         pass
     return key
 
 
 def _read_app_version() -> str:
-    version_file = Path(__file__).resolve().parent.parent.parent.parent / 'VERSION'
+    version_file = Path(__file__).resolve().parent.parent.parent.parent / "VERSION"
     if version_file.exists():
-        return version_file.read_text(encoding='utf-8').strip() or '0.0.0'
-    return '0.0.0'
+        return version_file.read_text(encoding="utf-8").strip() or "0.0.0"
+    return "0.0.0"
 
 
 class Settings(BaseSettings):

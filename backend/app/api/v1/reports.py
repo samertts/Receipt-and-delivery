@@ -22,47 +22,53 @@ async def get_governorate_report(
     db: Session = Depends(get_db),
 ):
     """Aggregate data across all institutions in a governorate."""
-    
+
     # Get all institutions in the governorate
-    institutions = db.query(Organization).filter(
-        Organization.governorate == governorate_name
-    ).all()
-    
+    institutions = (
+        db.query(Organization)
+        .filter(Organization.governorate == governorate_name)
+        .all()
+    )
+
     if not institutions:
         return {
             "governorate": governorate_name,
             "total_transactions": 0,
             "institutions": [],
         }
-    
+
     institution_ids = [str(inst.id) for inst in institutions]
-    
+
     # Count transactions for each institution
-    transaction_counts = db.query(
-        Transaction.sender_organization_id,
-        func.count(Transaction.id)
-    ).filter(
-        Transaction.sender_organization_id.in_(institution_ids),
-        Transaction.created_at >= start_date.isoformat(),
-        Transaction.created_at <= f"{end_date.isoformat()}T23:59:59"
-    ).group_by(Transaction.sender_organization_id).all()
-    
+    transaction_counts = (
+        db.query(Transaction.sender_organization_id, func.count(Transaction.id))
+        .filter(
+            Transaction.sender_organization_id.in_(institution_ids),
+            Transaction.created_at >= start_date.isoformat(),
+            Transaction.created_at <= f"{end_date.isoformat()}T23:59:59",
+        )
+        .group_by(Transaction.sender_organization_id)
+        .all()
+    )
+
     # Create mapping of institution_id to count
     count_map = dict(transaction_counts)
-    
+
     # Build response
     institutions_data = []
     total_transactions = 0
     for inst in institutions:
         count = count_map.get(str(inst.id), 0)
         total_transactions += count
-        institutions_data.append({
-            "id": str(inst.id),
-            "name": inst.name,
-            "code": inst.code,
-            "transaction_count": count,
-        })
-    
+        institutions_data.append(
+            {
+                "id": str(inst.id),
+                "name": inst.name,
+                "code": inst.code,
+                "transaction_count": count,
+            }
+        )
+
     return {
         "governorate": governorate_name,
         "start_date": start_date.isoformat(),

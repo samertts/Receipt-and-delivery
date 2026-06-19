@@ -1,4 +1,3 @@
-
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -54,10 +53,13 @@ class BackupPage(QWidget):
         self.refresh()
 
     def _do_backup(self):
-        check_permission(self.current_user, 'backup.create')
+        check_permission(self.current_user, "backup.create")
         from pathlib import Path
+
         try:
-            path = create_backup(user_id=self.current_user.get("id"), user=self.current_user)
+            path = create_backup(
+                user_id=self.current_user.get("id"), user=self.current_user
+            )
             log_action(
                 self.current_user["id"],
                 "backup_created",
@@ -65,7 +67,9 @@ class BackupPage(QWidget):
             )
         except Exception as e:
             QMessageBox.warning(
-                self, "خطأ", f"فشل إنشاء النسخة الاحتياطية: {e}",
+                self,
+                "خطأ",
+                f"فشل إنشاء النسخة الاحتياطية: {e}",
             )
 
     def refresh(self):
@@ -97,17 +101,19 @@ class BackupPage(QWidget):
             self.table.setCellWidget(i, 3, actions_widget)
 
     def _verify(self, backup_path):
-        check_permission(self.current_user, 'backup.verify')
+        check_permission(self.current_user, "backup.verify")
         result = verify_backup(backup_path)
         if result["valid"]:
             toast(self, "النسخة سليمة", "success")
         else:
             QMessageBox.warning(
-                self, "تحقق", f"النسخة تالفة: {result.get('error', 'خطأ غير معروف')}",
+                self,
+                "تحقق",
+                f"النسخة تالفة: {result.get('error', 'خطأ غير معروف')}",
             )
 
     def _restore(self, backup_path):
-        check_permission(self.current_user, 'backup.restore')
+        check_permission(self.current_user, "backup.restore")
         reply = QMessageBox.question(
             self,
             "تأكيد الاستعادة",
@@ -122,8 +128,11 @@ class BackupPage(QWidget):
                 raise FileNotFoundError(f"ملف النسخة غير موجود: {backup_path}")
             result = verify_backup(backup_path)
             if not result.get("valid"):
-                raise ValueError(f"النسخة تالفة: {result.get('error', 'خطأ غير معروف')}")
+                raise ValueError(
+                    f"النسخة تالفة: {result.get('error', 'خطأ غير معروف')}"
+                )
             from lab_system.app.services.recovery_service import restore_from_backup
+
             result = restore_from_backup(backup_path)
             if not result.get("success"):
                 raise RuntimeError(result.get("error", "فشلت الاستعادة"))
@@ -135,11 +144,14 @@ class BackupPage(QWidget):
             toast(self, "تمت الاستعادة بنجاح", "success")
         except Exception as e:
             QMessageBox.warning(
-                self, "خطأ", f"فشلت الاستعادة: {e}",
+                self,
+                "خطأ",
+                f"فشلت الاستعادة: {e}",
             )
 
     def _verify_all(self):
         from lab_system.app.services.recovery_service import list_backups
+
         backups = list_backups()
         if not backups:
             toast(self, "لا توجد نسخ احتياطية", "warning")
@@ -152,5 +164,9 @@ class BackupPage(QWidget):
                 valid += 1
             else:
                 invalid += 1
-        s = f"صحيح: {valid}, تالف: {invalid}" if invalid else f"جميع النسخ سليمة ({valid})"
+        s = (
+            f"صحيح: {valid}, تالف: {invalid}"
+            if invalid
+            else f"جميع النسخ سليمة ({valid})"
+        )
         toast(self, s, "success" if invalid == 0 else "warning")

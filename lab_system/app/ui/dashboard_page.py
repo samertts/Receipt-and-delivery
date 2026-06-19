@@ -27,13 +27,13 @@ ROLE_MAP = {
 
 
 class StatCard(QFrame):
-    def __init__(self, label, value, color=THEME['primary'], icon=""):
+    def __init__(self, label, value, color=THEME["primary"], icon=""):
         super().__init__()
         self.setObjectName("StatCard")
         self.setStyleSheet(f"""
             #StatCard {{
-                background: {THEME['panel']};
-                border: 1px solid {THEME['border']};
+                background: {THEME["panel"]};
+                border: 1px solid {THEME["border"]};
                 border-radius: 12px;
                 border-left: 4px solid {color};
             }}
@@ -76,7 +76,9 @@ class DashboardPage(QWidget):
 
         if self._auth and self._auth.needs_password_change():
             warn = QLabel("⚠ يرجى تغيير كلمة المرور الافتراضية")
-            warn.setStyleSheet("color:#DC2626;font-weight:bold;font-size:14px;padding:12px;background:#FEF2F2;border-radius:8px;")
+            warn.setStyleSheet(
+                "color:#DC2626;font-weight:bold;font-size:14px;padding:12px;background:#FEF2F2;border-radius:8px;"
+            )
             self.layout().addWidget(warn)
 
         self._build_quick_actions()
@@ -123,12 +125,12 @@ class DashboardPage(QWidget):
         grid.setSpacing(12)
 
         cards = [
-            ("إجمالي الاستلامات", stats["total"], THEME['primary'], "📦"),
-            ("استلامات اليوم", stats["today_count"], THEME['success'], "📅"),
+            ("إجمالي الاستلامات", stats["total"], THEME["primary"], "📦"),
+            ("استلامات اليوم", stats["today_count"], THEME["success"], "📅"),
             ("آخر 7 أيام", stats["week_count"], "#D97706", "📊"),
             ("آخر 30 يوماً", stats["month_count"], "#7C3AED", "📈"),
-            ("قيد المعالجة", stats["pending"], THEME['warning'], "⏳"),
-            ("المكتملة", stats["completed"], THEME['success'], "✅"),
+            ("قيد المعالجة", stats["pending"], THEME["warning"], "⏳"),
+            ("المكتملة", stats["completed"], THEME["success"], "✅"),
             ("الجهات", stats["org_count"], "#0891B2", "🏛️"),
             ("المستخدمون", stats["user_count"], "#DC2626", "👥"),
         ]
@@ -144,14 +146,19 @@ class DashboardPage(QWidget):
 
     def _build_quick_actions(self):
         section = QLabel("إجراءات سريعة")
-        section.setStyleSheet("font-size:14px;font-weight:700;color:#0F172A;margin-top:16px;margin-bottom:8px;")
+        section.setStyleSheet(
+            "font-size:14px;font-weight:700;color:#0F172A;margin-top:16px;margin-bottom:8px;"
+        )
         self.layout().addWidget(section)
 
         row = QHBoxLayout()
         row.setSpacing(8)
 
         actions = [
-            ("استلام جديد", lambda: self._navigate_cb and self._navigate_cb("receipts")),
+            (
+                "استلام جديد",
+                lambda: self._navigate_cb and self._navigate_cb("receipts"),
+            ),
             ("التقارير", lambda: self._navigate_cb and self._navigate_cb("reports")),
             ("إدارة الجهات", lambda: self._navigate_cb and self._navigate_cb("orgs")),
             ("المستخدمون", lambda: self._navigate_cb and self._navigate_cb("users")),
@@ -160,12 +167,12 @@ class DashboardPage(QWidget):
             btn = QPushButton(text)
             btn.setStyleSheet(f"""
                 QPushButton {{
-                    background: {THEME['panel']}; color: #334155;
-                    border: 1px solid {THEME['border']}; border-radius: 8px;
+                    background: {THEME["panel"]}; color: #334155;
+                    border: 1px solid {THEME["border"]}; border-radius: 8px;
                     padding: 12px 20px; font-size: 12pt; min-height: 44px;
                 }}
                 QPushButton:hover {{
-                    background: #F1F5F9; border-color: {THEME['primary']};
+                    background: #F1F5F9; border-color: {THEME["primary"]};
                 }}
             """)
             if cb:
@@ -230,15 +237,19 @@ class DashboardPage(QWidget):
         layout = QVBoxLayout(box)
         health = sync_service.get_health()
         status = QLabel()
-        if not health['enabled']:
+        if not health["enabled"]:
             status.setText("⚙ المزامنة غير مفعلة")
             status.setStyleSheet("color:#6B7280;font-weight:bold;padding:8px;")
-        elif health['healthy']:
+        elif health["healthy"]:
             status.setText(f"✓ سليمة — {health['synced']} عناصر متزامنة")
-            status.setStyleSheet(f"color:{THEME['success']};font-weight:bold;padding:8px;")
+            status.setStyleSheet(
+                f"color:{THEME['success']};font-weight:bold;padding:8px;"
+            )
         else:
             status.setText(f"⚠ {health['pending']} معلقة, {health['conflicts']} تعارض")
-            status.setStyleSheet(f"color:{THEME['warning']};font-weight:bold;padding:8px;")
+            status.setStyleSheet(
+                f"color:{THEME['warning']};font-weight:bold;padding:8px;"
+            )
         layout.addWidget(status)
         return box
 
@@ -247,8 +258,12 @@ class DashboardPage(QWidget):
         health = QLabel()
         if diag["all_ok"]:
             health.setText("✓ جميع الأنظمة تعمل بشكل طبيعي")
-            health.setStyleSheet(f"color:{THEME['success']};font-weight:bold;padding:12px;background:#F0FDF4;border-radius:8px;margin-top:8px;")
+            health.setStyleSheet(
+                f"color:{THEME['success']};font-weight:bold;padding:12px;background:#F0FDF4;border-radius:8px;margin-top:8px;"
+            )
         else:
             health.setText("⚠ توجد مشكلات في النظام — راجع سجل التشخيص")
-            health.setStyleSheet(f"color:{THEME['warning']};font-weight:bold;padding:12px;background:#FFFBEB;border-radius:8px;margin-top:8px;")
+            health.setStyleSheet(
+                f"color:{THEME['warning']};font-weight:bold;padding:12px;background:#FFFBEB;border-radius:8px;margin-top:8px;"
+            )
         self.layout().addWidget(health)

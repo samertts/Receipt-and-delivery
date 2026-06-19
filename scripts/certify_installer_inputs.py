@@ -45,18 +45,18 @@ def warn(cond, msg):
 def check_pe_header(path: Path) -> bool:
     """Check if file has a valid PE (Portable Executable) header."""
     try:
-        with open(path, 'rb') as f:
+        with open(path, "rb") as f:
             header = f.read(2)
-            if header != b'MZ':
+            if header != b"MZ":
                 return False
             f.seek(0x3C)
             pe_offset_bytes = f.read(4)
             if len(pe_offset_bytes) < 4:
                 return False
-            pe_offset = struct.unpack('<I', pe_offset_bytes)[0]
+            pe_offset = struct.unpack("<I", pe_offset_bytes)[0]
             f.seek(pe_offset)
             pe_sig = f.read(4)
-            return pe_sig == b'PE\x00\x00'
+            return pe_sig == b"PE\x00\x00"
     except Exception:
         return False
 
@@ -91,7 +91,10 @@ ok(version_path.exists(), "VERSION file not found")
 if version_path.exists():
     version_text = version_path.read_text(encoding="utf-8").strip()
     ok(bool(version_text), "VERSION file is empty")
-    ok(version_text.count(".") >= 1, f"VERSION does not look like a version: {version_text}")
+    ok(
+        version_text.count(".") >= 1,
+        f"VERSION does not look like a version: {version_text}",
+    )
     print(f"  Version: {version_text}")
 else:
     print("  MISSING")
@@ -122,10 +125,12 @@ if icon_path.exists():
     size = icon_path.stat().st_size
     ok(size > 0, f"Icon is zero bytes: {icon_path}")
     ok(size > 1000, f"Icon too small ({size} bytes)")
-    with open(icon_path, 'rb') as f:
+    with open(icon_path, "rb") as f:
         magic = f.read(4)
-    ok(magic[:2] == b'\x00\x00' and magic[2:4] in (b'\x01\x00', b'\x02\x00'),
-       f"Icon has invalid .ico header: {icon_path}")
+    ok(
+        magic[:2] == b"\x00\x00" and magic[2:4] in (b"\x01\x00", b"\x02\x00"),
+        f"Icon has invalid .ico header: {icon_path}",
+    )
     print(f"  {icon_path}  ({size:,} bytes)")
 else:
     print("  MISSING")
@@ -157,18 +162,20 @@ if iss_path.exists():
     for line in iss_text.splitlines():
         line = line.strip()
         if line.startswith("Source:"):
-            after_colon = line[len("Source:"):].strip()
+            after_colon = line[len("Source:") :].strip()
             if after_colon.startswith('"'):
                 src_val = after_colon.split('"')[1]
             elif after_colon.startswith("'"):
                 src_val = after_colon.split("'")[1]
             else:
                 src_val = after_colon.split(";")[0].strip()
-            src_posix = src_val.replace('\\', '/').rstrip('*')
+            src_posix = src_val.replace("\\", "/").rstrip("*")
             resolved = (iss_dir / src_posix).resolve()
-            parent_dir = resolved.parent if src_val.endswith('*') else resolved
-            ok(parent_dir.exists(),
-               f"Source path does not resolve: '{src_val}' → {resolved}")
+            parent_dir = resolved.parent if src_val.endswith("*") else resolved
+            ok(
+                parent_dir.exists(),
+                f"Source path does not resolve: '{src_val}' → {resolved}",
+            )
             print(f"  Source: {src_val} → {resolved}")
 else:
     print("  MISSING")
@@ -180,8 +187,7 @@ print()
 print("[6] Path Consistency")
 # EXE from spec should land where .iss expects it
 exe_expected = ROOT / "dist" / "LabReceiptSystem.exe"
-ok(exe_expected == exe_path,
-   f"Path inconsistency: expected EXE at {exe_expected}")
+ok(exe_expected == exe_path, f"Path inconsistency: expected EXE at {exe_expected}")
 
 # Installer output path
 installer_output = ROOT / "installer" / "Output" / "LabReceiptSetup.exe"

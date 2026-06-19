@@ -9,7 +9,7 @@ from app.repositories.base import BaseRepository
 
 def escape_like(value: str) -> str:
     """Escape special characters for SQL LIKE patterns."""
-    return value.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 class UserRepository(BaseRepository[User]):
@@ -42,12 +42,14 @@ class TransactionRepository(BaseRepository[Transaction]):
             query = query.filter(Transaction.status == status)
         if search:
             search_term = f"%{escape_like(search)}%"
-            query = query.filter(Transaction.transaction_no.ilike(search_term, escape='\\'))
+            query = query.filter(
+                Transaction.transaction_no.ilike(search_term, escape="\\")
+            )
         if institution_id:
             # Filter by institution through organization relationships
             query = query.filter(
-                (Transaction.sender_organization_id == institution_id) |
-                (Transaction.receiver_organization_id == institution_id)
+                (Transaction.sender_organization_id == institution_id)
+                | (Transaction.receiver_organization_id == institution_id)
             )
         total = query.count()
         items = (
@@ -60,14 +62,24 @@ class TransactionRepository(BaseRepository[Transaction]):
 
     def find_by_id_with_items(self, txn_id: str) -> Transaction | None:
         from sqlalchemy.orm import joinedload
-        return self.db.query(Transaction).options(
-            joinedload(Transaction.items),
-        ).filter(Transaction.id == txn_id).first()
+
+        return (
+            self.db.query(Transaction)
+            .options(
+                joinedload(Transaction.items),
+            )
+            .filter(Transaction.id == txn_id)
+            .first()
+        )
 
     def find_by_transaction_no(self, txn_no: str) -> Transaction | None:
-        return self.db.query(Transaction).filter(
-            Transaction.transaction_no == txn_no,
-        ).first()
+        return (
+            self.db.query(Transaction)
+            .filter(
+                Transaction.transaction_no == txn_no,
+            )
+            .first()
+        )
 
 
 class AuditRepository(BaseRepository[AuditLog]):
@@ -83,7 +95,9 @@ class AuditRepository(BaseRepository[AuditLog]):
         filters = {}
         if action_type:
             filters["action_type"] = action_type
-        return self.list(page=page, limit=limit, filters=filters, order_by="created_at", desc=True)
+        return self.list(
+            page=page, limit=limit, filters=filters, order_by="created_at", desc=True
+        )
 
 
 class SyncRepository(BaseRepository[SyncLog]):

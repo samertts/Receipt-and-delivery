@@ -10,8 +10,10 @@ class TestAuditChangesJson:
             transaction_type="Test",
             sender_organization_id="00000000-0000-0000-0000-000000000001",
             receiver_organization_id="00000000-0000-0000-0000-000000000002",
-            sender_name="S", receiver_name="R",
-            transaction_date="2026-06-01", status="draft",
+            sender_name="S",
+            receiver_name="R",
+            transaction_date="2026-06-01",
+            status="draft",
         )
         db.add(txn)
         db.commit()
@@ -45,8 +47,10 @@ class TestAuditChangesJson:
             transaction_type="Test",
             sender_organization_id="00000000-0000-0000-0000-000000000001",
             receiver_organization_id="00000000-0000-0000-0000-000000000002",
-            sender_name="S", receiver_name="R",
-            transaction_date="2026-06-01", status="draft",
+            sender_name="S",
+            receiver_name="R",
+            transaction_date="2026-06-01",
+            status="draft",
         )
         db.add(txn)
         db.commit()

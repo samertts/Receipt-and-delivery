@@ -25,9 +25,14 @@ def list_transactions(
     _: User = Depends(require_permission("view_transactions")),
 ):
     svc = get_transaction_service(db)
-    items, total = svc.list_transactions(page=page, limit=limit, status=status, search=search)
+    items, total = svc.list_transactions(
+        page=page, limit=limit, status=status, search=search
+    )
     return paginated_response(
-        items=[TransactionResponse.model_validate(item).model_dump(mode="json") for item in items],
+        items=[
+            TransactionResponse.model_validate(item).model_dump(mode="json")
+            for item in items
+        ],
         total=total,
         page=page,
         per_page=limit,

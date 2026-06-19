@@ -15,9 +15,15 @@ def _new_uuid() -> str:
 
 
 class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
+    )
 
 
 class UUIDMixin:
-    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True, default=_new_uuid)
+    id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False), primary_key=True, default=_new_uuid
+    )

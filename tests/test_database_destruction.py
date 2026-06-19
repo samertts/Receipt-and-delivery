@@ -17,6 +17,7 @@ import pytest
 
 # Ensure lab_system is importable
 import sys
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
@@ -51,6 +52,7 @@ def _redirect_db(db_path):
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def tmp_db_dir(tmp_path):
     """Create a temporary database directory."""
@@ -69,34 +71,57 @@ def fresh_db(tmp_db_dir):
     conn.execute("PRAGMA foreign_keys = ON;")
 
     from lab_system.app.database.db import SCHEMA
+
     conn.executescript(SCHEMA)
 
     # Seed with test data
-    conn.execute("INSERT INTO organizations(name, code, status) VALUES('Org A', 'ORG-A', 'Active')")
-    conn.execute("INSERT INTO organizations(name, code, status) VALUES('Org B', 'ORG-B', 'Active')")
-    conn.execute("INSERT INTO users(full_name, username, password_hash, role, institution_id, status) "
-                 "VALUES('Admin User', 'admin', 'hash_admin', 'Admin', 1, 'Active')")
-    conn.execute("INSERT INTO users(full_name, username, password_hash, role, institution_id, status) "
-                 "VALUES('Regular User', 'user1', 'hash_user1', 'User', 1, 'Active')")
+    conn.execute(
+        "INSERT INTO organizations(name, code, status) VALUES('Org A', 'ORG-A', 'Active')"
+    )
+    conn.execute(
+        "INSERT INTO organizations(name, code, status) VALUES('Org B', 'ORG-B', 'Active')"
+    )
+    conn.execute(
+        "INSERT INTO users(full_name, username, password_hash, role, institution_id, status) "
+        "VALUES('Admin User', 'admin', 'hash_admin', 'Admin', 1, 'Active')"
+    )
+    conn.execute(
+        "INSERT INTO users(full_name, username, password_hash, role, institution_id, status) "
+        "VALUES('Regular User', 'user1', 'hash_user1', 'User', 1, 'Active')"
+    )
     conn.execute("INSERT INTO transaction_types(name) VALUES('Receipt')")
     conn.execute("INSERT INTO transaction_types(name) VALUES('Delivery')")
-    conn.execute("INSERT INTO sample_types(name, status) VALUES('Blood Sample', 'Active')")
-    conn.execute("INSERT INTO sample_types(name, status) VALUES('Urine Sample', 'Active')")
-    conn.execute("INSERT INTO receipts(receipt_no, tx_type_id, sender_org_id, receiver_org_id, "
-                 "sender_name, receiver_name, created_at, status, created_by) "
-                 "VALUES('REC-001', 1, 1, 2, 'Sender A', 'Receiver B', '2024-01-15T10:00:00', 'Draft', 1)")
-    conn.execute("INSERT INTO receipts(receipt_no, tx_type_id, sender_org_id, receiver_org_id, "
-                 "sender_name, receiver_name, created_at, status, created_by) "
-                 "VALUES('REC-002', 2, 2, 1, 'Sender B', 'Receiver A', '2024-01-16T14:30:00', 'Approved', 2)")
-    conn.execute("INSERT INTO receipt_items(receipt_id, sample_type_id, total_count, valid_count, "
-                 "damaged_count, rejected_count, non_conforming_count) "
-                 "VALUES(1, 1, 100, 90, 5, 3, 2)")
-    conn.execute("INSERT INTO receipt_items(receipt_id, sample_type_id, total_count, valid_count, "
-                 "damaged_count, rejected_count, non_conforming_count) "
-                 "VALUES(2, 2, 50, 48, 1, 1, 0)")
+    conn.execute(
+        "INSERT INTO sample_types(name, status) VALUES('Blood Sample', 'Active')"
+    )
+    conn.execute(
+        "INSERT INTO sample_types(name, status) VALUES('Urine Sample', 'Active')"
+    )
+    conn.execute(
+        "INSERT INTO receipts(receipt_no, tx_type_id, sender_org_id, receiver_org_id, "
+        "sender_name, receiver_name, created_at, status, created_by) "
+        "VALUES('REC-001', 1, 1, 2, 'Sender A', 'Receiver B', '2024-01-15T10:00:00', 'Draft', 1)"
+    )
+    conn.execute(
+        "INSERT INTO receipts(receipt_no, tx_type_id, sender_org_id, receiver_org_id, "
+        "sender_name, receiver_name, created_at, status, created_by) "
+        "VALUES('REC-002', 2, 2, 1, 'Sender B', 'Receiver A', '2024-01-16T14:30:00', 'Approved', 2)"
+    )
+    conn.execute(
+        "INSERT INTO receipt_items(receipt_id, sample_type_id, total_count, valid_count, "
+        "damaged_count, rejected_count, non_conforming_count) "
+        "VALUES(1, 1, 100, 90, 5, 3, 2)"
+    )
+    conn.execute(
+        "INSERT INTO receipt_items(receipt_id, sample_type_id, total_count, valid_count, "
+        "damaged_count, rejected_count, non_conforming_count) "
+        "VALUES(2, 2, 50, 48, 1, 1, 0)"
+    )
     conn.execute("INSERT INTO meta(key, value) VALUES('schema_version', '10')")
-    conn.execute("INSERT INTO schema_version(id, version, app_version, updated_at) "
-                 "VALUES(1, 10, '1.0.0', '2024-01-16T00:00:00')")
+    conn.execute(
+        "INSERT INTO schema_version(id, version, app_version, updated_at) "
+        "VALUES(1, 10, '1.0.0', '2024-01-16T00:00:00')"
+    )
     conn.commit()
     conn.close()
     return db_path
@@ -109,7 +134,7 @@ def backup_db(fresh_db, tmp_db_dir):
     backup_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(str(fresh_db), str(backup_path))
     # Also copy WAL/SHM if present
-    for ext in ('-wal', '-shm'):
+    for ext in ("-wal", "-shm"):
         src = fresh_db.parent / (fresh_db.name + ext)
         if src.exists():
             shutil.copy2(str(src), str(backup_path) + ext)
@@ -119,6 +144,7 @@ def backup_db(fresh_db, tmp_db_dir):
 # ===========================================================================
 # 1. CORRUPTED DATABASE HEADER
 # ===========================================================================
+
 
 class TestCorruptedDatabaseHeader:
     """Simulate catastrophic header corruption."""
@@ -130,8 +156,10 @@ class TestCorruptedDatabaseHeader:
         # Save original data counts
         orig_conn = sqlite3.connect(str(db_path))
         orig_counts = {}
-        for t in ['organizations', 'users', 'receipts', 'receipt_items']:
-            orig_counts[t] = orig_conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+        for t in ["organizations", "users", "receipts", "receipt_items"]:
+            orig_counts[t] = orig_conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[
+                0
+            ]
         orig_conn.close()
 
         # Corrupt header: overwrite first 16 bytes with garbage
@@ -148,9 +176,10 @@ class TestCorruptedDatabaseHeader:
         except Exception:
             integrity_ok = False
 
-        result = {"corruption_detected": not integrity_ok,
-                  "orig_counts": orig_counts}
-        assert result["corruption_detected"], "Header corruption should be detected by integrity_check"
+        result = {"corruption_detected": not integrity_ok, "orig_counts": orig_counts}
+        assert result["corruption_detected"], (
+            "Header corruption should be detected by integrity_check"
+        )
 
     def test_corrupt_header_makes_db_unreadable(self, fresh_db):
         """Verify corrupted header causes integrity failure."""
@@ -174,6 +203,7 @@ class TestCorruptedDatabaseHeader:
 # ===========================================================================
 # 2. MISSING WAL FILE
 # ===========================================================================
+
 
 class TestMissingWALFile:
     """Simulate WAL file deletion."""
@@ -206,8 +236,10 @@ class TestMissingWALFile:
         row = conn.execute("SELECT value FROM meta WHERE key='wal_test'").fetchone()
 
         # The committed data should be in the main DB file after checkpoint
-        result = {"data_preserved": row is not None and row[0] == "value1",
-                  "wal_existed": wal_deleted}
+        result = {
+            "data_preserved": row is not None and row[0] == "value1",
+            "wal_existed": wal_deleted,
+        }
         conn.close()
         return result
 
@@ -244,6 +276,7 @@ class TestMissingWALFile:
 # 3. MISSING INDEXES
 # ===========================================================================
 
+
 class TestMissingIndexes:
     """Simulate index deletion and verify recovery."""
 
@@ -270,6 +303,7 @@ class TestMissingIndexes:
 
         # Now run init_db to recreate
         from lab_system.app.database import db as db_mod
+
         orig_config = _redirect_db(fresh_db)
         try:
             db_mod.init_db()
@@ -286,7 +320,7 @@ class TestMissingIndexes:
             "indexes_before": len(indexes),
             "indexes_after_drop": remaining,
             "indexes_after_restore": after,
-            "recovery_success": after >= len(indexes)
+            "recovery_success": after >= len(indexes),
         }
         assert result["recovery_success"], "Indexes should be recreated by init_db"
         return result
@@ -309,16 +343,21 @@ class TestMissingIndexes:
         ).fetchall()
         elapsed = time.time() - start
 
-        result = {"query_works_without_indexes": len(rows) > 0,
-                  "query_time_seconds": round(elapsed, 4)}
+        result = {
+            "query_works_without_indexes": len(rows) > 0,
+            "query_time_seconds": round(elapsed, 4),
+        }
         conn.close()
-        assert result["query_works_without_indexes"], "Queries should work without indexes"
+        assert result["query_works_without_indexes"], (
+            "Queries should work without indexes"
+        )
         return result
 
 
 # ===========================================================================
 # 4. BROKEN FOREIGN KEYS
 # ===========================================================================
+
 
 class TestBrokenForeignKeys:
     """Simulate foreign key violations and orphaned records."""
@@ -329,33 +368,44 @@ class TestBrokenForeignKeys:
         conn.execute("PRAGMA foreign_keys = ON;")
 
         # Insert a receipt with item
-        conn.execute("INSERT INTO receipts(receipt_no, tx_type_id, sender_org_id, receiver_org_id, "
-                     "sender_name, receiver_name, created_at, status, created_by) "
-                     "VALUES('TEMP-999', 1, 1, 2, 'Test', 'Test', '2024-01-01T00:00:00', 'Draft', 1)")
+        conn.execute(
+            "INSERT INTO receipts(receipt_no, tx_type_id, sender_org_id, receiver_org_id, "
+            "sender_name, receiver_name, created_at, status, created_by) "
+            "VALUES('TEMP-999', 1, 1, 2, 'Test', 'Test', '2024-01-01T00:00:00', 'Draft', 1)"
+        )
         receipt_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
-        conn.execute("INSERT INTO receipt_items(receipt_id, sample_type_id, total_count, valid_count, "
-                     "damaged_count, rejected_count, non_conforming_count) "
-                     "VALUES(?, 1, 10, 8, 1, 1, 0)", (receipt_id,))
+        conn.execute(
+            "INSERT INTO receipt_items(receipt_id, sample_type_id, total_count, valid_count, "
+            "damaged_count, rejected_count, non_conforming_count) "
+            "VALUES(?, 1, 10, 8, 1, 1, 0)",
+            (receipt_id,),
+        )
         conn.commit()
 
         # Verify item exists
-        item_count = conn.execute("SELECT COUNT(*) FROM receipt_items WHERE receipt_id=?",
-                                  (receipt_id,)).fetchone()[0]
+        item_count = conn.execute(
+            "SELECT COUNT(*) FROM receipt_items WHERE receipt_id=?", (receipt_id,)
+        ).fetchone()[0]
         assert item_count == 1
 
         # Delete receipt - CASCADE should delete item
         conn.execute("DELETE FROM receipts WHERE id=?", (receipt_id,))
         conn.commit()
 
-        item_count_after = conn.execute("SELECT COUNT(*) FROM receipt_items WHERE receipt_id=?",
-                                        (receipt_id,)).fetchone()[0]
+        item_count_after = conn.execute(
+            "SELECT COUNT(*) FROM receipt_items WHERE receipt_id=?", (receipt_id,)
+        ).fetchone()[0]
         conn.close()
 
-        result = {"cascade_delete_works": item_count_after == 0,
-                  "items_before": item_count,
-                  "items_after": item_count_after}
-        assert result["cascade_delete_works"], "ON DELETE CASCADE should remove child items"
+        result = {
+            "cascade_delete_works": item_count_after == 0,
+            "items_before": item_count,
+            "items_after": item_count_after,
+        }
+        assert result["cascade_delete_works"], (
+            "ON DELETE CASCADE should remove child items"
+        )
         return result
 
     def test_broken_fk_detection(self, fresh_db):
@@ -365,9 +415,11 @@ class TestBrokenForeignKeys:
 
         # Try to insert receipt with non-existent tx_type_id
         with pytest.raises(sqlite3.IntegrityError):
-            conn.execute("INSERT INTO receipts(receipt_no, tx_type_id, sender_org_id, receiver_org_id, "
-                         "sender_name, receiver_name, created_at, status, created_by) "
-                         "VALUES('FK-TEST', 99999, 1, 2, 'Test', 'Test', '2024-01-01T00:00:00', 'Draft', 1)")
+            conn.execute(
+                "INSERT INTO receipts(receipt_no, tx_type_id, sender_org_id, receiver_org_id, "
+                "sender_name, receiver_name, created_at, status, created_by) "
+                "VALUES('FK-TEST', 99999, 1, 2, 'Test', 'Test', '2024-01-01T00:00:00', 'Draft', 1)"
+            )
         conn.rollback()
         conn.close()
 
@@ -375,6 +427,7 @@ class TestBrokenForeignKeys:
 # ===========================================================================
 # 5. PARTIAL RESTORE
 # ===========================================================================
+
 
 class TestPartialRestore:
     """Simulate interrupted or partial restore operations."""
@@ -386,20 +439,29 @@ class TestPartialRestore:
             data = src.read()
         # Write only first 20% of the file
         with open(str(truncated), "wb") as dst:
-            dst.write(data[:len(data) // 5])
+            dst.write(data[: len(data) // 5])
 
         from lab_system.app.services.recovery_service import verify_backup
+
         result = verify_backup(truncated)
 
         assert not result["valid"], "Truncated backup should be detected as invalid"
-        return {"truncated_detected": True, "error": result.get("error"), "size": result.get("size")}
+        return {
+            "truncated_detected": True,
+            "error": result.get("error"),
+            "size": result.get("size"),
+        }
 
     def test_partial_migration_rollback(self, fresh_db):
         """Verify migration lock prevents concurrent migrations."""
         conn = sqlite3.connect(str(fresh_db))
         conn.execute("PRAGMA foreign_keys = ON;")
 
-        from lab_system.app.database.db import _acquire_migration_lock, _release_migration_lock
+        from lab_system.app.database.db import (
+            _acquire_migration_lock,
+            _release_migration_lock,
+        )
+
         _acquire_migration_lock(conn)
         try:
             with pytest.raises(RuntimeError, match="Migration lock is active"):
@@ -412,6 +474,7 @@ class TestPartialRestore:
 # ===========================================================================
 # 6. INTERRUPTED BACKUP
 # ===========================================================================
+
 
 class TestInterruptedBackup:
     """Simulate backup creation interruption."""
@@ -429,10 +492,15 @@ class TestInterruptedBackup:
             dst.write(chunk)
 
         from lab_system.app.services.recovery_service import verify_backup
+
         result = verify_backup(target)
 
         assert not result["valid"], "Partial backup should be detected as invalid"
-        return {"partial_backup_detected": True, "error": result.get("error"), "size": result.get("size")}
+        return {
+            "partial_backup_detected": True,
+            "error": result.get("error"),
+            "size": result.get("size"),
+        }
 
     def test_backup_zero_length(self, fresh_db, tmp_db_dir):
         """Simulate backup that created empty file."""
@@ -442,6 +510,7 @@ class TestInterruptedBackup:
         target.touch()
 
         from lab_system.app.services.recovery_service import verify_backup
+
         result = verify_backup(target)
 
         assert not result["valid"], "Empty backup should be detected as invalid"
@@ -452,10 +521,13 @@ class TestInterruptedBackup:
 # 7. INTERRUPTED RECOVERY
 # ===========================================================================
 
+
 class TestInterruptedRecovery:
     """Simulate recovery interruption mid-restore."""
 
-    def test_recovery_interruption_leaves_original(self, fresh_db, backup_db, tmp_db_dir):
+    def test_recovery_interruption_leaves_original(
+        self, fresh_db, backup_db, tmp_db_dir
+    ):
         """Simulate recovery failure - original DB should survive."""
         import lab_system.app.services.recovery_service as _rs
 
@@ -467,6 +539,7 @@ class TestInterruptedRecovery:
         _rs.BACKUP_DIR = tmp_db_dir
         try:
             from lab_system.app.services.recovery_service import restore_from_backup
+
             result = restore_from_backup(corrupted_backup, user=ADMIN_USER)
         finally:
             _rs.BACKUP_DIR = orig_backup_dir
@@ -478,8 +551,11 @@ class TestInterruptedRecovery:
 
         assert not result["success"], "Restore from corrupted backup should fail"
         assert row_count > 0, "Original data should be intact"
-        return {"restore_failed_as_expected": True, "original_intact": row_count > 0,
-                "error": result.get("error")}
+        return {
+            "restore_failed_as_expected": True,
+            "original_intact": row_count > 0,
+            "error": result.get("error"),
+        }
 
     def test_recovery_with_no_backups(self, fresh_db, tmp_db_dir):
         """Test recovery when no backups exist."""
@@ -487,21 +563,28 @@ class TestInterruptedRecovery:
         empty_dir.mkdir()
 
         from lab_system.app.services.recovery_service import attempt_recovery
+
         # attempt_recovery uses DB_PATH which points to production, we need to redirect
         orig_config = _redirect_db(fresh_db)
         try:
             result = attempt_recovery(user=ADMIN_USER)
         finally:
             from lab_system.app.database import db as db_mod
+
             db_mod.CONFIG = orig_config
 
-        return {"recovery_attempted": True,
-                "no_backups_message": any("No backup" in a for a in result.get("actions", []))}
+        return {
+            "recovery_attempted": True,
+            "no_backups_message": any(
+                "No backup" in a for a in result.get("actions", [])
+            ),
+        }
 
 
 # ===========================================================================
 # 8. DISK FULL CONDITION
 # ===========================================================================
+
 
 class TestDiskFullCondition:
     """Simulate disk-full conditions during writes."""
@@ -517,9 +600,11 @@ class TestDiskFullCondition:
         # Simulate disk full via transaction that fails
         try:
             conn.execute("BEGIN")
-            conn.execute("INSERT INTO receipts(receipt_no, tx_type_id, sender_org_id, receiver_org_id, "
-                         "sender_name, receiver_name, created_at, status, created_by) "
-                         "VALUES('DISK-FULL', 1, 1, 2, 'Test', 'Test', '2024-01-01T00:00:00', 'Draft', 1)")
+            conn.execute(
+                "INSERT INTO receipts(receipt_no, tx_type_id, sender_org_id, receiver_org_id, "
+                "sender_name, receiver_name, created_at, status, created_by) "
+                "VALUES('DISK-FULL', 1, 1, 2, 'Test', 'Test', '2024-01-01T00:00:00', 'Draft', 1)"
+            )
             # Simulate disk full error
             raise sqlite3.OperationalError("database or disk is full")
         except sqlite3.OperationalError:
@@ -528,9 +613,11 @@ class TestDiskFullCondition:
         count_after = conn.execute("SELECT COUNT(*) FROM receipts").fetchone()[0]
         conn.close()
 
-        result = {"data_preserved": count_before == count_after,
-                  "records_before": count_before,
-                  "records_after": count_after}
+        result = {
+            "data_preserved": count_before == count_after,
+            "records_before": count_before,
+            "records_after": count_after,
+        }
         assert result["data_preserved"], "Rollback should preserve existing data"
         return result
 
@@ -553,8 +640,10 @@ class TestDiskFullCondition:
 
         def write_to_db(conn, idx):
             try:
-                conn.execute("INSERT INTO meta(key, value) VALUES(?, ?)",
-                             (f"concurrent_{idx}", f"val_{idx}"))
+                conn.execute(
+                    "INSERT INTO meta(key, value) VALUES(?, ?)",
+                    (f"concurrent_{idx}", f"val_{idx}"),
+                )
                 conn.commit()
                 results.append(idx)
             except Exception as e:
@@ -565,8 +654,10 @@ class TestDiskFullCondition:
                 except Exception:
                     pass
 
-        threads = [threading.Thread(target=write_to_db, args=(c, i))
-                   for i, c in enumerate(connections)]
+        threads = [
+            threading.Thread(target=write_to_db, args=(c, i))
+            for i, c in enumerate(connections)
+        ]
         for t in threads:
             t.start()
         for t in threads:
@@ -586,12 +677,16 @@ class TestDiskFullCondition:
 # 9. CONCURRENT MIGRATION ATTEMPTS
 # ===========================================================================
 
+
 class TestConcurrentMigrations:
     """Simulate concurrent migration attempts."""
 
     def test_migration_lock_prevents_concurrent(self, fresh_db):
         """Verify migration lock prevents parallel migrations via separate connections."""
-        from lab_system.app.database.db import _acquire_migration_lock, _release_migration_lock
+        from lab_system.app.database.db import (
+            _acquire_migration_lock,
+            _release_migration_lock,
+        )
 
         # Use separate connections with WAL mode and busy_timeout
         conn1 = sqlite3.connect(str(fresh_db), timeout=10)
@@ -627,16 +722,23 @@ class TestConcurrentMigrations:
         conn = sqlite3.connect(str(fresh_db))
         conn.execute("PRAGMA foreign_keys = ON;")
 
-        conn.execute("INSERT OR IGNORE INTO migration_lock(id, is_locked, owner, updated_at) VALUES(1, 0, '', '')")
+        conn.execute(
+            "INSERT OR IGNORE INTO migration_lock(id, is_locked, owner, updated_at) VALUES(1, 0, '', '')"
+        )
 
-        conn.execute("UPDATE migration_lock SET is_locked=1, owner='dead_process', "
-                     "updated_at='2020-01-01T00:00:00' WHERE id=1")
+        conn.execute(
+            "UPDATE migration_lock SET is_locked=1, owner='dead_process', "
+            "updated_at='2020-01-01T00:00:00' WHERE id=1"
+        )
         conn.commit()
 
-        row = conn.execute("SELECT is_locked, updated_at FROM migration_lock WHERE id=1").fetchone()
+        row = conn.execute(
+            "SELECT is_locked, updated_at FROM migration_lock WHERE id=1"
+        ).fetchone()
         is_stale = row and row[0] == 1
 
         from lab_system.app.database.db import _acquire_migration_lock
+
         try:
             _acquire_migration_lock(conn)
             release_needed = True
@@ -645,16 +747,21 @@ class TestConcurrentMigrations:
 
         if release_needed:
             from lab_system.app.database.db import _release_migration_lock
+
             _release_migration_lock(conn)
 
         conn.close()
         assert is_stale, "Stale lock should be detected"
-        return {"stale_lock_detected": is_stale, "requires_manual_release": release_needed}
+        return {
+            "stale_lock_detected": is_stale,
+            "requires_manual_release": release_needed,
+        }
 
 
 # ===========================================================================
 # 10. DATABASE LOCK HANDLING
 # ===========================================================================
+
 
 class TestDatabaseLockHandling:
     """Test SQLite lock behavior under contention."""
@@ -671,7 +778,9 @@ class TestDatabaseLockHandling:
 
         start = time.time()
         try:
-            conn2.execute("INSERT INTO meta(key, value) VALUES('lock_test2', 'waiting')")
+            conn2.execute(
+                "INSERT INTO meta(key, value) VALUES('lock_test2', 'waiting')"
+            )
             conn2.commit()
             wait_result = "succeeded"
         except sqlite3.OperationalError as e:
@@ -691,7 +800,9 @@ class TestDatabaseLockHandling:
         # The get_conn context manager should close connections even on exceptions
         with pytest.raises(ValueError, match="Simulated error"):
             with db_mod.get_conn() as conn:
-                conn.execute("INSERT INTO meta(key, value) VALUES('cleanup_test', 'ok')")
+                conn.execute(
+                    "INSERT INTO meta(key, value) VALUES('cleanup_test', 'ok')"
+                )
                 raise ValueError("Simulated error")
 
         # Verify connection was closed (no leak)
@@ -708,6 +819,7 @@ class TestDatabaseLockHandling:
 # ===========================================================================
 # 11. CONNECTION POOL EXHAUSTION
 # ===========================================================================
+
 
 class TestConnectionPoolExhaustion:
     """Test behavior under connection exhaustion."""
@@ -732,8 +844,11 @@ class TestConnectionPoolExhaustion:
             except Exception:
                 pass
 
-        return {"opened": len(connections), "errors": len(errors),
-                "error_messages": errors[:5]}
+        return {
+            "opened": len(connections),
+            "errors": len(errors),
+            "error_messages": errors[:5],
+        }
 
     def test_repository_connection_cleanup(self, fresh_db):
         """Verify BaseRepository properly cleans up connections."""
@@ -759,6 +874,7 @@ class TestConnectionPoolExhaustion:
         db_mod.get_conn = test_conn
         try:
             from lab_system.app.database.repository import BaseRepository
+
             repo = BaseRepository()
 
             repo.execute("INSERT INTO meta(key, value) VALUES('repo_test', 'ok')")
@@ -771,6 +887,7 @@ class TestConnectionPoolExhaustion:
 # ===========================================================================
 # 12. TRANSACTION ISOLATION
 # ===========================================================================
+
 
 class TestTransactionIsolation:
     """Test transaction isolation levels."""
@@ -789,7 +906,9 @@ class TestTransactionIsolation:
         count1 = conn1.execute("SELECT COUNT(*) FROM meta").fetchone()[0]
 
         # Insert in conn2 but don't commit
-        conn2.execute("INSERT INTO meta(key, value) VALUES('isolation_test', 'uncommitted')")
+        conn2.execute(
+            "INSERT INTO meta(key, value) VALUES('isolation_test', 'uncommitted')"
+        )
 
         # conn1 should NOT see uncommitted data (WAL provides snapshot isolation)
         count2 = conn1.execute("SELECT COUNT(*) FROM meta").fetchone()[0]
@@ -803,13 +922,18 @@ class TestTransactionIsolation:
         conn1.close()
         conn2.close()
 
-        return {"before_insert": count1, "during_uncommitted": count2,
-                "after_commit": count3, "isolation_works": count2 == count1}
+        return {
+            "before_insert": count1,
+            "during_uncommitted": count2,
+            "after_commit": count3,
+            "isolation_works": count2 == count1,
+        }
 
 
 # ===========================================================================
 # 13. DATA PRESERVATION DURING FAILURES
 # ===========================================================================
+
 
 class TestDataPreservation:
     """Verify data survives various failure scenarios."""
@@ -835,8 +959,10 @@ class TestDataPreservation:
         conn = sqlite3.connect(str(fresh_db))
         conn.execute("PRAGMA journal_mode=WAL;")
         for i in range(100):
-            conn.execute("INSERT INTO meta(key, value) VALUES(?, ?)",
-                         (f"checkpoint_{i}", f"value_{i}"))
+            conn.execute(
+                "INSERT INTO meta(key, value) VALUES(?, ?)",
+                (f"checkpoint_{i}", f"value_{i}"),
+            )
         conn.commit()
 
         # Force checkpoint
@@ -845,7 +971,9 @@ class TestDataPreservation:
 
         # Verify data survived
         conn2 = sqlite3.connect(str(fresh_db))
-        count = conn2.execute("SELECT COUNT(*) FROM meta WHERE key LIKE 'checkpoint_%'").fetchone()[0]
+        count = conn2.execute(
+            "SELECT COUNT(*) FROM meta WHERE key LIKE 'checkpoint_%'"
+        ).fetchone()[0]
         conn2.close()
 
         assert count == 100
@@ -869,7 +997,7 @@ class TestDataPreservation:
             conn.execute(
                 "INSERT INTO audit_logs(action, machine_name, timestamp, details, prev_hash) "
                 "VALUES(?, ?, ?, ?, ?)",
-                (action, machine, ts, details, prev_hash)
+                (action, machine, ts, details, prev_hash),
             )
             prev_hash = entry_hash
         conn.commit()
@@ -896,6 +1024,7 @@ class TestDataPreservation:
 # 14. BACKUP VERIFICATION DEEP TESTS
 # ===========================================================================
 
+
 class TestBackupVerification:
     """Deep tests of backup verification logic."""
 
@@ -916,6 +1045,7 @@ class TestBackupVerification:
             f.write(b"\xff" * 16)
 
         from lab_system.app.services.recovery_service import verify_backup
+
         result = verify_backup(backup_db)
 
         assert not result["integrity_ok"], "Tampered backup should fail integrity check"
@@ -924,6 +1054,7 @@ class TestBackupVerification:
     def test_verify_nonexistent_backup(self, tmp_db_dir):
         """Verify a nonexistent backup is handled gracefully."""
         from lab_system.app.services.recovery_service import verify_backup
+
         result = verify_backup(tmp_db_dir / "nonexistent.db")
 
         assert result["error"] == "File not found"
@@ -933,6 +1064,7 @@ class TestBackupVerification:
 # ===========================================================================
 # 15. RECOVERY SERVICE INTEGRATION
 # ===========================================================================
+
 
 class TestRecoveryServiceIntegration:
     """Integration tests for the recovery service."""
@@ -948,6 +1080,7 @@ class TestRecoveryServiceIntegration:
         try:
             # First, verify healthy
             from lab_system.app.services.recovery_service import detect_corruption
+
             healthy = detect_corruption()
             assert healthy["ok"], "Fresh DB should be healthy"
 
@@ -978,6 +1111,7 @@ class TestRecoveryServiceIntegration:
             assert snap_path.exists(), "Snapshot file should exist on disk"
 
             from lab_system.app.services.recovery_service import verify_backup
+
             v = verify_backup(snap_path)
             assert v["valid"], "Snapshot should be a valid database"
         finally:
@@ -991,7 +1125,9 @@ class TestRecoveryServiceIntegration:
         rs_mod.DB_PATH = fresh_db
         try:
             from lab_system.app.services.recovery_service import (
-                detect_corruption, verify_backup, list_backups
+                detect_corruption,
+                verify_backup,
+                list_backups,
             )
 
             # Test detect_corruption
@@ -1016,12 +1152,14 @@ class TestRecoveryServiceIntegration:
 # 16. FTS5 REBUILD AFTER CORRUPTION
 # ===========================================================================
 
+
 class TestFTSRebuild:
     """Test FTS5 index rebuild after corruption."""
 
     def test_fts_rebuild(self, fresh_db):
         """Rebuild FTS indexes and verify search works."""
         import lab_system.app.database.db as db_mod
+
         orig = _redirect_db(fresh_db)
         try:
             conn = sqlite3.connect(str(fresh_db))
@@ -1034,18 +1172,27 @@ class TestFTSRebuild:
             conn.execute("DELETE FROM receipts_fts")
             conn.commit()
 
-            count_after_corrupt = conn.execute("SELECT COUNT(*) FROM receipts_fts").fetchone()[0]
+            count_after_corrupt = conn.execute(
+                "SELECT COUNT(*) FROM receipts_fts"
+            ).fetchone()[0]
 
             # Rebuild
             from lab_system.app.database.db import rebuild_fts
+
             rebuild_fts()
 
-            count_after_rebuild = conn.execute("SELECT COUNT(*) FROM receipts_fts").fetchone()[0]
+            count_after_rebuild = conn.execute(
+                "SELECT COUNT(*) FROM receipts_fts"
+            ).fetchone()[0]
             conn.close()
 
             assert count_after_rebuild == count
-            return {"original_count": count, "after_corrupt": count_after_corrupt,
-                    "after_rebuild": count_after_rebuild, "rebuild_successful": True}
+            return {
+                "original_count": count,
+                "after_corrupt": count_after_corrupt,
+                "after_rebuild": count_after_rebuild,
+                "rebuild_successful": True,
+            }
         finally:
             db_mod.CONFIG = orig
 
@@ -1053,6 +1200,7 @@ class TestFTSRebuild:
 # ===========================================================================
 # 17. MIGRATION HISTORY INTEGRITY
 # ===========================================================================
+
 
 class TestMigrationHistoryIntegrity:
     """Test migration history tracking and verification."""
@@ -1066,18 +1214,25 @@ class TestMigrationHistoryIntegrity:
             "SELECT migration_key, checksum, status FROM migration_history ORDER BY id"
         ).fetchall()
 
-        all_applied = all(r[2] == 'applied' for r in rows)
+        all_applied = all(r[2] == "applied" for r in rows)
         all_have_checksums = all(len(r[1]) == 64 for r in rows)
 
         conn.close()
         assert all_applied
         assert all_have_checksums
-        return {"migration_count": len(rows), "all_applied": all_applied,
-                "all_have_checksums": all_have_checksums, "keys": [r[0] for r in rows]}
+        return {
+            "migration_count": len(rows),
+            "all_applied": all_applied,
+            "all_have_checksums": all_have_checksums,
+            "keys": [r[0] for r in rows],
+        }
 
     def test_migration_lock_auto_released(self, fresh_db):
         """Verify migration lock is released properly."""
-        from lab_system.app.database.db import _acquire_migration_lock, _release_migration_lock
+        from lab_system.app.database.db import (
+            _acquire_migration_lock,
+            _release_migration_lock,
+        )
 
         conn = sqlite3.connect(str(fresh_db))
         conn.execute("PRAGMA foreign_keys = ON;")
@@ -1096,6 +1251,7 @@ class TestMigrationHistoryIntegrity:
 # 18. BACKUP SERVICE EDGE CASES
 # ===========================================================================
 
+
 class TestBackupServiceEdgeCases:
     """Edge cases in backup creation."""
 
@@ -1106,12 +1262,18 @@ class TestBackupServiceEdgeCases:
         orig = _redirect_db(fresh_db)
         try:
             from lab_system.app.services.backup_service import create_backup
+
             path = create_backup(user_id=1, notes="test backup", user=ADMIN_USER)
 
             from lab_system.app.services.recovery_service import verify_backup
+
             v = verify_backup(Path(path))
             assert v["valid"], "Backup should be valid"
-            return {"backup_created": True, "valid": v["valid"], "integrity_ok": v["integrity_ok"]}
+            return {
+                "backup_created": True,
+                "valid": v["valid"],
+                "integrity_ok": v["integrity_ok"],
+            }
         finally:
             db_mod.CONFIG = orig
 
@@ -1119,6 +1281,7 @@ class TestBackupServiceEdgeCases:
 # ===========================================================================
 # 19. AUTOMATIC RECOVERY PATHS
 # ===========================================================================
+
 
 class TestAutomaticRecoveryPaths:
     """Test automatic recovery attempt paths."""
@@ -1139,6 +1302,7 @@ class TestAutomaticRecoveryPaths:
             _checkpoint_wal()
         finally:
             from lab_system.app.settings.config import DB_PATH as ORIG
+
             rs_mod.DB_PATH = ORIG
 
         conn = sqlite3.connect(str(fresh_db))
@@ -1174,12 +1338,16 @@ class TestAutomaticRecoveryPaths:
 # 20. DEADLOCK POTENTIAL
 # ===========================================================================
 
+
 class TestDeadlockPotential:
     """Test for potential deadlocks in concurrent operations."""
 
     def test_no_deadlock_with_migration_lock(self, fresh_db):
         """Verify migration lock doesn't cause deadlock."""
-        from lab_system.app.database.db import _acquire_migration_lock, _release_migration_lock
+        from lab_system.app.database.db import (
+            _acquire_migration_lock,
+            _release_migration_lock,
+        )
         import threading
 
         results = []
@@ -1214,6 +1382,7 @@ class TestDeadlockPotential:
 # 21. GRACEFUL DEGRADATION
 # ===========================================================================
 
+
 class TestGracefulDegradation:
     """Test system behavior when DB is unavailable."""
 
@@ -1230,6 +1399,7 @@ class TestGracefulDegradation:
         db_mod.get_conn = broken_conn
         try:
             from lab_system.app.database.repository import BaseRepository
+
             repo = BaseRepository()
             try:
                 repo.fetch_one("SELECT 1")
@@ -1248,21 +1418,39 @@ class TestGracefulDegradation:
 # 22. COMPREHENSIVE SCHEMA VALIDATION
 # ===========================================================================
 
+
 class TestSchemaValidation:
     """Validate complete schema integrity."""
 
     def test_all_tables_exist(self, fresh_db):
         """Verify all required tables exist."""
         conn = sqlite3.connect(str(fresh_db))
-        tables = {r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-        ).fetchall()}
+        tables = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            ).fetchall()
+        }
 
         required = {
-            'meta', 'organizations', 'users', 'transaction_types', 'sample_types',
-            'templates', 'receipts', 'receipt_history', 'receipt_items', 'attachments',
-            'settings', 'schema_version', 'migration_history', 'migration_lock',
-            'backups', 'audit_logs', 'login_attempts', 'sync_queue',
+            "meta",
+            "organizations",
+            "users",
+            "transaction_types",
+            "sample_types",
+            "templates",
+            "receipts",
+            "receipt_history",
+            "receipt_items",
+            "attachments",
+            "settings",
+            "schema_version",
+            "migration_history",
+            "migration_lock",
+            "backups",
+            "audit_logs",
+            "login_attempts",
+            "sync_queue",
         }
 
         missing = required - tables
@@ -1274,15 +1462,24 @@ class TestSchemaValidation:
     def test_all_indexes_exist(self, fresh_db):
         """Verify all required indexes exist."""
         conn = sqlite3.connect(str(fresh_db))
-        indexes = {r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL"
-        ).fetchall()}
+        indexes = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL"
+            ).fetchall()
+        }
 
         required = {
-            'idx_sync_status', 'idx_sync_entity', 'idx_login_attempts_user',
-            'idx_receipts_no', 'idx_receipts_created', 'idx_items_sample',
-            'idx_org_code', 'idx_users_username', 'idx_receipts_status_created',
-            'idx_receipt_items_receipt_id',
+            "idx_sync_status",
+            "idx_sync_entity",
+            "idx_login_attempts_user",
+            "idx_receipts_no",
+            "idx_receipts_created",
+            "idx_items_sample",
+            "idx_org_code",
+            "idx_users_username",
+            "idx_receipts_status_created",
+            "idx_receipt_items_receipt_id",
         }
 
         missing = required - indexes
@@ -1294,13 +1491,20 @@ class TestSchemaValidation:
     def test_all_triggers_exist(self, fresh_db):
         """Verify all required triggers exist."""
         conn = sqlite3.connect(str(fresh_db))
-        triggers = {r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='trigger'"
-        ).fetchall()}
+        triggers = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='trigger'"
+            ).fetchall()
+        }
 
         required = {
-            'receipts_ai', 'receipts_ad', 'receipts_au',
-            'organizations_ai', 'organizations_ad', 'organizations_au',
+            "receipts_ai",
+            "receipts_ad",
+            "receipts_au",
+            "organizations_ai",
+            "organizations_ad",
+            "organizations_au",
         }
 
         missing = required - triggers
@@ -1312,12 +1516,15 @@ class TestSchemaValidation:
     def test_fts_tables_exist(self, fresh_db):
         """Verify FTS virtual tables exist."""
         conn = sqlite3.connect(str(fresh_db))
-        fts = {r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%_fts'"
-        ).fetchall()}
+        fts = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%_fts'"
+            ).fetchall()
+        }
 
-        assert 'receipts_fts' in fts
-        assert 'organizations_fts' in fts
+        assert "receipts_fts" in fts
+        assert "organizations_fts" in fts
         conn.close()
         return {"fts_tables_exist": True}
 
@@ -1325,6 +1532,7 @@ class TestSchemaValidation:
 # ===========================================================================
 # SUMMARY REPORT
 # ===========================================================================
+
 
 class TestSummaryReport:
     """Generate comprehensive test report."""

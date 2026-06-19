@@ -42,7 +42,9 @@ class TransactionCreate(BaseModel):
     transaction_date: str = Field(..., max_length=30)
     notes: str = Field(default="", max_length=2000)
     transport_info: str = Field(default="", max_length=255)
-    status: str = Field(default="draft", pattern="^(draft|approved|rejected|archived|cancelled)$")
+    status: str = Field(
+        default="draft", pattern="^(draft|approved|rejected|archived|cancelled)$"
+    )
     items: list[TransactionItemCreate] = Field(..., min_length=1)
 
 
@@ -72,7 +74,9 @@ class TransactionUpdate(BaseModel):
     transaction_date: Optional[str] = Field(None, max_length=30)
     notes: Optional[str] = Field(None, max_length=2000)
     transport_info: Optional[str] = Field(None, max_length=255)
-    status: Optional[str] = Field(None, pattern="^(draft|approved|rejected|archived|cancelled)$")
+    status: Optional[str] = Field(
+        None, pattern="^(draft|approved|rejected|archived|cancelled)$"
+    )
     items: Optional[list[TransactionItemUpdate]] = None
 
 

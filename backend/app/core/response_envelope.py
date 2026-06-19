@@ -19,6 +19,7 @@ def wrap_response(
     message: str = "",
 ) -> dict[str, Any]:
     import datetime
+
     return {
         "success": success,
         "message": message,
@@ -58,6 +59,7 @@ def error_response(
     data: Any = None,
 ) -> dict[str, Any]:
     import datetime
+
     return {
         "success": False,
         "message": message,
@@ -70,6 +72,3 @@ def error_response(
             ).isoformat(),
         },
     }
-
-
-

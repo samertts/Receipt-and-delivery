@@ -18,5 +18,7 @@ class Organization(UUIDMixin, TimestampMixin, Base):
     logo_path: Mapped[str] = mapped_column(String(255), default="")
     notes: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(
-        String(20), default="active", index=True,
+        String(20),
+        default="active",
+        index=True,
     )

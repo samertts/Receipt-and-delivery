@@ -5,7 +5,17 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1 import audit, auth, attachments, health, organizations, reports, sync, transactions, users
+from app.api.v1 import (
+    audit,
+    auth,
+    attachments,
+    health,
+    organizations,
+    reports,
+    sync,
+    transactions,
+    users,
+)
 from app.core.config import settings
 from app.core.exceptions import AppException
 from app.core.logging import logger, setup_logging
@@ -14,11 +24,19 @@ from app.core.security import rate_limit_middleware
 
 
 ENVELOPE_EXCLUDE_PATHS = {
-    "/api/docs", "/api/redoc", "/api/openapi.json",
-    "/api/health", "/api/health/live", "/api/health/ready",
-    "/api/health/version", "/api/health/dependencies",
-    "/api/v1/health", "/api/v1/health/live", "/api/v1/health/ready",
-    "/api/v1/health/version", "/api/v1/health/dependencies",
+    "/api/docs",
+    "/api/redoc",
+    "/api/openapi.json",
+    "/api/health",
+    "/api/health/live",
+    "/api/health/ready",
+    "/api/health/version",
+    "/api/health/dependencies",
+    "/api/v1/health",
+    "/api/v1/health/live",
+    "/api/v1/health/ready",
+    "/api/v1/health/version",
+    "/api/v1/health/dependencies",
 }
 
 
@@ -34,6 +52,7 @@ async def lifespan(_app: FastAPI):
     try:
         from app.services.auth_service import AuthService
         from app.db.session import SessionLocal
+
         db = SessionLocal()
         purged = AuthService.purge_expired_blacklisted_tokens(db)
         if purged:
@@ -84,6 +103,7 @@ async def response_envelope_middleware(
     if not body:
         return response
     import json
+
     try:
         data = json.loads(body)
         if isinstance(data, dict) and "success" in data and "meta" in data:
@@ -91,7 +111,11 @@ async def response_envelope_middleware(
         wrapped = wrap_response(data=data)
         return JSONResponse(content=wrapped, status_code=response.status_code)
     except (json.JSONDecodeError, UnicodeDecodeError):
-        return Response(content=body, status_code=response.status_code, headers=dict(response.headers))
+        return Response(
+            content=body,
+            status_code=response.status_code,
+            headers=dict(response.headers),
+        )
 
 
 @app.exception_handler(AppException)

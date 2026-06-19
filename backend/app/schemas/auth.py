@@ -26,7 +26,9 @@ class ChangePasswordRequest(BaseModel):
 
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=80, description="اسم المستخدم")
-    full_name: str = Field(..., min_length=1, max_length=180, description="الاسم الكامل")
+    full_name: str = Field(
+        ..., min_length=1, max_length=180, description="الاسم الكامل"
+    )
     password: str = Field(..., min_length=8, max_length=128, description="كلمة المرور")
     role: str = Field(
         default="user",

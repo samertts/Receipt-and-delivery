@@ -15,4 +15,6 @@ class SyncLog(Base):
     payload = Column(Text, default="")
     device_id = Column(String(100), default="", index=True)
     branch_id = Column(String(100), default="")
-    synced_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    synced_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )

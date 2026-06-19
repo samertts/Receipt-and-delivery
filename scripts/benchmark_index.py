@@ -99,7 +99,9 @@ conn2 = sqlite3.connect(DB)
 conn2.execute("PRAGMA busy_timeout = 5000;")
 conn2.execute("PRAGMA foreign_keys = ON;")
 t0 = time.perf_counter()
-conn2.execute("CREATE INDEX IF NOT EXISTS idx_receipt_items_receipt_id ON receipt_items(receipt_id)")
+conn2.execute(
+    "CREATE INDEX IF NOT EXISTS idx_receipt_items_receipt_id ON receipt_items(receipt_id)"
+)
 conn2.commit()
 t_idx = time.perf_counter() - t0
 print(f"Index created in {t_idx:.2f}s")

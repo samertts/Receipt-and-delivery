@@ -25,14 +25,18 @@ from lab_system.app.utils.constants import THEME, TABLE_STYLE
 def _open_file_safe(path):
     try:
         from sys import platform as _p
+
         if _p == "win32":
             import os
+
             os.startfile(str(path))
         else:
             import subprocess
+
             subprocess.Popen(["xdg-open", str(path)])
     except Exception:
         pass
+
 
 STATUS_TRANSLATION = {
     "Draft": "مسودة",
@@ -52,7 +56,7 @@ STATUS_STYLES = {
 
 _SECTION = f"""
     QLabel {{
-        font-size: 10pt; font-weight: 700; color: {THEME['primary']};
+        font-size: 10pt; font-weight: 700; color: {THEME["primary"]};
         padding: 2px 0; margin-top: 6px;
     }}
 """
@@ -178,13 +182,16 @@ class ReceiptDetailDialog(QDialog):
             ["الملف", "النوع", "فتح"],
         )
         self.attachments_table.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.Stretch,
+            0,
+            QHeaderView.Stretch,
         )
         self.attachments_table.horizontalHeader().setSectionResizeMode(
-            1, QHeaderView.ResizeToContents,
+            1,
+            QHeaderView.ResizeToContents,
         )
         self.attachments_table.horizontalHeader().setSectionResizeMode(
-            2, QHeaderView.ResizeToContents,
+            2,
+            QHeaderView.ResizeToContents,
         )
         self.attachments_table.setAlternatingRowColors(True)
         self.attachments_table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -241,37 +248,57 @@ class ReceiptDetailDialog(QDialog):
         for i, item in enumerate(items):
             id = dict(item)
             self.items_table.setItem(
-                i, 0, QTableWidgetItem(id.get("sample_name", "")),
+                i,
+                0,
+                QTableWidgetItem(id.get("sample_name", "")),
             )
             self.items_table.setItem(
-                i, 1, QTableWidgetItem(str(id["total_count"])),
+                i,
+                1,
+                QTableWidgetItem(str(id["total_count"])),
             )
             self.items_table.setItem(
-                i, 2, QTableWidgetItem(str(id["valid_count"])),
+                i,
+                2,
+                QTableWidgetItem(str(id["valid_count"])),
             )
             self.items_table.setItem(
-                i, 3, QTableWidgetItem(str(id["damaged_count"])),
+                i,
+                3,
+                QTableWidgetItem(str(id["damaged_count"])),
             )
             self.items_table.setItem(
-                i, 4, QTableWidgetItem(str(id["rejected_count"])),
+                i,
+                4,
+                QTableWidgetItem(str(id["rejected_count"])),
             )
             self.items_table.setItem(
-                i, 5, QTableWidgetItem(str(id["non_conforming_count"])),
+                i,
+                5,
+                QTableWidgetItem(str(id["non_conforming_count"])),
             )
             self.items_table.setItem(
-                i, 6, QTableWidgetItem(id.get("transport_condition", "")),
+                i,
+                6,
+                QTableWidgetItem(id.get("transport_condition", "")),
             )
             self.items_table.setItem(
-                i, 7, QTableWidgetItem(id.get("notes", "")),
+                i,
+                7,
+                QTableWidgetItem(id.get("notes", "")),
             )
 
         self.attachments_table.setRowCount(len(atts))
         for i, att in enumerate(atts):
             self.attachments_table.setItem(
-                i, 0, QTableWidgetItem(Path(att["file_path"]).name),
+                i,
+                0,
+                QTableWidgetItem(Path(att["file_path"]).name),
             )
             self.attachments_table.setItem(
-                i, 1, QTableWidgetItem(att["file_type"]),
+                i,
+                1,
+                QTableWidgetItem(att["file_type"]),
             )
             open_btn = QPushButton("فتح")
             file_path = att["file_path"]

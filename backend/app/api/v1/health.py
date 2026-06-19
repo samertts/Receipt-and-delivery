@@ -29,11 +29,17 @@ def _utcnow() -> str:
 def health():
     db_ok, db_detail = _check_db()
     checks = {
-        "app": {"status": "ok", "name": settings.app_name, "version": settings.app_version},
+        "app": {
+            "status": "ok",
+            "name": settings.app_name,
+            "version": settings.app_version,
+        },
         "database": {"status": "ok" if db_ok else "error", "detail": db_detail},
         "timestamp": _utcnow(),
     }
-    overall = all(v.get("status") == "ok" for v in checks.values() if isinstance(v, dict))
+    overall = all(
+        v.get("status") == "ok" for v in checks.values() if isinstance(v, dict)
+    )
     return {
         "status": "ok" if overall else "degraded",
         "checks": checks,
@@ -56,9 +62,14 @@ def readiness():
     db_ok, db_detail = _check_db()
     if not db_ok:
         from fastapi.responses import JSONResponse
+
         return JSONResponse(
             status_code=503,
-            content={"status": "not_ready", "reason": "database unreachable", "detail": db_detail},
+            content={
+                "status": "not_ready",
+                "reason": "database unreachable",
+                "detail": db_detail,
+            },
         )
     return {
         "status": "ready",
@@ -87,24 +98,30 @@ version.__exclude_from_envelope__ = True
 def dependencies():
     deps = []
     db_ok, db_detail = _check_db()
-    deps.append({
-        "name": "database",
-        "status": "connected" if db_ok else "disconnected",
-        "detail": db_detail,
-        "required": True,
-    })
-    deps.append({
-        "name": "secret_key",
-        "status": "configured" if settings.effective_secret_key else "missing",
-        "detail": None,
-        "required": True,
-    })
-    deps.append({
-        "name": "storage",
-        "status": "available",
-        "detail": None,
-        "required": False,
-    })
+    deps.append(
+        {
+            "name": "database",
+            "status": "connected" if db_ok else "disconnected",
+            "detail": db_detail,
+            "required": True,
+        }
+    )
+    deps.append(
+        {
+            "name": "secret_key",
+            "status": "configured" if settings.effective_secret_key else "missing",
+            "detail": None,
+            "required": True,
+        }
+    )
+    deps.append(
+        {
+            "name": "storage",
+            "status": "available",
+            "detail": None,
+            "required": False,
+        }
+    )
     all_ok = all(d["status"] in ("connected", "configured", "available") for d in deps)
     return {
         "status": "healthy" if all_ok else "degraded",

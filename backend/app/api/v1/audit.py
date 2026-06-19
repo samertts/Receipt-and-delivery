@@ -22,7 +22,9 @@ def list_audit_logs(
     svc = get_audit_service(db)
     items, total = svc.list_audit_logs(page=page, limit=limit, action_type=action_type)
     return paginated_response(
-        items=[AuditLogResponse.model_validate(i).model_dump(mode="json") for i in items],
+        items=[
+            AuditLogResponse.model_validate(i).model_dump(mode="json") for i in items
+        ],
         total=total,
         page=page,
         per_page=limit,

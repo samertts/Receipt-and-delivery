@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 def _setup():
     from lab_system.app.database.db import SCHEMA
+
     tmp = Path(tempfile.mkdtemp(prefix="lab_att_"))
     db_path = tmp / "test.db"
     conn = sqlite3.connect(str(db_path))
@@ -54,6 +55,7 @@ def _setup():
 
     import lab_system.app.database.db as db_mod
     import lab_system.app.attachments.manager as att_mod
+
     db_mod.get_conn = test_conn
     att_mod.STORAGE_DIR = storage_dir
     return tmp
@@ -70,6 +72,7 @@ def _make_pdf(path: Path):
 
 def _make_png(path: Path):
     from PIL import Image
+
     img = Image.new("RGB", (10, 10), color="red")
     img.save(path, format="PNG")
 
@@ -85,59 +88,70 @@ class TestAttachmentsUtils:
 
     def test_sanitize_ascii(self):
         from lab_system.app.attachments.manager import _sanitize_filename
+
         assert _sanitize_filename("hello.pdf") == "hello.pdf"
 
     def test_sanitize_arabic(self):
         from lab_system.app.attachments.manager import _sanitize_filename
+
         assert "تقرير.pdf" in _sanitize_filename("تقرير.pdf")
 
     def test_sanitize_path_traversal(self):
         from lab_system.app.attachments.manager import _sanitize_filename
+
         result = _sanitize_filename("../../etc/passwd")
         assert ".." not in result or result.count(".") <= 1
 
     def test_sanitize_long_name(self):
         from lab_system.app.attachments.manager import _sanitize_filename
+
         long_name = "a" * 200 + ".pdf"
         result = _sanitize_filename(long_name)
         assert len(result) <= 128
 
     def test_check_magic_pdf(self):
         from lab_system.app.attachments.manager import _check_magic_bytes
+
         f = self.tmp / "test.pdf"
         _make_pdf(f)
         assert _check_magic_bytes(f) == ".pdf"
 
     def test_check_magic_png(self):
         from lab_system.app.attachments.manager import _check_magic_bytes
+
         f = self.tmp / "test.png"
         _make_png(f)
         assert _check_magic_bytes(f) == ".png"
 
     def test_check_magic_jpg(self):
         from lab_system.app.attachments.manager import _check_magic_bytes
+
         f = self.tmp / "test.jpg"
         _make_jpg(f)
         assert _check_magic_bytes(f) == ".jpg"
 
     def test_check_magic_invalid(self):
         from lab_system.app.attachments.manager import _check_magic_bytes
+
         f = self.tmp / "test.bin"
         f.write_bytes(b"\x00\x00\x00\x00")
         assert _check_magic_bytes(f) is None
 
     def test_check_magic_nonexistent(self):
         from lab_system.app.attachments.manager import _check_magic_bytes
+
         assert _check_magic_bytes(self.tmp / "nope") is None
 
     def test_compute_hash(self):
         from lab_system.app.attachments.manager import _compute_hash
+
         f = self.tmp / "hash_me.txt"
         f.write_text("hello")
         assert _compute_hash(f) == _compute_hash(f)
 
     def test_compute_hash_length(self):
         from lab_system.app.attachments.manager import _compute_hash
+
         f = self.tmp / "len_test.txt"
         f.write_text("test")
         assert len(_compute_hash(f)) == 64
@@ -145,12 +159,14 @@ class TestAttachmentsUtils:
     def test_save_attachment_file_not_found(self):
         from lab_system.app.attachments.manager import save_attachment
         import pytest
+
         with pytest.raises(ValueError, match="الملف غير موجود"):
             save_attachment(1, str(self.tmp / "nope"), "receipt")
 
     def test_save_attachment_oversized(self):
         from lab_system.app.attachments.manager import save_attachment, MAX_FILE_SIZE
         import pytest
+
         f = self.tmp / "big.pdf"
         _make_pdf(f)
         f.write_bytes(b"X" * (MAX_FILE_SIZE + 1))
@@ -160,6 +176,7 @@ class TestAttachmentsUtils:
     def test_save_attachment_bad_magic(self):
         from lab_system.app.attachments.manager import save_attachment
         import pytest
+
         f = self.tmp / "fake.pdf"
         f.write_text("not a real pdf")
         with pytest.raises(ValueError, match="غير مدعوم"):
@@ -167,6 +184,7 @@ class TestAttachmentsUtils:
 
     def test_save_attachment_success_pdf(self):
         from lab_system.app.attachments.manager import save_attachment
+
         f = self.tmp / "good.pdf"
         _make_pdf(f)
         path, h = save_attachment(1, str(f), "receipt")
@@ -176,6 +194,7 @@ class TestAttachmentsUtils:
     def test_save_attachment_duplicate(self):
         from lab_system.app.attachments.manager import save_attachment
         import pytest
+
         f = self.tmp / "dup_test.pdf"
         f.write_bytes(b"%PDF-1.4 unique content for dup test")
         save_attachment(1, str(f), "receipt")
@@ -184,12 +203,14 @@ class TestAttachmentsUtils:
 
     def test_round_trip_pdf(self):
         from lab_system.app.attachments.manager import save_attachment
+
         f = self.tmp / "rt.pdf"
         _make_pdf(f)
         path, h = save_attachment(1, str(f), "receipt")
         assert Path(path).exists()
         assert len(h) == 64
         from lab_system.app.database import db as _db
+
         with _db.get_conn() as conn:
             row = conn.execute(
                 "SELECT * FROM attachments WHERE file_hash=?", (h,)
@@ -200,12 +221,14 @@ class TestAttachmentsUtils:
 
     def test_round_trip_png(self):
         from lab_system.app.attachments.manager import save_attachment
+
         f = self.tmp / "rt.png"
         _make_png(f)
         path, h = save_attachment(1, str(f), "receipt_attachment")
         assert Path(path).exists()
         assert len(h) == 64
         from lab_system.app.database import db as _db
+
         with _db.get_conn() as conn:
             row = conn.execute(
                 "SELECT * FROM attachments ORDER BY id DESC LIMIT 1"

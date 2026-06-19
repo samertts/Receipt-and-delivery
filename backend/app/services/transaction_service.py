@@ -28,7 +28,9 @@ class TransactionService:
         status: str = "",
         search: str = "",
     ) -> tuple[list[Transaction], int]:
-        return self.repo.list_with_filters(page=page, limit=limit, status=status, search=search)
+        return self.repo.list_with_filters(
+            page=page, limit=limit, status=status, search=search
+        )
 
     def create_transaction(
         self,
@@ -41,7 +43,7 @@ class TransactionService:
 
         # Generate transaction number
         transaction_no = self._generate_transaction_no(payload["transaction_type"])
-        
+
         # Create transaction object
         txn = Transaction(
             transaction_no=transaction_no,
@@ -62,21 +64,52 @@ class TransactionService:
         )
         self.db.add(txn)
         self.db.flush()  # Get the ID without committing
-        
+
         for item_data in items:
             item = TransactionItem(
                 transaction_id=str(txn.id),
-                sample_type=item_data.get("sample_type", item_data.sample_type if hasattr(item_data, "sample_type") else ""),
-                total_count=item_data.get("total_count", item_data.total_count if hasattr(item_data, "total_count") else 0),
-                valid_count=item_data.get("valid_count", item_data.valid_count if hasattr(item_data, "valid_count") else 0),
-                damaged_count=item_data.get("damaged_count", item_data.damaged_count if hasattr(item_data, "damaged_count") else 0),
-                rejected_count=item_data.get("rejected_count", item_data.rejected_count if hasattr(item_data, "rejected_count") else 0),
-                nonconforming_count=item_data.get("nonconforming_count", item_data.nonconforming_count if hasattr(item_data, "nonconforming_count") else 0),
-                transport_condition=item_data.get("transport_condition", item_data.transport_condition if hasattr(item_data, "transport_condition") else ""),
-                notes=item_data.get("notes", item_data.notes if hasattr(item_data, "notes") else ""),
+                sample_type=item_data.get(
+                    "sample_type",
+                    item_data.sample_type if hasattr(item_data, "sample_type") else "",
+                ),
+                total_count=item_data.get(
+                    "total_count",
+                    item_data.total_count if hasattr(item_data, "total_count") else 0,
+                ),
+                valid_count=item_data.get(
+                    "valid_count",
+                    item_data.valid_count if hasattr(item_data, "valid_count") else 0,
+                ),
+                damaged_count=item_data.get(
+                    "damaged_count",
+                    item_data.damaged_count
+                    if hasattr(item_data, "damaged_count")
+                    else 0,
+                ),
+                rejected_count=item_data.get(
+                    "rejected_count",
+                    item_data.rejected_count
+                    if hasattr(item_data, "rejected_count")
+                    else 0,
+                ),
+                nonconforming_count=item_data.get(
+                    "nonconforming_count",
+                    item_data.nonconforming_count
+                    if hasattr(item_data, "nonconforming_count")
+                    else 0,
+                ),
+                transport_condition=item_data.get(
+                    "transport_condition",
+                    item_data.transport_condition
+                    if hasattr(item_data, "transport_condition")
+                    else "",
+                ),
+                notes=item_data.get(
+                    "notes", item_data.notes if hasattr(item_data, "notes") else ""
+                ),
             )
             self.db.add(item)
-        
+
         self.db.commit()
         self.db.refresh(txn)
 
@@ -86,7 +119,12 @@ class TransactionService:
             request=request,
             details=f"إنشاء معاملة: {txn.transaction_no} ({payload['transaction_type']})",
             db=self.db,
-            changes_json=json.dumps({"transaction_no": txn.transaction_no, "type": payload["transaction_type"]}),
+            changes_json=json.dumps(
+                {
+                    "transaction_no": txn.transaction_no,
+                    "type": payload["transaction_type"],
+                }
+            ),
         )
         return txn
 
@@ -122,7 +160,11 @@ class TransactionService:
             for item_data in items_data:
                 item_id = item_data.get("id")
                 if item_id and item_id in existing_ids:
-                    item = self.db.query(TransactionItem).filter(TransactionItem.id == item_id).first()
+                    item = (
+                        self.db.query(TransactionItem)
+                        .filter(TransactionItem.id == item_id)
+                        .first()
+                    )
                     if item:
                         if item_data.get("delete"):
                             self.db.delete(item)
@@ -214,5 +256,8 @@ class TransactionService:
         for key, value in update_data.items():
             old = getattr(txn, key, None)
             if old != value:
-                changes[key] = {"old": str(old) if old else "", "new": str(value) if value else ""}
+                changes[key] = {
+                    "old": str(old) if old else "",
+                    "new": str(value) if value else "",
+                }
         return changes

@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 class TestStorageManager:
     def test_path_for_creates_dir(self):
         from lab_system.app.settings.storage import StorageManager
+
         tmp = Path(tempfile.mkdtemp(prefix="lab_stor_"))
         sm = StorageManager()
         orig_base = sm.base
@@ -22,6 +23,7 @@ class TestStorageManager:
 
     def test_path_for_twice_returns_same(self):
         from lab_system.app.settings.storage import StorageManager
+
         tmp = Path(tempfile.mkdtemp(prefix="lab_stor_"))
         sm = StorageManager()
         orig_base = sm.base
@@ -33,6 +35,7 @@ class TestStorageManager:
 
     def test_path_for_nested(self):
         from lab_system.app.settings.storage import StorageManager
+
         tmp = Path(tempfile.mkdtemp(prefix="lab_stor_"))
         sm = StorageManager()
         orig_base = sm.base
@@ -44,10 +47,12 @@ class TestStorageManager:
 
     def test_storage_manager_singleton(self):
         from lab_system.app.settings.storage import storage_manager, StorageManager
+
         assert isinstance(storage_manager, StorageManager)
 
     def test_write_and_read_file(self):
         from lab_system.app.settings.storage import StorageManager
+
         tmp = Path(tempfile.mkdtemp(prefix="lab_stor_"))
         sm = StorageManager()
         orig_base = sm.base

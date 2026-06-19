@@ -9,7 +9,7 @@ from lab_system.app.settings.config import CONFIG
 
 SCHEMA_VERSION = 11
 
-SCHEMA = '''
+SCHEMA = """
 PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS organizations (
@@ -178,7 +178,7 @@ CREATE TRIGGER IF NOT EXISTS organizations_au AFTER UPDATE ON organizations BEGI
     INSERT INTO organizations_fts(rowid, name, code)
     VALUES (NEW.id, NEW.name, NEW.code);
 END;
-'''
+"""
 
 
 def rebuild_fts():
@@ -194,47 +194,66 @@ def rebuild_fts():
 
 
 DEFAULT_SETTINGS = {
-    'receipt.numbering_prefix': 'LAB',
-    'receipt.font_size': '11',
-    'receipt.margin_mm': '10',
-    'receipt.template': 'default',
-    'printer.mode': 'A4',
-    'backup.auto_enabled': '0',
-    'backup.retention_max': '30',
-    'backup.path': str((CONFIG.storage_dir / 'backups').resolve()),
-    'session.timeout_minutes': '15',
-    'security.max_login_attempts': '5',
-    'security.login_lockout_minutes': '5',
-    'security.force_password_change_days': '0',
+    "receipt.numbering_prefix": "LAB",
+    "receipt.font_size": "11",
+    "receipt.margin_mm": "10",
+    "receipt.template": "default",
+    "printer.mode": "A4",
+    "backup.auto_enabled": "0",
+    "backup.retention_max": "30",
+    "backup.path": str((CONFIG.storage_dir / "backups").resolve()),
+    "session.timeout_minutes": "15",
+    "security.max_login_attempts": "5",
+    "security.login_lockout_minutes": "5",
+    "security.force_password_change_days": "0",
 }
 
 
 def _table_columns(conn: sqlite3.Connection, table_name: str) -> set[str]:
-    return {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
+    return {
+        row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    }
 
 
 def migrate_db(conn: sqlite3.Connection) -> None:
-    schema_row = conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
+    schema_row = conn.execute(
+        "SELECT value FROM meta WHERE key='schema_version'"
+    ).fetchone()
     current = int(schema_row[0]) if schema_row else 0
 
     if current < 2:
-        if 'additional_comments' not in _table_columns(conn, 'receipts'):
-            statement = "ALTER TABLE receipts ADD COLUMN additional_comments TEXT DEFAULT ''"
+        if "additional_comments" not in _table_columns(conn, "receipts"):
+            statement = (
+                "ALTER TABLE receipts ADD COLUMN additional_comments TEXT DEFAULT ''"
+            )
             conn.execute(statement)
-            _record_migration(conn, 'v2_receipts_additional_comments', statement)
+            _record_migration(conn, "v2_receipts_additional_comments", statement)
 
     if current < 3:
-        if 'thumbnail_path' not in _table_columns(conn, 'attachments'):
-            statement = "ALTER TABLE attachments ADD COLUMN thumbnail_path TEXT DEFAULT ''"
+        if "thumbnail_path" not in _table_columns(conn, "attachments"):
+            statement = (
+                "ALTER TABLE attachments ADD COLUMN thumbnail_path TEXT DEFAULT ''"
+            )
             conn.execute(statement)
-            _record_migration(conn, 'v3_attachments_thumbnail_path', statement)
+            _record_migration(conn, "v3_attachments_thumbnail_path", statement)
 
     if current < 4:
-        conn.execute("INSERT OR IGNORE INTO schema_version(id, version, app_version, updated_at) VALUES(1, ?, ?, ?)", (SCHEMA_VERSION, CONFIG.app_version, datetime.now().isoformat(timespec='seconds')))
-        _record_migration(conn, 'v4_lifecycle_metadata', 'schema_version + migration_history initialization')
+        conn.execute(
+            "INSERT OR IGNORE INTO schema_version(id, version, app_version, updated_at) VALUES(1, ?, ?, ?)",
+            (
+                SCHEMA_VERSION,
+                CONFIG.app_version,
+                datetime.now().isoformat(timespec="seconds"),
+            ),
+        )
+        _record_migration(
+            conn,
+            "v4_lifecycle_metadata",
+            "schema_version + migration_history initialization",
+        )
 
     if current < 5:
-        statement = 'sync_queue table with indexes for future synchronization'
+        statement = "sync_queue table with indexes for future synchronization"
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS sync_queue (
              id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -250,11 +269,13 @@ def migrate_db(conn: sqlite3.Connection) -> None:
             CREATE INDEX IF NOT EXISTS idx_sync_status ON sync_queue(status);
             CREATE INDEX IF NOT EXISTS idx_sync_entity ON sync_queue(entity_type, entity_id);
         """)
-        _record_migration(conn, 'v5_sync_queue', statement)
+        _record_migration(conn, "v5_sync_queue", statement)
 
     if current < 6:
-        if 'password_changed_at' not in _table_columns(conn, 'users'):
-            conn.execute("ALTER TABLE users ADD COLUMN password_changed_at TEXT DEFAULT '';")
+        if "password_changed_at" not in _table_columns(conn, "users"):
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN password_changed_at TEXT DEFAULT '';"
+            )
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS login_attempts (
              id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -264,10 +285,12 @@ def migrate_db(conn: sqlite3.Connection) -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_login_attempts_user ON login_attempts(username, attempted_at);
         """)
-        _record_migration(conn, 'v6_security_hardening', 'password_changed_at + login_attempts table')
+        _record_migration(
+            conn, "v6_security_hardening", "password_changed_at + login_attempts table"
+        )
 
     if current < 7:
-        if 'deleted_at' not in _table_columns(conn, 'receipts'):
+        if "deleted_at" not in _table_columns(conn, "receipts"):
             conn.execute("ALTER TABLE receipts ADD COLUMN deleted_at TEXT DEFAULT '';")
         conn.executescript("""
             CREATE INDEX IF NOT EXISTS idx_receipts_deleted ON receipts(deleted_at);
@@ -286,7 +309,9 @@ def migrate_db(conn: sqlite3.Connection) -> None:
             )
         """)
         conn.execute("INSERT INTO receipts_fts(receipts_fts) VALUES('rebuild')")
-        conn.execute("INSERT INTO organizations_fts(organizations_fts) VALUES('rebuild')")
+        conn.execute(
+            "INSERT INTO organizations_fts(organizations_fts) VALUES('rebuild')"
+        )
         # FTS sync triggers
         conn.executescript("""
             CREATE TRIGGER IF NOT EXISTS receipts_ai AFTER INSERT ON receipts BEGIN
@@ -319,9 +344,11 @@ def migrate_db(conn: sqlite3.Connection) -> None:
                 VALUES (NEW.id, NEW.name, NEW.code);
             END;
         """)
-        _recreate_table_with_fk(conn, 'backups')
-        _recreate_table_with_fk(conn, 'audit_logs')
-        _record_migration(conn, 'v7_data_integrity', 'soft delete, FTS5, indexes, FKs, CHECKs')
+        _recreate_table_with_fk(conn, "backups")
+        _recreate_table_with_fk(conn, "audit_logs")
+        _record_migration(
+            conn, "v7_data_integrity", "soft delete, FTS5, indexes, FKs, CHECKs"
+        )
 
     if current < 8:
         conn.execute("""
@@ -336,7 +363,7 @@ def migrate_db(conn: sqlite3.Connection) -> None:
                 FOREIGN KEY(receipt_id) REFERENCES receipts(id) ON DELETE CASCADE
             )
         """)
-        _record_migration(conn, 'v8_receipt_history', 'receipt history table')
+        _record_migration(conn, "v8_receipt_history", "receipt history table")
 
     if current < 9:
         conn.executescript("""
@@ -349,21 +376,33 @@ def migrate_db(conn: sqlite3.Connection) -> None:
             "SELECT id, receipt_no, sender_name, receiver_name FROM receipts "
             "WHERE deleted_at IS NULL OR deleted_at = ''"
         )
-        _record_migration(conn, 'v9_index_and_fts_fix', 'receipt_items(receipt_id) index, deleted_at index, FTS rebuild')
+        _record_migration(
+            conn,
+            "v9_index_and_fts_fix",
+            "receipt_items(receipt_id) index, deleted_at index, FTS rebuild",
+        )
 
     if current < 10:
-        if 'prev_hash' not in _table_columns(conn, 'audit_logs'):
+        if "prev_hash" not in _table_columns(conn, "audit_logs"):
             conn.execute("ALTER TABLE audit_logs ADD COLUMN prev_hash TEXT DEFAULT ''")
-        _record_migration(conn, 'v10_audit_integrity', 'add prev_hash column for audit chain integrity')
+        _record_migration(
+            conn,
+            "v10_audit_integrity",
+            "add prev_hash column for audit chain integrity",
+        )
 
     if current < 11:
-        if 'idempotency_key' not in _table_columns(conn, 'sync_queue'):
-            conn.execute("ALTER TABLE sync_queue ADD COLUMN idempotency_key TEXT DEFAULT ''")
-        _record_migration(conn, 'v11_sync_idempotency', 'add idempotency_key column to sync_queue')
+        if "idempotency_key" not in _table_columns(conn, "sync_queue"):
+            conn.execute(
+                "ALTER TABLE sync_queue ADD COLUMN idempotency_key TEXT DEFAULT ''"
+            )
+        _record_migration(
+            conn, "v11_sync_idempotency", "add idempotency_key column to sync_queue"
+        )
 
 
 def _recreate_table_with_fk(conn: sqlite3.Connection, table: str) -> None:
-    fk_map = {'user_id': 'users(id)', 'created_by': 'users(id)'}
+    fk_map = {"user_id": "users(id)", "created_by": "users(id)"}
     cols = conn.execute(f"PRAGMA table_info({table})").fetchall()
     if not cols:
         return
@@ -372,12 +411,11 @@ def _recreate_table_with_fk(conn: sqlite3.Connection, table: str) -> None:
         cid, name, ctype, notnull, default, pk = c
         parts = [name, ctype]
         if pk:
-            parts.append("PRIMARY KEY AUTOINCREMENT" if pk == 1
-                         else "PRIMARY KEY")
+            parts.append("PRIMARY KEY AUTOINCREMENT" if pk == 1 else "PRIMARY KEY")
         if notnull:
             parts.append("NOT NULL")
         if default is not None:
-            if default == '':
+            if default == "":
                 parts.append("DEFAULT ''")
             else:
                 parts.append(f"DEFAULT '{default}'")
@@ -398,10 +436,10 @@ def _backup_before_migration():
     db_path = Path(CONFIG.db_path)
     if not db_path.exists():
         return
-    backup_dir = db_path.parent / 'migration_backups'
+    backup_dir = db_path.parent / "migration_backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    backup_path = backup_dir / f'pre_migration_{timestamp}.db'
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = backup_dir / f"pre_migration_{timestamp}.db"
     shutil.copy2(str(db_path), str(backup_path))
 
 
@@ -417,20 +455,28 @@ def init_db():
             migrate_db(conn)
         finally:
             _release_migration_lock(conn)
-        now = datetime.now().isoformat(timespec='seconds')
-        conn.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('schema_version',?)", (str(SCHEMA_VERSION),))
-        conn.execute("INSERT OR REPLACE INTO schema_version(id, version, app_version, updated_at) VALUES(1, ?, ?, ?)", (SCHEMA_VERSION, CONFIG.app_version, now))
+        now = datetime.now().isoformat(timespec="seconds")
+        conn.execute(
+            "INSERT OR REPLACE INTO meta(key,value) VALUES('schema_version',?)",
+            (str(SCHEMA_VERSION),),
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO schema_version(id, version, app_version, updated_at) VALUES(1, ?, ?, ?)",
+            (SCHEMA_VERSION, CONFIG.app_version, now),
+        )
         for k, v in DEFAULT_SETTINGS.items():
-            conn.execute('INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)', (k, v))
+            conn.execute(
+                "INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)", (k, v)
+            )
 
 
 @contextmanager
 def get_conn():
     conn = sqlite3.connect(CONFIG.db_path)
     conn.row_factory = sqlite3.Row
-    conn.execute('PRAGMA busy_timeout = 5000;')
-    conn.execute('PRAGMA foreign_keys = ON;')
-    conn.execute('PRAGMA journal_mode=WAL;')
+    conn.execute("PRAGMA busy_timeout = 5000;")
+    conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA journal_mode=WAL;")
     try:
         yield conn
         conn.commit()
@@ -441,36 +487,51 @@ def get_conn():
         conn.close()
 
 
-
-def _record_migration(conn: sqlite3.Connection, migration_key: str, payload: str, notes: str = '') -> None:
-    checksum = hashlib.sha256(payload.encode('utf-8')).hexdigest()
+def _record_migration(
+    conn: sqlite3.Connection, migration_key: str, payload: str, notes: str = ""
+) -> None:
+    checksum = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     conn.execute(
         """INSERT OR REPLACE INTO migration_history(migration_key, checksum, applied_at, status, notes)
         VALUES(?, ?, ?, 'applied', ?)""",
-        (migration_key, checksum, datetime.now().isoformat(timespec='seconds'), notes),
+        (migration_key, checksum, datetime.now().isoformat(timespec="seconds"), notes),
     )
 
 
-
 def _acquire_migration_lock(conn: sqlite3.Connection) -> None:
-    now = datetime.now().isoformat(timespec='seconds')
-    conn.execute("INSERT OR IGNORE INTO migration_lock(id, is_locked, owner, updated_at) VALUES(1, 0, '', ?)", (now,))
-    row = conn.execute("SELECT is_locked, updated_at FROM migration_lock WHERE id=1").fetchone()
+    now = datetime.now().isoformat(timespec="seconds")
+    conn.execute(
+        "INSERT OR IGNORE INTO migration_lock(id, is_locked, owner, updated_at) VALUES(1, 0, '', ?)",
+        (now,),
+    )
+    row = conn.execute(
+        "SELECT is_locked, updated_at FROM migration_lock WHERE id=1"
+    ).fetchone()
     if row and int(row[0]) == 1:
         updated_at = row[1]
         if updated_at:
             lock_time = datetime.fromisoformat(updated_at)
             if datetime.now() - lock_time > timedelta(minutes=5):
-                conn.execute("UPDATE migration_lock SET is_locked=0, owner='', updated_at=? WHERE id=1", (now,))
+                conn.execute(
+                    "UPDATE migration_lock SET is_locked=0, owner='', updated_at=? WHERE id=1",
+                    (now,),
+                )
             else:
-                raise RuntimeError('Migration lock is active; aborting concurrent migration.')
+                raise RuntimeError(
+                    "Migration lock is active; aborting concurrent migration."
+                )
         else:
-            raise RuntimeError('Migration lock is active; aborting concurrent migration.')
-    conn.execute("UPDATE migration_lock SET is_locked=1, owner='init_db', updated_at=? WHERE id=1", (now,))
+            raise RuntimeError(
+                "Migration lock is active; aborting concurrent migration."
+            )
+    conn.execute(
+        "UPDATE migration_lock SET is_locked=1, owner='init_db', updated_at=? WHERE id=1",
+        (now,),
+    )
 
 
 def _release_migration_lock(conn: sqlite3.Connection) -> None:
     conn.execute(
         "UPDATE migration_lock SET is_locked=0, owner='', updated_at=? WHERE id=1",
-        (datetime.now().isoformat(timespec='seconds'),),
+        (datetime.now().isoformat(timespec="seconds"),),
     )
