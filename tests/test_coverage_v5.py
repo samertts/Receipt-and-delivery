@@ -1742,3 +1742,278 @@ class TestDbRemainingCoverage:
             conn = sqlite3.connect(str(fresh_db))
             db_mod._recreate_table_with_fk(conn, "nonexistent_table")
             conn.close()
+
+
+# ============================================================================
+# DESKTOP SERVICES — backup_listing, desktop_settings, dashboard, desktop_audit
+# ============================================================================
+
+class TestBackupListingService:
+    def test_list_backups_empty(self, fresh_db):
+        from lab_system.app.services.backup_listing_service import BackupListingService
+        with _patch_db(fresh_db):
+            svc = BackupListingService()
+            result = svc.list_backups()
+            assert result == []
+
+    def test_list_backups_with_data(self, fresh_db):
+        from lab_system.app.services.backup_listing_service import BackupListingService
+        import lab_system.app.database.db as db_mod
+        with _patch_db(fresh_db):
+            with db_mod.get_conn() as conn:
+                conn.execute("INSERT INTO users(full_name,username,password_hash,role,status) VALUES('A','a','h','Admin','Active')")
+                conn.execute(
+                    "INSERT INTO backups(backup_file,created_at,created_by,notes) VALUES(?,?,?,?)",
+                    ("/tmp/b1.db", "2024-01-01T00:00:00", 1, "backup1"),
+                )
+                conn.execute(
+                    "INSERT INTO backups(backup_file,created_at,created_by,notes) VALUES(?,?,?,?)",
+                    ("/tmp/b2.db", "2024-01-02T00:00:00", 1, "backup2"),
+                )
+            svc = BackupListingService()
+            result = svc.list_backups()
+            assert len(result) == 2
+
+    def test_list_backups_returns_dicts(self, fresh_db):
+        from lab_system.app.services.backup_listing_service import BackupListingService
+        import lab_system.app.database.db as db_mod
+        with _patch_db(fresh_db):
+            with db_mod.get_conn() as conn:
+                conn.execute("INSERT INTO users(full_name,username,password_hash,role,status) VALUES('A','a','h','Admin','Active')")
+                conn.execute(
+                    "INSERT INTO backups(backup_file,created_at,created_by,notes) VALUES(?,?,?,?)",
+                    ("/tmp/test.db", "2024-01-01T00:00:00", 1, "test"),
+                )
+            svc = BackupListingService()
+            result = svc.list_backups()
+            assert isinstance(result[0], dict)
+            assert "backup_file" in result[0]
+
+
+class TestDesktopSettingsService:
+    def test_get_default(self, fresh_db):
+        from lab_system.app.services.desktop_settings_service import DesktopSettingsService
+        with _patch_db(fresh_db):
+            svc = DesktopSettingsService()
+            val = svc.get("nonexistent_key", "default_val")
+            assert val == "default_val"
+
+    def test_set_and_get(self, fresh_db):
+        from lab_system.app.services.desktop_settings_service import DesktopSettingsService
+        with _patch_db(fresh_db):
+            svc = DesktopSettingsService()
+            svc.set("my_key", "my_value")
+            val = svc.get("my_key")
+            assert val == "my_value"
+
+    def test_set_overwrite(self, fresh_db):
+        from lab_system.app.services.desktop_settings_service import DesktopSettingsService
+        with _patch_db(fresh_db):
+            svc = DesktopSettingsService()
+            svc.set("key1", "old")
+            svc.set("key1", "new")
+            val = svc.get("key1")
+            assert val == "new"
+
+    def test_get_all(self, fresh_db):
+        from lab_system.app.services.desktop_settings_service import DesktopSettingsService
+        with _patch_db(fresh_db):
+            svc = DesktopSettingsService()
+            result = svc.get_all()
+            assert isinstance(result, dict)
+            assert len(result) > 0
+
+    def test_set_all(self, fresh_db):
+        from lab_system.app.services.desktop_settings_service import DesktopSettingsService
+        with _patch_db(fresh_db):
+            svc = DesktopSettingsService()
+            svc.set_all({"key_a": "val_a", "key_b": "val_b"})
+            assert svc.get("key_a") == "val_a"
+            assert svc.get("key_b") == "val_b"
+
+    def test_get_defaults(self, fresh_db):
+        from lab_system.app.services.desktop_settings_service import DesktopSettingsService
+        with _patch_db(fresh_db):
+            result = DesktopSettingsService.get_defaults()
+            assert isinstance(result, dict)
+            assert "session.timeout_minutes" in result
+
+    def test_set_and_get_all_roundtrip(self, fresh_db):
+        from lab_system.app.services.desktop_settings_service import DesktopSettingsService
+        with _patch_db(fresh_db):
+            svc = DesktopSettingsService()
+            defaults = svc.get_defaults()
+            svc.set_all(defaults)
+            result = svc.get_all()
+            for key in defaults:
+                assert key in result
+
+
+class TestDashboardService:
+    def test_get_stats(self, fresh_db):
+        from lab_system.app.services.dashboard_service import DashboardService
+        with _patch_db(fresh_db):
+            svc = DashboardService()
+            stats = svc.get_stats()
+            assert "total" in stats
+            assert "today_count" in stats
+            assert "week_count" in stats
+            assert "month_count" in stats
+            assert "pending" in stats
+            assert "completed" in stats
+            assert "org_count" in stats
+            assert "user_count" in stats
+
+    def test_get_stats_with_data(self, fresh_db_with_data):
+        from lab_system.app.services.dashboard_service import DashboardService
+        with _patch_db(fresh_db_with_data):
+            svc = DashboardService()
+            stats = svc.get_stats()
+            assert stats["total"] >= 1
+            assert stats["org_count"] >= 2
+            assert stats["user_count"] >= 1
+
+    def test_get_recent_activity(self, fresh_db):
+        from lab_system.app.services.dashboard_service import DashboardService
+        with _patch_db(fresh_db):
+            svc = DashboardService()
+            result = svc.get_recent_activity(limit=5)
+            assert isinstance(result, list)
+
+    def test_get_recent_activity_with_data(self, fresh_db):
+        from lab_system.app.services.dashboard_service import DashboardService
+        from lab_system.app.audit.logger import log_action
+        import lab_system.app.database.db as db_mod
+        with _patch_db(fresh_db):
+            with db_mod.get_conn() as conn:
+                conn.execute("INSERT INTO users(full_name,username,password_hash,role,status) VALUES('A','a','h','Admin','Active')")
+            log_action(1, "test_action_1")
+            log_action(1, "test_action_2")
+            svc = DashboardService()
+            result = svc.get_recent_activity(limit=10)
+            assert len(result) == 2
+
+    def test_get_recent_backups(self, fresh_db):
+        from lab_system.app.services.dashboard_service import DashboardService
+        with _patch_db(fresh_db):
+            svc = DashboardService()
+            result = svc.get_recent_backups(limit=5)
+            assert isinstance(result, list)
+
+    def test_get_recent_backups_with_data(self, fresh_db):
+        from lab_system.app.services.dashboard_service import DashboardService
+        import lab_system.app.database.db as db_mod
+        with _patch_db(fresh_db):
+            with db_mod.get_conn() as conn:
+                conn.execute("INSERT INTO users(full_name,username,password_hash,role,status) VALUES('A','a','h','Admin','Active')")
+                conn.execute(
+                    "INSERT INTO backups(backup_file,created_at,created_by,notes) VALUES(?,?,?,?)",
+                    ("/tmp/b.db", "2024-01-01T00:00:00", 1, "note"),
+                )
+            svc = DashboardService()
+            result = svc.get_recent_backups(limit=5)
+            assert len(result) == 1
+
+
+class TestDesktopAuditService:
+    def test_list_logs_empty(self, fresh_db):
+        from lab_system.app.services.desktop_audit_service import DesktopAuditService
+        with _patch_db(fresh_db):
+            svc = DesktopAuditService()
+            result = svc.list_logs()
+            assert result == []
+
+    def test_list_logs_with_data(self, fresh_db):
+        from lab_system.app.services.desktop_audit_service import DesktopAuditService
+        from lab_system.app.audit.logger import log_action
+        import lab_system.app.database.db as db_mod
+        with _patch_db(fresh_db):
+            with db_mod.get_conn() as conn:
+                conn.execute("INSERT INTO users(full_name,username,password_hash,role,status) VALUES('A','a','h','Admin','Active')")
+            log_action(1, "audit_test_1")
+            log_action(1, "audit_test_2")
+            svc = DesktopAuditService()
+            result = svc.list_logs()
+            assert len(result) == 2
+
+    def test_list_logs_limit(self, fresh_db):
+        from lab_system.app.services.desktop_audit_service import DesktopAuditService
+        from lab_system.app.audit.logger import log_action
+        import lab_system.app.database.db as db_mod
+        with _patch_db(fresh_db):
+            with db_mod.get_conn() as conn:
+                conn.execute("INSERT INTO users(full_name,username,password_hash,role,status) VALUES('A','a','h','Admin','Active')")
+            for i in range(5):
+                log_action(1, f"action_{i}")
+            svc = DesktopAuditService()
+            result = svc.list_logs(limit=3)
+            assert len(result) == 3
+
+
+# ============================================================================
+# ORG SERVICE — UPDATE path (line 18)
+# ============================================================================
+
+class TestOrgServiceUpdate:
+    def test_upsert_organization_update(self, fresh_db):
+        from lab_system.app.services.org_service import upsert_organization, list_organizations
+        with _patch_db(fresh_db):
+            upsert_organization({
+                "name": "Org X", "code": "OX-001", "org_type": "Lab",
+                "governorate": "", "address": "", "phone": "", "email": "",
+                "logo_path": "", "notes": "", "status": "Active"
+            }, user=ADMIN_USER)
+            orgs = list_organizations()
+            org_id = [o["id"] for o in orgs if o["code"] == "OX-001"][0]
+            upsert_organization({
+                "id": org_id,
+                "name": "Org X Updated", "code": "OX-001", "org_type": "Lab",
+                "governorate": "Baghdad", "address": "", "phone": "", "email": "",
+                "logo_path": "", "notes": "", "status": "Active"
+            }, user=ADMIN_USER)
+            orgs = list_organizations()
+            updated = [o for o in orgs if o["id"] == org_id]
+            assert updated[0]["name"] == "Org X Updated"
+
+
+# ============================================================================
+# AUDIT LOGGER — verify_audit_chain with explicit conn (line 36)
+# ============================================================================
+
+class TestAuditLoggerExplicitConn:
+    def test_verify_audit_chain_with_explicit_conn(self, fresh_db):
+        from lab_system.app.audit.logger import log_action, verify_audit_chain
+        import lab_system.app.database.db as _db
+        with _patch_db(fresh_db):
+            with _db.get_conn() as conn:
+                conn.execute("INSERT INTO users(full_name,username,password_hash,role,status) VALUES('A','a','h','Admin','Active')")
+            log_action(1, "conn_test_1")
+            log_action(1, "conn_test_2")
+            with _db.get_conn() as conn:
+                ok, count, msg = verify_audit_chain(conn)
+                assert ok is True
+                assert count >= 2
+
+
+# ============================================================================
+# ATTACHMENTS MANAGER — path traversal guard (lines 72-73)
+# ============================================================================
+
+class TestAttachmentPathTraversal:
+    def test_save_attachment_path_traversal_blocked(self, fresh_db, tmp_path):
+        import lab_system.app.attachments.manager as att_mod
+        with _patch_db(fresh_db):
+            evil = tmp_path / "evil.pdf"
+            evil.write_bytes(b"%PDF-1.4 evil content")
+            storage = tmp_path / "storage"
+            storage.mkdir()
+            original_storage = att_mod.STORAGE_DIR
+            original_sanitize = att_mod._sanitize_filename
+            try:
+                att_mod.STORAGE_DIR = storage
+                att_mod._sanitize_filename = lambda name: "../../../../../../../etc/passwd"
+                with pytest.raises(ValueError, match="مسار الملف غير صالح"):
+                    att_mod.save_attachment(1, str(evil), "receipt")
+            finally:
+                att_mod.STORAGE_DIR = original_storage
+                att_mod._sanitize_filename = original_sanitize
