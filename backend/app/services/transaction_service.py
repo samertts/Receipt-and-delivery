@@ -224,7 +224,9 @@ class TransactionService:
 
     @staticmethod
     def _generate_transaction_no(txn_type: str) -> str:
-        return f"TXN-{txn_type[:3].upper()}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        import uuid
+        short_id = uuid.uuid4().hex[:8].upper()
+        return f"TXN-{txn_type[:3].upper()}-{datetime.now().strftime('%Y%m%d')}-{short_id}"
 
     @staticmethod
     def _validate_item_counts(items: list) -> None:

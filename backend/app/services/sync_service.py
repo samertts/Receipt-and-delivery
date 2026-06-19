@@ -86,7 +86,11 @@ class SyncService:
                 accepted += 1
 
         if accepted:
-            self.db.commit()
+            try:
+                self.db.commit()
+            except Exception:
+                self.db.rollback()
+                accepted = 0
 
         log_audit(
             user_id=str(current_user.id) if current_user else "system",

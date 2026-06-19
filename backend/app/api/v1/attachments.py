@@ -20,6 +20,12 @@ ALLOWED_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
 }
+MAGIC_BYTES = {
+    b"\x25\x50\x44\x46": "application/pdf",
+    b"\xff\xd8\xff\xe0": "image/jpeg",
+    b"\xff\xd8\xff\xe1": "image/jpeg",
+    b"\x89\x50\x4e\x47": "image/png",
+}
 
 
 @router.post("/upload")
@@ -42,6 +48,17 @@ async def upload_attachment(
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="حجم الملف يتجاوز 50 ميغابايت")
+
+    # Validate magic bytes
+    actual_type = None
+    for magic, mime in MAGIC_BYTES.items():
+        if content[:len(magic)] == magic:
+            actual_type = mime
+            break
+    if actual_type is None:
+        raise HTTPException(status_code=400, detail="محتوى الملف لا يتطابق مع النوع المعلن")
+    if actual_type != file.content_type:
+        raise HTTPException(status_code=400, detail="نوع الملف غير متطابق")
 
     # Generate unique filename
     file_ext = ALLOWED_TYPES[file.content_type]

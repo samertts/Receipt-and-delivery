@@ -168,6 +168,7 @@ def create_recovery_snapshot(reason="manual") -> dict:
     name = f"snapshot_{reason}_{ts}.db"
     target = SNAPSHOT_DIR / name
     try:
+        _checkpoint_wal()
         shutil.copy2(str(DB_PATH), str(target))
         return {"success": True, "path": str(target), "name": name}
     except Exception as e:
@@ -325,7 +326,8 @@ def attempt_recovery(user=None) -> dict:
     backups = list_backups()
     if backups:
         latest = backups[0]
-        restore_result = restore_from_backup(latest["path"])
+        _system_user = {"id": 0, "username": "system", "role": "Admin", "status": "Active"}
+        restore_result = restore_from_backup(latest["path"], user=_system_user)
         if restore_result["success"]:
             result["success"] = True
             result["actions"].append(f"Restored from backup: {latest['name']}")

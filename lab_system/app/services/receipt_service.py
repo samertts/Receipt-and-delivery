@@ -159,25 +159,25 @@ def get_receipt(receipt_id):
 
 def get_attachment(attachment_id: int) -> dict:
     """Get attachment with hash verification."""
-    conn = _db.get_conn()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM attachments WHERE id = ?", (attachment_id,))
-    att = cursor.fetchone()
-    if not att:
-        return None
+    with _db.get_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM attachments WHERE id = ?", (attachment_id,))
+        att = cursor.fetchone()
+        if not att:
+            return None
 
-    # Verify file integrity
-    file_path = att["file_path"]
-    if os.path.exists(file_path):
-        actual_hash = _compute_hash(file_path)
-        if actual_hash != att["file_hash"]:
-            logger.warning(
-                f"Attachment {attachment_id} hash mismatch: expected {att['file_hash']}, got {actual_hash}"
-            )
-    else:
-        logger.warning(f"Attachment {attachment_id} file missing: {file_path}")
+        # Verify file integrity
+        file_path = att["file_path"]
+        if os.path.exists(file_path):
+            actual_hash = _compute_hash(file_path)
+            if actual_hash != att["file_hash"]:
+                logger.warning(
+                    f"Attachment {attachment_id} hash mismatch: expected {att['file_hash']}, got {actual_hash}"
+                )
+        else:
+            logger.warning(f"Attachment {attachment_id} file missing: {file_path}")
 
-    return dict(att)
+        return dict(att)
 
 
 @with_permission("receipts.update")
