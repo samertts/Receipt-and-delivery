@@ -68,16 +68,31 @@ def _make_test_get_conn():
     return test_get_conn
 
 
+_original_get_conn = None
+
+
 def setup_module():
     _init_test_db()
     import lab_system.app.database.db as db_mod
     import lab_system.app.settings.config as cfg_mod
+
+    global _original_get_conn
+    _original_get_conn = db_mod.get_conn
 
     db_mod.get_conn = _make_test_get_conn()
     cfg_mod.DB_PATH = TEST_DB
 
 
 def teardown_module():
+    import lab_system.app.database.db as db_mod
+    import lab_system.app.settings.config as cfg_mod
+    from lab_system.app.database.db import get_conn as _real_get_conn
+
+    if _original_get_conn is not None:
+        db_mod.get_conn = _original_get_conn
+    else:
+        db_mod.get_conn = _real_get_conn
+    object.__setattr__(cfg_mod.CONFIG, "db_path", str(Path.home() / "Documents" / "LabReceiptSystem" / "database" / "lab_system.db"))
     shutil.rmtree(TEST_DIR, ignore_errors=True)
 
 

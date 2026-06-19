@@ -19,12 +19,13 @@ def _create_test_db():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
 
-    schema = open(
+    with open(
         os.path.join(
             os.path.dirname(__file__), "..", "lab_system", "app", "database", "db.py"
         ),
         "r",
-    ).read()
+    ) as f:
+        schema = f.read()
     # Extract SCHEMA variable
     exec(schema, globals_ := {})
 

@@ -52,11 +52,13 @@ async def upload_attachment(
     # Validate magic bytes
     actual_type = None
     for magic, mime in MAGIC_BYTES.items():
-        if content[:len(magic)] == magic:
+        if content[: len(magic)] == magic:
             actual_type = mime
             break
     if actual_type is None:
-        raise HTTPException(status_code=400, detail="محتوى الملف لا يتطابق مع النوع المعلن")
+        raise HTTPException(
+            status_code=400, detail="محتوى الملف لا يتطابق مع النوع المعلن"
+        )
     if actual_type != file.content_type:
         raise HTTPException(status_code=400, detail="نوع الملف غير متطابق")
 

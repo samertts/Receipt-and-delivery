@@ -42,10 +42,6 @@ def _check_magic_bytes(path: Path) -> str | None:
         return None
 
 
-def _compute_hash(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
 def save_attachment(receipt_id: int, src_path: str, category: str):
     src = Path(src_path)
     if not src.exists():

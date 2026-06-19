@@ -58,9 +58,18 @@ class TestAuthServiceAdvanced:
     @classmethod
     def setup_class(cls):
         import lab_system.app.database.db as _db_mod
+        from lab_system.app.database.db import get_conn as _real_get_conn
 
+        cls._original_get_conn = _db_mod.get_conn
+        cls._real_get_conn = _real_get_conn
         cls.db_path = _make_db()
         _db_mod.get_conn = _make_get_conn(cls.db_path)
+
+    @classmethod
+    def teardown_class(cls):
+        import lab_system.app.database.db as _db_mod
+
+        _db_mod.get_conn = getattr(cls, '_original_get_conn', cls._real_get_conn)
 
     def test_authenticate_valid(self):
         from lab_system.app.services.user_service import authenticate
@@ -277,6 +286,7 @@ class TestSeedDefaultUsers:
         import lab_system.app.database.db as _db_mod
         from lab_system.app.database.db import SCHEMA
 
+        cls._original_get_conn = _db_mod.get_conn
         cls.db_path = Path(tempfile.mkdtemp(prefix="lab_seed_")) / "test.db"
         conn = sqlite3.connect(str(cls.db_path))
         conn.row_factory = sqlite3.Row
@@ -297,6 +307,12 @@ class TestSeedDefaultUsers:
                 c.close()
 
         _db_mod.get_conn = test_conn
+
+    @classmethod
+    def teardown_class(cls):
+        import lab_system.app.database.db as _db_mod
+
+        _db_mod.get_conn = cls._original_get_conn
 
     def test_seed_users_creates_admin(self):
         from lab_system.app.services.user_service import (

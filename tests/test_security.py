@@ -56,6 +56,7 @@ class TestSecurityEdgeCases:
     def setup_method(self):
         import lab_system.app.database.db as _db_mod
 
+        self._original_get_conn = _db_mod.get_conn
         self.tmp = Path(tempfile.mkdtemp(prefix="lab_sec_"))
         self.db_path = self.tmp / "test.db"
         conn = sqlite3.connect(str(self.db_path))
@@ -85,7 +86,10 @@ class TestSecurityEdgeCases:
 
     def teardown_method(self):
         import shutil
+        import lab_system.app.database.db as _db_mod
+        from lab_system.app.database.db import get_conn as _real_get_conn
 
+        _db_mod.get_conn = getattr(self, '_original_get_conn', _real_get_conn)
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def test_record_login_attempt_success(self):

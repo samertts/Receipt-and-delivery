@@ -37,8 +37,9 @@ def verify_backup(path: Path | str) -> dict:
     if not path.exists():
         result["error"] = "File not found"
         return result
-    result["size"] = path.stat().st_size
-    if result["size"] < 100:
+    file_size: int = path.stat().st_size
+    result["size"] = file_size
+    if file_size < 100:
         result["error"] = "File too small to be a valid database"
         return result
     try:
@@ -326,7 +327,12 @@ def attempt_recovery(user=None) -> dict:
     backups = list_backups()
     if backups:
         latest = backups[0]
-        _system_user = {"id": 0, "username": "system", "role": "Admin", "status": "Active"}
+        _system_user = {
+            "id": 0,
+            "username": "system",
+            "role": "Admin",
+            "status": "Active",
+        }
         restore_result = restore_from_backup(latest["path"], user=_system_user)
         if restore_result["success"]:
             result["success"] = True

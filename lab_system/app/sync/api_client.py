@@ -108,7 +108,7 @@ class APIClient:
                     time.sleep(wait_time)
                     continue
                 resp_body = e.read().decode("utf-8", errors="replace")
-                resp_data: dict[str, Any] = {}
+                resp_data = {}
                 if resp_body:
                     try:
                         resp_data = json.loads(resp_body)
