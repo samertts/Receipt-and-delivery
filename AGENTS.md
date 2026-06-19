@@ -206,3 +206,29 @@ The platform shall continuously evolve toward:
 - National Health Operations Platform
 
 without architectural redesign.
+
+---
+
+## 15-Phase Execution Order
+
+The Constitution defines 15 phases for platform evolution. Each phase must be completed with full evidence before proceeding to the next. See [PHASE_EXECUTION_PLAN.md](./PHASE_EXECUTION_PLAN.md) for detailed execution steps.
+
+### Phase Status
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 1 | Platform Core Extraction | PENDING |
+| 2 | Unified Ecosystem Architecture | PENDING |
+| 3 | Operational Intelligence Engine | PENDING |
+| 4 | AI Operations Assistant | PENDING |
+| 5 | Event Platform | PENDING |
+| 6 | Observability Platform | PENDING |
+| 7 | National Scale Readiness | PENDING |
+| 8 | Mobile Ecosystem Readiness | PENDING |
+| 9 | Self-Improvement Framework | PENDING |
+| 10 | Pilot Deployment Program | PENDING |
+| 11 | Platform Governance | PENDING |
+| 12 | Future Ecosystem Consolidation | PENDING |
+| 13 | National Laboratory Platform Readiness | PENDING |
+| 14 | Certification Governance | PENDING |
+| 15 | Evolution Guarantee | PENDING |

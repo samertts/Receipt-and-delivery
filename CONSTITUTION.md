@@ -1,271 +1,323 @@
-# CONSTITUTION V3.0 — Receipt-and-Delivery Enterprise Platform
+# UNIFIED NATIONAL PLATFORM CONSTITUTION V3.0
 
 **Adopted: 2026-06-19**
 **Supersedes all previous constitutions, guidelines, standards, and architectural directives.**
 
 ---
 
-## MISSION
+## Project
 
-Transform Receipt-and-delivery from a standalone operational system into a continuously improving, intelligent, extensible, government-grade enterprise platform capable of future integration with all organizational systems, laboratory systems, mobile applications, analytics platforms, and national-scale infrastructure.
+Receipt-and-delivery
 
----
+## Current Classification
 
-## CORE PRINCIPLES
+Production Ready
 
-### 1. Data Sovereignty
+## Mission
 
-All data remains owned by the organization.
-
-No feature, service, update, integration, migration, or deployment may compromise:
-
-- Data ownership
-- Data integrity
-- Data recoverability
-- Data traceability
-
-### 2. Zero Data Loss
-
-No feature is more important than preserving data.
-
-**Priority Order:**
-
-1. Data Integrity
-2. Data Availability
-3. Operational Continuity
-4. Features
-
-### 3. Service Boundary Enforcement
-
-The only approved execution flow is:
-
-```
-UI → Application Services → Domain Services → Repositories → Database
-```
-
-Direct database access outside approved repositories is prohibited.
-
-### 4. Zero Trust Security
-
-Every request must be authenticated, authorized, audited, and validated.
-
-**Fail Closed** is mandatory.
-
-### 5. Audit Everything
-
-Every privileged operation must produce immutable audit evidence.
-
-Audit logs must support:
-
-- Forensic review
-- Accountability
-- Compliance review
-- Incident investigation
+Transform Receipt-and-delivery into the foundational platform core for a unified government-grade enterprise ecosystem capable of supporting laboratory operations, workforce management, training systems, inventory management, surveillance systems, public health operations, and future national-scale digital services.
 
 ---
 
-## CONTINUOUS EVOLUTION PRINCIPLES
+## Foundational Principles
 
-### 6. Self-Improvement Architecture
-
-The platform must continuously measure itself.
-
-The system shall collect:
-
-- Performance metrics
-- Reliability metrics
-- Usage metrics
-- Error metrics
-- Security metrics
-
-The platform must generate improvement recommendations automatically.
-
-### 7. Operational Intelligence Layer
-
-The platform shall proactively identify:
-
-- Delayed workflows
-- Abnormal user activity
-- Backup failures
-- Recovery risks
-- Synchronization failures
-- Performance degradation
-- Security anomalies
-
-Before users report them.
-
-### 8. AI Readiness
-
-Every new service must be designed for future AI integration.
-
-All services must expose structured contracts.
-
-All critical events must be machine-readable.
-
-### 9. Event-Driven Readiness
-
-Critical business operations must be capable of producing events.
-
-**Examples:**
-
-- `ReceiptCreated`
-- `ReceiptUpdated`
-- `ReceiptDeleted`
-- `ReceiptRestored`
-- `BackupCreated`
-- `RecoveryExecuted`
-- `SyncConflictDetected`
+1. Zero Data Loss
+2. Data Sovereignty
+3. Fail-Closed Security
+4. Audit Everything
+5. Service-Oriented Architecture
+6. Event-Driven Readiness
+7. AI Readiness
+8. Offline-First Capability
+9. National Scale Compatibility
+10. Continuous Improvement
 
 ---
 
-## UNIFIED PLATFORM PRINCIPLES
+## Phase 1 — Platform Core Extraction
 
-### 10. Future Platform Consolidation
+Extract and centralize:
 
-Receipt-and-delivery shall not evolve as an isolated application.
+- Identity
+- Authentication
+- Authorization
+- Audit
+- Notifications
+- Configuration
+- Backup
+- Recovery
+- Reporting
+- Synchronization
+- Telemetry
 
-Future architecture must support integration with:
+**Target:** Platform Core Layer
 
-- Laboratory Systems
-- Workforce Systems
-- Training Systems
+No future module may duplicate these services.
+
+---
+
+## Phase 2 — Unified Ecosystem Architecture
+
+Implement:
+
+- Module Registry
+- Service Registry
+- Feature Registry
+- Permission Registry
+- Event Registry
+- Policy Registry
+
+**Future Modules:**
+
+- Receipt & Delivery
+- Laboratory Operations
+- Workforce Management
+- Training Management
+- Inventory Management
+- Quality Management
 - Surveillance Systems
-- Inventory Systems
-- Quality Management Systems
-- Public Health Platforms
-- Mobile Applications
-
-### 11. Shared Identity
-
-Future systems must support unified authentication and authorization.
-
-Users should eventually operate across all integrated systems through a common identity framework.
-
-### 12. Shared Data Contracts
-
-All future integrations must use standardized APIs, DTOs, schemas, and versioned contracts.
-
-### 13. National Platform Compatibility
-
-Every architectural decision must be evaluated against future:
-
-- Multi-site deployment
-- Province-wide deployment
-- National deployment
-
-Architectural choices that block national expansion are prohibited.
+- Public Health Systems
+- Mobile Clients
 
 ---
 
-## QUALITY PRINCIPLES
+## Phase 3 — Operational Intelligence Engine
 
-### 14. Every Defect Produces a Test
+Implement: **System Intelligence Layer**
 
-No bug may be closed without a regression test.
+Generate:
 
-### 15. Every Security Finding Produces a Security Test
+- Health Score
+- Reliability Score
+- Security Score
+- Backup Score
+- Recovery Score
+- Synchronization Score
+- Data Integrity Score
+- Performance Score
 
-Security issues must never reappear undetected.
-
-### 16. Measurable Engineering
-
-No claim may be accepted without evidence.
-
-All decisions must be supported by:
-
-- Tests
-- Metrics
-- Benchmarks
-- Reports
+Display all metrics in operational dashboards.
 
 ---
 
-## RESILIENCE PRINCIPLES
+## Phase 4 — AI Operations Assistant
 
-### 17. Recovery Before Features
+Implement: **AI Operational Assistant**
 
-Backup and recovery capability takes precedence over feature development.
+Capabilities:
 
-### 18. Continuous Disaster Preparedness
+- Error Analysis
+- Root Cause Analysis
+- Log Analysis
+- Performance Recommendations
+- Security Recommendations
+- Backup Recommendations
+- Recovery Recommendations
+- Capacity Planning
+- Risk Prediction
 
-The platform must regularly validate recovery from:
-
-- Database corruption
-- Storage failure
-- Unexpected shutdown
-- Power loss
-- Synchronization interruption
-
-### 19. Observability First
-
-Every production issue must be diagnosable through:
-
-- Logs
-- Metrics
-- Traces
-- Audit Evidence
+**Target:** Self-Assisting Platform
 
 ---
 
-## USER EXPERIENCE PRINCIPLES
+## Phase 5 — Event Platform
 
-### 20. User Productivity First
+Implement Event Bus.
 
-The system exists to reduce operational effort.
+**Mandatory Events:**
 
-Every common workflow should require minimal interaction.
+```
+ReceiptCreated, ReceiptUpdated, ReceiptDeleted, ReceiptRestored
+BackupCreated, BackupVerified, BackupFailed
+RecoveryStarted, RecoveryCompleted, RecoveryFailed
+SyncStarted, SyncCompleted, SyncFailed
+PermissionDenied, AuthenticationFailed, AuditViolationDetected
+```
 
-### 21. Intelligent Assistance
-
-The platform should progressively evolve toward:
-
-- Smart search
-- Smart recommendations
-- Workflow guidance
-- Automated diagnostics
-- Context-aware assistance
+**Target:** Event Driven Architecture
 
 ---
 
-## GOVERNANCE PRINCIPLES
+## Phase 6 — Observability Platform
 
-### 22. No Release Without Certification
+Implement:
 
-Certification reports are mandatory.
+- Structured Logging
+- Metrics Collection
+- Distributed Tracing
+- Audit Analytics
+- Error Analytics
+- Performance Analytics
+- Operational Analytics
 
-### 23. No Deployment With Critical Findings
-
-- Critical Findings > 0 = Deployment Blocked
-- High Findings > 0 = Deployment Blocked
-
-### 24. Continuous Architecture Evolution
-
-Architecture is not static.
-
-The platform must continuously evolve toward:
-
-- Better scalability
-- Better maintainability
-- Better reliability
-- Better security
-- Better intelligence
+**Target:** Full System Visibility
 
 ---
 
-## LONG-TERM VISION
+## Phase 7 — National Scale Readiness
 
-Receipt-and-delivery shall serve as the foundational operational core of a future unified enterprise ecosystem.
+**Mandatory:**
 
-Future expansion shall require configuration, integration, and scaling rather than complete system replacement.
+- UUID Strategy
+- API Versioning
+- Contract Versioning
+- Multi-Node Synchronization
+- Regional Node Registration
+- National Node Registration
+- Multi-Tenant Capability
 
-The platform shall continuously evolve toward:
+**Target:** National Platform Compatibility
 
-- Enterprise Platform
-- Laboratory Platform
-- Government Operations Platform
-- National Health Operations Platform
+---
 
-without architectural redesign.
+## Phase 8 — Mobile Ecosystem Readiness
+
+Prepare:
+
+- Android Contracts
+- Tablet Contracts
+- Offline Contracts
+- Sync Contracts
+- Attachment Contracts
+- Authentication Contracts
+- Notification Contracts
+
+**Target:** Mobile Ready
+
+---
+
+## Phase 9 — Self-Improvement Framework
+
+Implement: **Continuous Improvement Engine**
+
+Capabilities:
+
+- Technical Debt Detection
+- Performance Bottleneck Detection
+- Security Weakness Detection
+- Reliability Risk Detection
+- Capacity Forecasting
+
+Generate automated recommendations.
+
+---
+
+## Phase 10 — Pilot Deployment Program
+
+Measure:
+
+- User Adoption
+- User Satisfaction
+- Error Rates
+- Backup Success
+- Recovery Success
+- Synchronization Success
+- Performance Trends
+
+**Generate:** `pilot_deployment_report.md`
+
+---
+
+## Phase 11 — Platform Governance
+
+Every feature requires:
+
+- Security Review
+- Architecture Review
+- Performance Review
+- Recovery Review
+- Audit Review
+- Compliance Review
+
+**Deployment blocked if:**
+
+- Critical Findings > 0
+- High Findings > 0
+
+---
+
+## Phase 12 — Future Ecosystem Consolidation
+
+**Mandatory Long-Term Direction:**
+
+All future organizational projects shall integrate into the Unified Platform Core.
+
+**Shared Components:**
+
+- Single Identity
+- Single Authorization
+- Single Audit System
+- Single Reporting System
+- Single Notification System
+- Single Synchronization Engine
+- Single Operational Intelligence Engine
+- Single AI Assistant
+
+---
+
+## Phase 13 — National Laboratory Platform Readiness
+
+Prepare future compatibility with:
+
+- Medical Laboratories
+- Public Health Laboratories
+- Research Laboratories
+- Surveillance Laboratories
+
+Without architectural redesign.
+
+---
+
+## Phase 14 — Certification Governance
+
+No release may occur without:
+
+- Security Certification
+- Backup Certification
+- Recovery Certification
+- Synchronization Certification
+- Performance Certification
+- Operational Certification
+
+---
+
+## Phase 15 — Evolution Guarantee
+
+The platform must continuously evolve without requiring full-system rewrites.
+
+Every architectural decision must support:
+
+- Horizontal Expansion
+- Vertical Expansion
+- Module Addition
+- National Deployment
+- AI Integration
+
+---
+
+## Success Criteria
+
+- Business Logic Coverage >= 95%
+- Critical Findings = 0
+- High Findings = 0
+- Operational Intelligence Active
+- AI Assistant Active
+- Observability Active
+- Event Platform Active
+- National Scale Ready
+- Mobile Ready
+- Pilot Deployment Successful
+- Unified Platform Core Operational
+
+---
+
+## End State
+
+Receipt-and-delivery shall become:
+
+**UNIFIED ENTERPRISE PLATFORM CORE**
+
+serving as the foundational infrastructure for future laboratory, workforce, training, inventory, surveillance, public health, and national government digital systems without architectural redesign.
 
 ---
 
