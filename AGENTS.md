@@ -1,6 +1,6 @@
 # AGENTS.md — Agent Operating Instructions for Receipt-and-Delivery
 
-**Governing Document: [CONSTITUTION.md](./CONSTITUTION.md) — V3.0**
+**Governing Document: [CONSTITUTION.md](./CONSTITUTION.md) — V4.0**
 
 ---
 
