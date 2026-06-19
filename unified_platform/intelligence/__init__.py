@@ -15,6 +15,12 @@ from unified_platform.intelligence.scores import (
     SyncScoreCalculator,
 )
 from unified_platform.intelligence.engine import IntelligenceEngine, IntelligenceReport
+from unified_platform.intelligence.self_improvement import (
+    SelfImprovementEngine,
+    Recommendation,
+    RecommendationType,
+    RiskLevel,
+)
 
 __all__ = [
     "BackupScoreCalculator",
@@ -29,4 +35,8 @@ __all__ = [
     "SyncScoreCalculator",
     "IntelligenceEngine",
     "IntelligenceReport",
+    "SelfImprovementEngine",
+    "Recommendation",
+    "RecommendationType",
+    "RiskLevel",
 ]
