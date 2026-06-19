@@ -48,6 +48,7 @@ class SyncQueueEntry:
     retry_count: int = 0
     created_at: str = ''
     synced_at: str = ''
+    idempotency_key: str = ''
 
 
 @dataclass

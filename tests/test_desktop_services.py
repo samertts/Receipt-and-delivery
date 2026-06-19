@@ -17,6 +17,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 TEST_DIR = Path(tempfile.mkdtemp(prefix="lab_test_"))
 TEST_DB = TEST_DIR / "test.db"
 
+ADMIN_USER = {"id": 1, "username": "admin", "role": "Admin", "status": "Active"}
+
 
 def _init_test_db():
     """Create a temporary SQLite database with full schema and seed data."""
@@ -89,13 +91,13 @@ class TestReceiptServiceFull:
 
     def test_1_create_receipt(self):
         from lab_system.app.services.receipt_service import create_receipt
-        rid, rno = create_receipt(self._data(), [self._item()], 1)
+        rid, rno = create_receipt(self._data(), [self._item()], 1, user=ADMIN_USER)
         assert rid > 0
         assert rno.startswith("LAB-2026-")
 
     def test_2_get_receipt(self):
         from lab_system.app.services.receipt_service import create_receipt, get_receipt
-        rid, _ = create_receipt(self._data(), [self._item(), self._item({"sample_type_id": 2})], 1)
+        rid, _ = create_receipt(self._data(), [self._item(), self._item({"sample_type_id": 2})], 1, user=ADMIN_USER)
         r, items, atts = get_receipt(rid)
         assert r is not None
         assert r["sender_name"] == "Ali"
@@ -107,10 +109,10 @@ class TestReceiptServiceFull:
             get_receipt,
             update_receipt,
         )
-        rid, _ = create_receipt(self._data(), [self._item()], 1)
+        rid, _ = create_receipt(self._data(), [self._item()], 1, user=ADMIN_USER)
         d = self._data({"status": "Approved", "additional_comments": "OK"})
         items = [self._item({"valid_count": 96, "damaged_count": 2})]
-        update_receipt(rid, d, items)
+        update_receipt(rid, d, items, user=ADMIN_USER)
         r, ri, _ = get_receipt(rid)
         assert r["status"] == "Approved"
         assert ri[0]["valid_count"] == 96
@@ -121,9 +123,9 @@ class TestReceiptServiceFull:
             get_receipt,
             set_receipt_status,
         )
-        rid, _ = create_receipt(self._data(), [self._item()], 1)
-        for st in ["Approved", "Rejected", "Archived"]:
-            set_receipt_status(rid, st)
+        rid, _ = create_receipt(self._data(), [self._item()], 1, user=ADMIN_USER)
+        for st in ["Approved", "Archived", "Draft"]:
+            set_receipt_status(rid, st, user=ADMIN_USER)
             assert get_receipt(rid)[0]["status"] == st
 
     def test_5_list_receipts(self):
@@ -132,9 +134,9 @@ class TestReceiptServiceFull:
             list_receipts,
             set_receipt_status,
         )
-        r1, _ = create_receipt(self._data(), [self._item()], 1)
-        r2, _ = create_receipt(self._data(), [self._item()], 1)
-        set_receipt_status(r2, "Approved")
+        r1, _ = create_receipt(self._data(), [self._item()], 1, user=ADMIN_USER)
+        r2, _ = create_receipt(self._data(), [self._item()], 1, user=ADMIN_USER)
+        set_receipt_status(r2, "Approved", user=ADMIN_USER)
         _, total = list_receipts()
         assert total >= 2
         _, total = list_receipts(status="Draft")
@@ -147,7 +149,7 @@ class TestReceiptServiceFull:
             create_receipt,
             search_receipts,
         )
-        create_receipt(self._data(), [self._item()], 1)
+        create_receipt(self._data(), [self._item()], 1, user=ADMIN_USER)
         r = search_receipts(q="Org A")
         assert len(r) >= 1
         r = search_receipts(q="ZZZZNONEXISTENT")
@@ -159,8 +161,8 @@ class TestReceiptServiceFull:
             get_receipt,
             hard_delete_receipt,
         )
-        rid, _ = create_receipt(self._data(), [self._item()], 1)
-        hard_delete_receipt(rid)
+        rid, _ = create_receipt(self._data(), [self._item()], 1, user=ADMIN_USER)
+        hard_delete_receipt(rid, user=ADMIN_USER)
         assert get_receipt(rid)[0] is None
 
     def test_8_validation(self):
@@ -171,7 +173,7 @@ class TestReceiptServiceFull:
                 "damaged_count": 10, "rejected_count": 5, "non_conforming_count": 5,
                 "transport_condition": "", "notes": ""}]
         with pytest.raises(ValueError):
-            create_receipt(self._data(), bad, 1)
+            create_receipt(self._data(), bad, 1, user=ADMIN_USER)
 
 
 class TestOrganizationService:
@@ -184,7 +186,7 @@ class TestOrganizationService:
         assert len(orgs) >= 2
         upsert_organization({"name": "Org C", "code": "OC-001", "org_type": "Lab",
                              "governorate": "Baghdad", "address": "", "phone": "",
-                             "email": "", "logo_path": "", "notes": "", "status": "Active"})
+                             "email": "", "logo_path": "", "notes": "", "status": "Active"}, user=ADMIN_USER)
         orgs = list_organizations()
         names = [o["name"] for o in orgs]
         assert "Org C" in names
@@ -220,7 +222,7 @@ class TestReportService:
 class TestBackupService:
     def test_create_backup(self):
         from lab_system.app.services.backup_service import create_backup
-        path = create_backup(user_id=1, notes="Test backup")
+        path = create_backup(user_id=1, notes="Test backup", user=ADMIN_USER)
         assert Path(path).exists()
         assert Path(path).stat().st_size > 0
 
@@ -250,7 +252,7 @@ class TestUserService:
         from lab_system.app.services.user_service import create_user, list_users
         users = list_users()
         assert len(users) >= 1
-        create_user("New User", "newuser", "Pass@123", "User", institution_id=1)
+        create_user("New User", "newuser", "Pass@123", "User", institution_id=1, user=ADMIN_USER)
         users = list_users()
         usernames = [u["username"] for u in users]
         assert "newuser" in usernames

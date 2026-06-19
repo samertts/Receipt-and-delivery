@@ -170,16 +170,19 @@ class TestPermissions:
             do_stuff(user={"role": "Auditor"})
 
     def test_with_permission_no_user_passes_through(self):
-        """When no user kwarg is provided, the decorator should pass through."""
+        """When no user kwarg is provided, the decorator raises AuthorizationError (fail-closed)."""
+        import pytest
+
         from lab_system.app.auth.permissions import with_permission
+        from lab_system.app.utils.errors import AuthorizationError
 
         @with_permission("settings.update")
         def do_stuff(x, y, user=None):
             return x + y
 
-        # No user kwarg — should pass through without raising
-        result = do_stuff(1, 2)
-        assert result == 3
+        # No user kwarg — should raise AuthorizationError (fail-closed security)
+        with pytest.raises(AuthorizationError):
+            do_stuff(1, 2)
 
 
 class TestCatalogService:

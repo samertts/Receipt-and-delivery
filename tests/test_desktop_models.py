@@ -11,6 +11,8 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+ADMIN_USER = {"id": 1, "username": "admin", "role": "Admin", "status": "Active"}
+
 
 def _create_test_db():
     conn = sqlite3.connect(":memory:")
@@ -73,7 +75,7 @@ class TestReceiptService:
              "transport_condition": "Good", "notes": ""},
         ]
         with pytest.raises(ValueError, match="Invalid item totals"):
-            create_receipt({}, bad, 1)
+            create_receipt({}, bad, 1, user=ADMIN_USER)
 
 
 class TestOrganizationService:

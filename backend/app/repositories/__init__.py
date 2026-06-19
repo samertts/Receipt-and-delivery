@@ -1,5 +1,3 @@
-from sqlalchemy import func
-
 from app.models.audit_log import AuditLog
 from app.models.organization import Organization
 from app.models.sync_log import SyncLog

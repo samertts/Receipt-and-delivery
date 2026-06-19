@@ -1,12 +1,11 @@
 import hashlib
 import os
 import uuid
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_permission
+from app.api.deps import require_permission
 from app.db.session import get_db
 from app.models.attachment import Attachment
 from app.models.transaction import Transaction

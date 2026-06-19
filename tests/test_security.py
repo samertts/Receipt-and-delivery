@@ -7,6 +7,8 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+ADMIN_USER = {"id": 1, "username": "admin", "role": "Admin", "status": "Active"}
+
 
 def _make_db():
     from lab_system.app.auth.security import hash_password
@@ -127,7 +129,7 @@ class TestSecurityEdgeCases:
         user = authenticate('admin', 'Admin@123')
         assert user is not None
         admin_id = user['id']
-        disable_user(admin_id)
+        disable_user(admin_id, user=ADMIN_USER)
         user = authenticate('admin', 'Admin@123')
         assert user is None
 
@@ -137,8 +139,8 @@ class TestSecurityEdgeCases:
             disable_user,
             enable_user,
         )
-        disable_user(1)
-        enable_user(1)
+        disable_user(1, user=ADMIN_USER)
+        enable_user(1, user=ADMIN_USER)
         user = authenticate('admin', 'Admin@123')
         assert user is not None
 

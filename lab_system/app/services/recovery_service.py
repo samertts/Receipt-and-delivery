@@ -182,8 +182,9 @@ def list_snapshots() -> list[dict]:
 def auto_backup(notes="auto") -> dict:
     """Create automatic backup and enforce retention policy."""
     from lab_system.app.services.backup_service import create_backup
+    _system_user = {"id": 0, "username": "system", "role": "Admin", "status": "Active"}
     try:
-        path = create_backup(user_id=None, notes=notes)
+        path = create_backup(user_id=None, notes=notes, user=_system_user)
         enforce_retention()
         return {"success": True, "path": path}
     except Exception as e:
@@ -192,12 +193,13 @@ def auto_backup(notes="auto") -> dict:
 
 def enforce_retention(max_backups=30) -> int:
     """Remove oldest backups exceeding max_backups. Returns number deleted."""
+    _system_user = {"id": 0, "username": "system", "role": "Admin", "status": "Active"}
     backups = list_backups()
     if len(backups) <= max_backups:
         return 0
     deleted = 0
     for b in backups[max_backups:]:
-        result = delete_backup(b["path"])
+        result = delete_backup(b["path"], user=_system_user)
         if result["success"]:
             deleted += 1
     return deleted

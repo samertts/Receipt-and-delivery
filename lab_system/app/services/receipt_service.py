@@ -318,42 +318,42 @@ def change_receipt_status(receipt_id, new_status, user_id=None, user=None):
                f'Receipt {receipt_id}: {old_status} → {new_status}')
 
 
-def approve_receipt(receipt_id, user_id=None):
-    return change_receipt_status(receipt_id, 'Approved', user_id)
+def approve_receipt(receipt_id, user_id=None, user=None):
+    return change_receipt_status(receipt_id, 'Approved', user_id, user=user)
 
 
-def reject_receipt(receipt_id, user_id=None):
-    return change_receipt_status(receipt_id, 'Rejected', user_id)
+def reject_receipt(receipt_id, user_id=None, user=None):
+    return change_receipt_status(receipt_id, 'Rejected', user_id, user=user)
 
 
-def archive_receipt(receipt_id, user_id=None):
-    return change_receipt_status(receipt_id, 'Archived', user_id)
+def archive_receipt(receipt_id, user_id=None, user=None):
+    return change_receipt_status(receipt_id, 'Archived', user_id, user=user)
 
 
-def unarchive_receipt(receipt_id, user_id=None):
-    return change_receipt_status(receipt_id, 'Draft', user_id)
+def unarchive_receipt(receipt_id, user_id=None, user=None):
+    return change_receipt_status(receipt_id, 'Draft', user_id, user=user)
 
 
-def cancel_receipt(receipt_id, user_id=None):
-    return change_receipt_status(receipt_id, 'Cancelled', user_id)
+def cancel_receipt(receipt_id, user_id=None, user=None):
+    return change_receipt_status(receipt_id, 'Cancelled', user_id, user=user)
 
 
-def batch_update_status(ids, new_status, user_id=None):
+def batch_update_status(ids, new_status, user_id=None, user=None):
     results = []
     for rid in ids:
         try:
-            change_receipt_status(rid, new_status, user_id)
+            change_receipt_status(rid, new_status, user_id, user=user)
             results.append((rid, 'ok', ''))
         except (ValueError, Exception) as e:
             results.append((rid, 'error', str(e)))
     return results
 
 
-def batch_soft_delete(ids, user_id=None):
+def batch_soft_delete(ids, user_id=None, user=None):
     results = []
     for rid in ids:
         try:
-            soft_delete_receipt(rid, user_id)
+            soft_delete_receipt(rid, user_id, user=user)
             results.append((rid, 'ok', ''))
         except Exception as e:
             results.append((rid, 'error', str(e)))

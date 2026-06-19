@@ -9,6 +9,8 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+ADMIN_USER = {"id": 1, "username": "admin", "role": "Admin", "status": "Active"}
+
 
 def _make_db():
     from lab_system.app.auth.security import hash_password
@@ -221,14 +223,14 @@ class TestAuthServiceAdvanced:
             list_users,
             reset_password,
         )
-        create_user('Temp', 'temp', 'Temp@123', 'User', 1)
-        reset_password(1, 'NewPass789!')
+        create_user('Temp', 'temp', 'Temp@123', 'User', 1, user=ADMIN_USER)
+        reset_password(1, 'NewPass789!', user=ADMIN_USER)
         user = authenticate('admin', 'NewPass789!')
         assert user is not None
-        reset_password(1, 'Admin@123')
+        reset_password(1, 'Admin@123!', user=ADMIN_USER)
         users = list_users()
         new_user = next(u for u in users if u['username'] == 'temp')
-        disable_user(new_user['id'])
+        disable_user(new_user['id'], user=ADMIN_USER)
         users = list_users()
         disabled = next(u for u in users if u['id'] == new_user['id'])
         assert disabled['status'] == 'Inactive'

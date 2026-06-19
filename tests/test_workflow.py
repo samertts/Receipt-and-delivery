@@ -61,6 +61,9 @@ def _item():
     }
 
 
+ADMIN_USER = {"id": 1, "username": "admin", "role": "Admin", "status": "Active"}
+
+
 class TestWorkflow:
     @classmethod
     def setup_class(cls):
@@ -74,12 +77,12 @@ class TestWorkflow:
             create_receipt,
             get_receipt,
         )
-        rid, _ = create_receipt(_data(), [_item()], 1)
-        change_receipt_status(rid, "Approved", 1)
+        rid, _ = create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+        change_receipt_status(rid, "Approved", 1, user=ADMIN_USER)
         assert get_receipt(rid)[0]["status"] == "Approved"
-        change_receipt_status(rid, "Archived", 1)
+        change_receipt_status(rid, "Archived", 1, user=ADMIN_USER)
         assert get_receipt(rid)[0]["status"] == "Archived"
-        change_receipt_status(rid, "Draft", 1)
+        change_receipt_status(rid, "Draft", 1, user=ADMIN_USER)
         assert get_receipt(rid)[0]["status"] == "Draft"
 
     def test_invalid_transitions(self):
@@ -87,11 +90,11 @@ class TestWorkflow:
             change_receipt_status,
             create_receipt,
         )
-        rid, _ = create_receipt(_data(), [_item()], 1)
-        change_receipt_status(rid, "Approved", 1)
+        rid, _ = create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+        change_receipt_status(rid, "Approved", 1, user=ADMIN_USER)
         import pytest
         with pytest.raises(ValueError, match="Cannot transition"):
-            change_receipt_status(rid, "Draft", 1)
+            change_receipt_status(rid, "Draft", 1, user=ADMIN_USER)
 
     def test_receipt_history(self):
         from lab_system.app.services.receipt_service import (
@@ -99,9 +102,9 @@ class TestWorkflow:
             create_receipt,
             get_receipt_history,
         )
-        rid, _ = create_receipt(_data(), [_item()], 1)
-        change_receipt_status(rid, "Approved", 1)
-        change_receipt_status(rid, "Archived", 1)
+        rid, _ = create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+        change_receipt_status(rid, "Approved", 1, user=ADMIN_USER)
+        change_receipt_status(rid, "Archived", 1, user=ADMIN_USER)
         history = get_receipt_history(rid)
         assert len(history) >= 2
         assert history[0]["field_name"] == "status"
@@ -114,9 +117,9 @@ class TestWorkflow:
             create_receipt,
             get_receipt,
         )
-        r1, _ = create_receipt(_data(), [_item()], 1)
-        r2, _ = create_receipt(_data(), [_item()], 1)
-        results = batch_update_status([r1, r2], "Approved", 1)
+        r1, _ = create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+        r2, _ = create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+        results = batch_update_status([r1, r2], "Approved", 1, user=ADMIN_USER)
         assert all(r[1] == "ok" for r in results)
         assert get_receipt(r1)[0]["status"] == "Approved"
         assert get_receipt(r2)[0]["status"] == "Approved"
@@ -126,7 +129,7 @@ class TestWorkflow:
 
         from lab_system.app.services.receipt_service import change_receipt_status
         with pytest.raises(ValueError, match="not found"):
-            change_receipt_status(99999, "Approved", 1)
+            change_receipt_status(99999, "Approved", 1, user=ADMIN_USER)
 
     def test_change_status_same_status(self):
         from lab_system.app.services.receipt_service import (
@@ -134,8 +137,8 @@ class TestWorkflow:
             create_receipt,
             get_receipt,
         )
-        rid, _ = create_receipt(_data(), [_item()], 1)
-        result = change_receipt_status(rid, "Draft", 1)
+        rid, _ = create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+        result = change_receipt_status(rid, "Draft", 1, user=ADMIN_USER)
         assert result is None
         assert get_receipt(rid)[0]["status"] == "Draft"
 
@@ -144,7 +147,7 @@ class TestWorkflow:
 
         from lab_system.app.services.receipt_service import set_receipt_status
         with pytest.raises(ValueError, match="not found"):
-            set_receipt_status(99999, "Approved", 1)
+            set_receipt_status(99999, "Approved", 1, user=ADMIN_USER)
 
     def test_set_status_same_status(self):
         from lab_system.app.services.receipt_service import (
@@ -152,8 +155,8 @@ class TestWorkflow:
             get_receipt,
             set_receipt_status,
         )
-        rid, _ = create_receipt(_data(), [_item()], 1)
-        result = set_receipt_status(rid, "Draft", 1)
+        rid, _ = create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+        result = set_receipt_status(rid, "Draft", 1, user=ADMIN_USER)
         assert result is None
         assert get_receipt(rid)[0]["status"] == "Draft"
 
@@ -162,7 +165,7 @@ class TestWorkflow:
             create_receipt,
             list_receipts,
         )
-        create_receipt(_data(), [_item()], 1)
+        create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
         result = list_receipts(date_from="2026-01-01", date_to="2026-12-31")
         assert len(result) >= 1
 
@@ -171,7 +174,7 @@ class TestWorkflow:
             create_receipt,
             list_receipts,
         )
-        create_receipt(_data(), [_item()], 1)
+        create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
         rows, count = list_receipts(tx_type_id=1)
         assert count >= 1
         rows_empty, count_empty = list_receipts(tx_type_id=999)
@@ -197,10 +200,10 @@ class TestWorkflow:
             create_receipt,
             restore_receipt,
         )
-        rid, _ = create_receipt(_data(), [_item()], 1)
-        results = batch_soft_delete([rid], user_id=1)
+        rid, _ = create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+        results = batch_soft_delete([rid], user_id=1, user=ADMIN_USER)
         assert results[0][1] == "ok"
-        restore_receipt(rid, 1)
+        restore_receipt(rid, 1, user=ADMIN_USER)
 
     def test_invalid_item_totals(self):
         import pytest
@@ -213,10 +216,10 @@ class TestWorkflow:
         bad_item["total_count"] = 10
         bad_item["valid_count"] = 100
         with pytest.raises(ValueError, match="Invalid item totals"):
-            create_receipt(_data(), [bad_item], 1)
-        rid, _ = create_receipt(_data(), [_item()], 1)
+            create_receipt(_data(), [bad_item], 1, user=ADMIN_USER)
+        rid, _ = create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
         with pytest.raises(ValueError, match="Invalid item totals"):
-            update_receipt(rid, _data(), [bad_item])
+            update_receipt(rid, _data(), [bad_item], user=ADMIN_USER)
 
     def test_status_wrappers(self):
         from lab_system.app.services.receipt_service import (
@@ -226,13 +229,13 @@ class TestWorkflow:
             get_receipt,
             reject_receipt,
         )
-        rid, _ = create_receipt(_data(), [_item()], 1)
-        approve_receipt(rid, 1)
+        rid, _ = create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+        approve_receipt(rid, 1, user=ADMIN_USER)
         assert get_receipt(rid)[0]["status"] == "Approved"
-        cancel_receipt(rid, 1)
+        cancel_receipt(rid, 1, user=ADMIN_USER)
         assert get_receipt(rid)[0]["status"] == "Cancelled"
-        rid2, _ = create_receipt(_data(), [_item()], 1)
-        reject_receipt(rid2, 1)
+        rid2, _ = create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+        reject_receipt(rid2, 1, user=ADMIN_USER)
         assert get_receipt(rid2)[0]["status"] == "Rejected"
 
     def test_soft_delete_and_list(self):
@@ -242,13 +245,13 @@ class TestWorkflow:
             restore_receipt,
             soft_delete_receipt,
         )
-        rid, _ = create_receipt(_data(), [_item()], 1)
-        soft_delete_receipt(rid, 1)
+        rid, _ = create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+        soft_delete_receipt(rid, 1, user=ADMIN_USER)
         rows, total = list_receipts()
         assert all(r["id"] != rid for r in rows)
         rows, total = list_receipts(include_deleted=True)
         assert any(r["id"] == rid for r in rows)
-        restore_receipt(rid, 1)
+        restore_receipt(rid, 1, user=ADMIN_USER)
         rows, total = list_receipts()
         assert any(r["id"] == rid for r in rows)
 
@@ -260,12 +263,11 @@ class TestWorkflow:
             get_receipt,
             unarchive_receipt,
         )
-        rid, _ = create_receipt(_data(), [_item()], 1)
-        # Must approve before archive
-        change_receipt_status(rid, "Approved", 1)
-        archive_receipt(rid, 1)
+        rid, _ = create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+        change_receipt_status(rid, "Approved", 1, user=ADMIN_USER)
+        archive_receipt(rid, 1, user=ADMIN_USER)
         assert get_receipt(rid)[0]["status"] == "Archived"
-        unarchive_receipt(rid, 1)
+        unarchive_receipt(rid, 1, user=ADMIN_USER)
         assert get_receipt(rid)[0]["status"] == "Draft"
 
     def test_hard_delete(self):
@@ -274,8 +276,8 @@ class TestWorkflow:
             get_receipt,
             hard_delete_receipt,
         )
-        rid, _ = create_receipt(_data(), [_item()], 1)
-        hard_delete_receipt(rid, 1)
+        rid, _ = create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+        hard_delete_receipt(rid, 1, user=ADMIN_USER)
         assert get_receipt(rid)[0] is None
 
 
@@ -286,8 +288,8 @@ class TestReporting:
         cls.db_path = _make_db()
         _db_mod.get_conn = _make_get_conn(cls.db_path)
         from lab_system.app.services.receipt_service import create_receipt
-        create_receipt(_data(), [_item()], 1)
-        create_receipt(_data(), [_item()], 1)
+        create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+        create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
 
     def test_receipt_summary(self):
         from lab_system.app.services.report_service import receipt_summary
@@ -437,18 +439,18 @@ class TestBackupRecovery:
         cls.backup_dir.mkdir(parents=True, exist_ok=True)
         cls.snapshot_dir.mkdir(parents=True, exist_ok=True)
         from lab_system.app.services.receipt_service import create_receipt
-        create_receipt(_data(), [_item()], 1)
+        create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
 
     def test_create_backup(self):
         from lab_system.app.services.backup_service import create_backup
-        path = create_backup(user_id=1, notes="test")
+        path = create_backup(user_id=1, notes="test", user=ADMIN_USER)
         assert Path(path).exists()
         Path(path).unlink()
 
     def test_verify_backup(self):
         from lab_system.app.services.backup_service import create_backup
         from lab_system.app.services.recovery_service import verify_backup
-        path = create_backup(user_id=1, notes="test")
+        path = create_backup(user_id=1, notes="test", user=ADMIN_USER)
         result = verify_backup(path)
         assert result["valid"] is True
         assert result["integrity_ok"] is True
@@ -479,8 +481,8 @@ class TestBackupRecovery:
     def test_validate_recovery(self):
         from lab_system.app.services.backup_service import create_backup
         from lab_system.app.services.recovery_service import validate_recovery
-        path = create_backup(user_id=1, notes="test")
-        result = validate_recovery(path)
+        path = create_backup(user_id=1, notes="test", user=ADMIN_USER)
+        result = validate_recovery(path, user=ADMIN_USER)
         assert result["valid"] is True
         Path(path).unlink()
 
@@ -497,7 +499,7 @@ class TestBackupRecovery:
 
     def test_attempt_recovery(self):
         from lab_system.app.services.recovery_service import attempt_recovery
-        result = attempt_recovery()
+        result = attempt_recovery(user=ADMIN_USER)
         assert "actions" in result
 
     def test_verify_backup_missing(self):
@@ -509,7 +511,7 @@ class TestBackupRecovery:
     def test_verify_backup_empty_file(self):
         from lab_system.app.services.backup_service import create_backup
         from lab_system.app.services.recovery_service import verify_backup
-        path = create_backup(user_id=1, notes="empty_test")
+        path = create_backup(user_id=1, notes="empty_test", user=ADMIN_USER)
         Path(path).write_bytes(b"")
         result = verify_backup(path)
         assert result["valid"] is False
@@ -517,15 +519,15 @@ class TestBackupRecovery:
 
     def test_delete_backup_nonexistent(self):
         from lab_system.app.services.recovery_service import delete_backup
-        result = delete_backup("/nonexistent/backup.db")
+        result = delete_backup("/nonexistent/backup.db", user=ADMIN_USER)
         assert result["success"] is True
 
     def test_delete_backup(self):
         from lab_system.app.services.backup_service import create_backup
         from lab_system.app.services.recovery_service import delete_backup, list_backups
-        path = create_backup(user_id=1, notes="delete_test")
+        path = create_backup(user_id=1, notes="delete_test", user=ADMIN_USER)
         before = len(list_backups())
-        result = delete_backup(path)
+        result = delete_backup(path, user=ADMIN_USER)
         assert result["success"] is True
         after = len(list_backups())
         assert after == before - 1 or after <= before
@@ -538,7 +540,7 @@ class TestBackupRecovery:
     def test_get_backup_record_found(self):
         from lab_system.app.services.backup_service import create_backup
         from lab_system.app.services.recovery_service import _get_backup_record
-        path = create_backup(user_id=1, notes="record_test")
+        path = create_backup(user_id=1, notes="record_test", user=ADMIN_USER)
         result = _get_backup_record(path)
         assert result is not None
         assert result["backup_file"] == path
@@ -548,7 +550,7 @@ class TestBackupRecovery:
         from lab_system.app.services.recovery_service import restore_from_backup
         bad_path = self.backup_dir / "bad_backup.db"
         bad_path.write_bytes(b"not a database")
-        result = restore_from_backup(str(bad_path))
+        result = restore_from_backup(str(bad_path), user=ADMIN_USER)
         assert result["success"] is False
         assert result["error"] is not None
         bad_path.unlink()
@@ -591,7 +593,7 @@ class TestBackupRecovery:
         from lab_system.app.services.recovery_service import validate_recovery
         bad_path = self.backup_dir / "bad_validate.db"
         bad_path.write_bytes(b"invalid data")
-        result = validate_recovery(str(bad_path))
+        result = validate_recovery(str(bad_path), user=ADMIN_USER)
         assert result["valid"] is False
         assert not result["checks"][0]["passed"]
         bad_path.unlink()
@@ -618,7 +620,7 @@ class TestBackupRecovery:
         empty_dir = self.db_path.parent / "empty_backups"
         empty_dir.mkdir(exist_ok=True)
         _rs.BACKUP_DIR = empty_dir
-        result = attempt_recovery()
+        result = attempt_recovery(user=ADMIN_USER)
         assert "actions" in result
         _rs.BACKUP_DIR = old_backup_dir
         shutil.rmtree(str(empty_dir), ignore_errors=True)

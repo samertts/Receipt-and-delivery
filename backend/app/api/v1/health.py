@@ -1,5 +1,4 @@
 from datetime import datetime
-from importlib.metadata import version as _pkg_version
 
 from fastapi import APIRouter
 from sqlalchemy import text
