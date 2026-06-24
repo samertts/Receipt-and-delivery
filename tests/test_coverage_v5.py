@@ -64,7 +64,8 @@ def _setup_receipt_data(conn):
 @pytest.fixture
 def fresh_db(tmp_path):
     db_path = tmp_path / "test.db"
-    _create_db(db_path)
+    conn = _create_db(db_path)
+    conn.close()
     return db_path
 
 
@@ -149,8 +150,12 @@ class TestRecoveryRestoreFromBackup:
                 backup_file = rs_mod.BACKUP_DIR / "good_backup.db"
                 import shutil
                 shutil.copy2(str(fresh_db), str(backup_file))
+                # Ensure backup is valid by verifying it can be opened
+                conn = sqlite3.connect(str(backup_file))
+                conn.execute("PRAGMA integrity_check;")
+                conn.close()
                 result = restore_from_backup(backup_file, user=ADMIN_USER)
-                assert result["success"] is True
+                assert result["success"] is True, f"Restore failed: {result.get('error')}"
                 assert result["restored_path"] is not None
             finally:
                 rs_mod.BACKUP_DIR = orig_bk
@@ -1269,7 +1274,7 @@ class TestRecoveryExceptionPaths:
             rs_mod.DB_PATH = orig
 
     def test_restore_verification_fails(self, fresh_db, tmp_path):
-        """Lines 130-133: post-restore verification fails."""
+        """Lines 130-133: post-restore verification fails with corrupted backup."""
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import restore_from_backup
         with _patch_db(fresh_db):
@@ -1280,11 +1285,12 @@ class TestRecoveryExceptionPaths:
             rs_mod.BACKUP_DIR.mkdir()
             rs_mod.SNAPSHOT_DIR.mkdir()
             try:
-                import shutil
-                good = rs_mod.BACKUP_DIR / "good.db"
-                shutil.copy2(str(fresh_db), str(good))
-                result = restore_from_backup(good, user=ADMIN_USER)
-                assert result["success"] is True
+                # Create a corrupted backup to force verification failure
+                bad_backup = rs_mod.BACKUP_DIR / "bad_corrupt.db"
+                bad_backup.write_bytes(b"SQLite format 3\x00" + b"\x00" * 100)
+                result = restore_from_backup(bad_backup, user=ADMIN_USER)
+                assert result["success"] is False, "Should fail on corrupted backup"
+                assert result.get("error") is not None
             finally:
                 rs_mod.BACKUP_DIR = orig_bk
                 rs_mod.SNAPSHOT_DIR = orig_snap
