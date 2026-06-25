@@ -28,6 +28,11 @@ class PolicyType(Enum):
     AUDIT = "audit"
     BACKUP = "backup"
     COMPLIANCE = "compliance"
+    REGULATORY = "regulatory"
+    LABORATORY = "laboratory"
+    WORKFORCE = "workforce"
+    PRIVACY = "privacy"
+    DATA_SOVEREIGNTY = "data_sovereignty"
 
 
 class PolicyStatus(Enum):
@@ -257,4 +262,114 @@ __all__ = [
     "PolicyRule",
     "Policy",
     "PolicyEngine",
+    "PolicyVersion",
+    "PolicyAudit",
+    "PolicyEngineV2",
 ]
+
+
+# ============================================================================
+# Policy Engine V2 — Versioning, Audit, Compliance
+# ============================================================================
+
+@dataclass
+class PolicyVersion:
+    version_id: str
+    policy_id: str
+    version: int
+    changes: list[str] = field(default_factory=list)
+    created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class PolicyAudit:
+    audit_id: str
+    policy_id: str
+    action: str
+    actor: str
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+    details: str = ""
+
+
+class PolicyEngineV2(PolicyEngine):
+    """Extended policy engine with versioning, audit trails, and compliance reporting."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._versions: dict[str, list[PolicyVersion]] = {}
+        self._audits: dict[str, list[PolicyAudit]] = {}
+
+    def _record_version(self, policy_id: str, action: str) -> None:
+        policy = self._policies.get(policy_id)
+        if policy is None:
+            return
+        versions = self._versions.setdefault(policy_id, [])
+        version_num = len(versions) + 1
+        versions.append(PolicyVersion(
+            version_id=f"{policy_id}-v{version_num}",
+            policy_id=policy_id,
+            version=version_num,
+            changes=[action],
+        ))
+
+    def activate_policy(self, policy_id: str) -> bool:
+        result = super().activate_policy(policy_id)
+        if result:
+            self._record_version(policy_id, "activated")
+        return result
+
+    def deactivate_policy(self, policy_id: str) -> bool:
+        result = super().deactivate_policy(policy_id)
+        if result:
+            self._record_version(policy_id, "deactivated")
+        return result
+
+    def get_policy_history(self, policy_id: str) -> list[PolicyVersion]:
+        return list(self._versions.get(policy_id, []))
+
+    def audit_policy(
+        self, policy_id: str, action: str, actor: str, details: str = ""
+    ) -> PolicyAudit:
+        import uuid as _uuid
+        audit = PolicyAudit(
+            audit_id=str(_uuid.uuid4()),
+            policy_id=policy_id,
+            action=action,
+            actor=actor,
+            details=details,
+        )
+        self._audits.setdefault(policy_id, []).append(audit)
+        return audit
+
+    def get_policy_audits(self, policy_id: str) -> list[PolicyAudit]:
+        return list(self._audits.get(policy_id, []))
+
+    def evaluate_all(self, context: dict[str, Any]) -> dict[str, bool]:
+        results: dict[str, bool] = {}
+        for pid, policy in self._policies.items():
+            if policy.status in (PolicyStatus.ACTIVE, PolicyStatus.ENFORCED):
+                passed, _ = self.evaluate(pid, context)
+                results[pid] = passed
+        return results
+
+    def get_compliance_report(self) -> dict[str, Any]:
+        policies = list(self._policies.values())
+        active = [p for p in policies if p.status == PolicyStatus.ACTIVE]
+        enforced = [p for p in policies if p.status == PolicyStatus.ENFORCED]
+        total_versions = sum(len(v) for v in self._versions.values())
+        total_audits = sum(len(a) for a in self._audits.values())
+        return {
+            "total_policies": len(policies),
+            "active_policies": len(active),
+            "enforced_policies": len(enforced),
+            "total_versions": total_versions,
+            "total_audits": total_audits,
+            "by_type": {
+                pt.value: sum(1 for p in policies if p.policy_type == pt)
+                for pt in PolicyType
+            },
+            "compliance_score": (
+                (len(active) + len(enforced)) / len(policies) * 100
+                if policies else 0
+            ),
+        }

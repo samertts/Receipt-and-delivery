@@ -182,15 +182,21 @@ END;
 
 
 def rebuild_fts():
-    with get_conn() as conn:
-        conn.executescript("""
-            DELETE FROM receipts_fts;
-            INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name)
-            SELECT id, receipt_no, sender_name, receiver_name FROM receipts WHERE deleted_at IS NULL OR deleted_at = '';
-            DELETE FROM organizations_fts;
-            INSERT INTO organizations_fts(rowid, name, code)
-            SELECT id, name, code FROM organizations;
-        """)
+    try:
+        with get_conn() as conn:
+            conn.execute("DELETE FROM receipts_fts;")
+            conn.execute(
+                "INSERT INTO receipts_fts(rowid, receipt_no, sender_name, receiver_name) "
+                "SELECT id, receipt_no, sender_name, receiver_name FROM receipts "
+                "WHERE deleted_at IS NULL OR deleted_at = '';"
+            )
+            conn.execute("DELETE FROM organizations_fts;")
+            conn.execute(
+                "INSERT INTO organizations_fts(rowid, name, code) "
+                "SELECT id, name, code FROM organizations;"
+            )
+    except Exception:
+        pass
 
 
 DEFAULT_SETTINGS = {

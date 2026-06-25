@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import lab_system.app.settings.config as _cfg
 ORIGINAL_DB_PATH = _cfg.CONFIG.db_path
+ORIGINAL_STORAGE_DIR = _cfg.CONFIG.storage_dir
 
 ADMIN_USER = {"id": 1, "username": "admin", "role": "Admin", "status": "Active"}
 
@@ -78,8 +79,8 @@ def fresh_db_with_data(tmp_path):
     return db_path
 
 
-def _patch_db(db_path):
-    """Context manager that patches DB_PATH and get_conn for all relevant modules."""
+def _patch_db(db_path, storage_dir=None):
+    """Context manager that patches DB_PATH, get_conn, and storage_dir for all relevant modules."""
     import lab_system.app.settings.config as cfg_mod
     import lab_system.app.database.db as db_mod
     import lab_system.app.services.recovery_service as rs_mod
@@ -111,6 +112,14 @@ def _patch_db(db_path):
         originals["rs_db_path"] = rs_mod.DB_PATH
         rs_mod.DB_PATH = db_path
 
+    if storage_dir is not None:
+        originals["cfg_storage_dir"] = cfg_mod.CONFIG.storage_dir
+        object.__setattr__(cfg_mod.CONFIG, "storage_dir", storage_dir)
+        originals["rs_backup_dir"] = rs_mod.BACKUP_DIR
+        originals["rs_snapshot_dir"] = rs_mod.SNAPSHOT_DIR
+        rs_mod.BACKUP_DIR = storage_dir / "backups"
+        rs_mod.SNAPSHOT_DIR = storage_dir / "snapshots"
+
     class _Ctx:
         def __enter__(self):
             return self
@@ -119,6 +128,10 @@ def _patch_db(db_path):
             object.__setattr__(cfg_mod.CONFIG, "db_path", originals["cfg_db_path"])
             if "rs_db_path" in originals:
                 rs_mod.DB_PATH = originals["rs_db_path"]
+            if "cfg_storage_dir" in originals:
+                object.__setattr__(cfg_mod.CONFIG, "storage_dir", originals["cfg_storage_dir"])
+                rs_mod.BACKUP_DIR = originals["rs_backup_dir"]
+                rs_mod.SNAPSHOT_DIR = originals["rs_snapshot_dir"]
 
     return _Ctx()
 
@@ -128,6 +141,7 @@ def _restore_config():
     import lab_system.app.settings.config as cfg_mod
     yield
     object.__setattr__(cfg_mod.CONFIG, "db_path", ORIGINAL_DB_PATH)
+    object.__setattr__(cfg_mod.CONFIG, "storage_dir", ORIGINAL_STORAGE_DIR)
 
 
 # ============================================================================
@@ -139,177 +153,114 @@ class TestRecoveryRestoreFromBackup:
     def test_restore_success(self, fresh_db, tmp_path):
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import restore_from_backup
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            orig_snap = rs_mod.SNAPSHOT_DIR
-            rs_mod.BACKUP_DIR = tmp_path / "backups"
-            rs_mod.SNAPSHOT_DIR = tmp_path / "snapshots"
-            rs_mod.BACKUP_DIR.mkdir()
-            rs_mod.SNAPSHOT_DIR.mkdir()
-            try:
-                backup_file = rs_mod.BACKUP_DIR / "good_backup.db"
-                import shutil
-                shutil.copy2(str(fresh_db), str(backup_file))
-                # Ensure backup is valid by verifying it can be opened
-                conn = sqlite3.connect(str(backup_file))
-                conn.execute("PRAGMA integrity_check;")
-                conn.close()
-                result = restore_from_backup(backup_file, user=ADMIN_USER)
-                assert result["success"] is True, f"Restore failed: {result.get('error')}"
-                assert result["restored_path"] is not None
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
-                rs_mod.SNAPSHOT_DIR = orig_snap
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            backup_file = rs_mod._get_backup_dir() / "good_backup.db"
+            import shutil
+            shutil.copy2(str(fresh_db), str(backup_file))
+            result = restore_from_backup(backup_file, user=ADMIN_USER)
+            assert result["success"] is True
+            assert result["restored_path"] is not None
 
     def test_restore_invalid_backup_fails_verification(self, fresh_db, tmp_path):
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import restore_from_backup
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            rs_mod.BACKUP_DIR = tmp_path / "backups"
-            rs_mod.BACKUP_DIR.mkdir()
-            try:
-                bad = rs_mod.BACKUP_DIR / "bad.db"
-                bad.write_bytes(b"not a real db")
-                result = restore_from_backup(bad, user=ADMIN_USER)
-                assert result["success"] is False
-                assert result["error"] is not None
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            bad = tmp_path / "backups" / "bad.db"
+            bad.write_bytes(b"not a real db")
+            result = restore_from_backup(bad, user=ADMIN_USER)
+            assert result["success"] is False
+            assert result["error"] is not None
 
     def test_restore_outside_dir_rejected(self, fresh_db, tmp_path):
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import restore_from_backup
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            rs_mod.BACKUP_DIR = tmp_path / "backups"
-            rs_mod.BACKUP_DIR.mkdir()
-            try:
-                outside = tmp_path / "outside.db"
-                outside.write_bytes(b"evil")
-                with pytest.raises(ValueError):
-                    restore_from_backup(outside, user=ADMIN_USER)
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            outside = tmp_path / "outside.db"
+            outside.write_bytes(b"evil")
+            with pytest.raises(ValueError):
+                restore_from_backup(outside, user=ADMIN_USER)
 
 
 class TestRecoveryValidateRecovery:
     def test_validate_recovery_valid(self, fresh_db_with_data, tmp_path):
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import validate_recovery
-        with _patch_db(fresh_db_with_data):
-            orig_bk = rs_mod.BACKUP_DIR
-            rs_mod.BACKUP_DIR = tmp_path / "backups"
-            rs_mod.BACKUP_DIR.mkdir()
-            try:
-                backup_file = rs_mod.BACKUP_DIR / "validate_test.db"
-                import shutil
-                shutil.copy2(str(fresh_db_with_data), str(backup_file))
-                result = validate_recovery(backup_file, user=ADMIN_USER)
-                assert result["valid"] is True
-                assert len(result["checks"]) >= 3
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
+        with _patch_db(fresh_db_with_data, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            backup_file = tmp_path / "backups" / "validate_test.db"
+            import shutil
+            shutil.copy2(str(fresh_db_with_data), str(backup_file))
+            result = validate_recovery(backup_file, user=ADMIN_USER)
+            assert result["valid"] is True
+            assert len(result["checks"]) >= 3
 
     def test_validate_recovery_invalid_file(self, fresh_db, tmp_path):
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import validate_recovery
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            rs_mod.BACKUP_DIR = tmp_path / "backups"
-            rs_mod.BACKUP_DIR.mkdir()
-            try:
-                bad = rs_mod.BACKUP_DIR / "bad_validate.db"
-                bad.write_bytes(b"not a real db file here")
-                result = validate_recovery(bad, user=ADMIN_USER)
-                assert result["valid"] is False
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            bad = tmp_path / "backups" / "bad_validate.db"
+            bad.write_bytes(b"not a real db file here")
+            result = validate_recovery(bad, user=ADMIN_USER)
+            assert result["valid"] is False
 
 
 class TestRecoveryAttemptRecovery:
     def test_attempt_recovery_wal_checkpoint(self, fresh_db, tmp_path):
         from lab_system.app.services.recovery_service import attempt_recovery
-        with _patch_db(fresh_db):
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
             result = attempt_recovery(user=ADMIN_USER)
             assert "actions" in result
 
     def test_attempt_recovery_with_backup_available(self, fresh_db, tmp_path):
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import attempt_recovery
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            orig_snap = rs_mod.SNAPSHOT_DIR
-            rs_mod.BACKUP_DIR = tmp_path / "backups"
-            rs_mod.SNAPSHOT_DIR = tmp_path / "snapshots"
-            rs_mod.BACKUP_DIR.mkdir()
-            rs_mod.SNAPSHOT_DIR.mkdir()
-            try:
-                import shutil
-                backup_file = rs_mod.BACKUP_DIR / "recovery_backup.db"
-                shutil.copy2(str(fresh_db), str(backup_file))
-                result = attempt_recovery(user=ADMIN_USER)
-                assert result["success"] is True
-                assert any("WAL" in a or "backup" in a.lower() or "recovered" in a.lower() for a in result["actions"])
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
-                rs_mod.SNAPSHOT_DIR = orig_snap
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            import shutil
+            backup_file = rs_mod._get_backup_dir() / "recovery_backup.db"
+            shutil.copy2(str(fresh_db), str(backup_file))
+            result = attempt_recovery(user=ADMIN_USER)
+            assert result["success"] is True
+            assert any("WAL" in a or "backup" in a.lower() or "recovered" in a.lower() for a in result["actions"])
 
     def test_attempt_recovery_no_backup_available(self, fresh_db, tmp_path):
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import attempt_recovery
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            rs_mod.BACKUP_DIR = tmp_path / "empty_backups"
-            rs_mod.BACKUP_DIR.mkdir()
-            try:
-                result = attempt_recovery(user=ADMIN_USER)
-                assert any("No backup" in a or "WAL" in a for a in result["actions"])
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            result = attempt_recovery(user=ADMIN_USER)
+            assert any("No backup" in a or "WAL" in a for a in result["actions"])
 
 
 class TestRecoveryAutoBackupAndRetention:
     def test_auto_backup_success(self, fresh_db, tmp_path):
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import auto_backup
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            rs_mod.BACKUP_DIR = tmp_path / "auto_backups"
-            rs_mod.BACKUP_DIR.mkdir()
-            try:
-                result = auto_backup(notes="test auto")
-                assert result["success"] is True
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            result = auto_backup(notes="test auto")
+            assert result["success"] is True
 
     def test_enforce_retention_no_deletion_needed(self, fresh_db, tmp_path):
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import enforce_retention
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            rs_mod.BACKUP_DIR = tmp_path / "retention_backups"
-            rs_mod.BACKUP_DIR.mkdir()
-            try:
-                deleted = enforce_retention(max_backups=30)
-                assert deleted == 0
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            deleted = enforce_retention(max_backups=30)
+            assert deleted == 0
 
     def test_enforce_retention_deletes_oldest(self, fresh_db, tmp_path):
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import enforce_retention
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            rs_mod.BACKUP_DIR = tmp_path / "retention_backups"
-            rs_mod.BACKUP_DIR.mkdir()
-            try:
-                for i in range(5):
-                    (rs_mod.BACKUP_DIR / f"backup_{i}.db").write_bytes(b"data")
-                deleted = enforce_retention(max_backups=2)
-                assert deleted > 0
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            for i in range(5):
+                (rs_mod._get_backup_dir() / f"backup_{i}.db").write_bytes(b"data")
+            deleted = enforce_retention(max_backups=2)
+            assert deleted > 0
 
 
 # ============================================================================
@@ -1261,17 +1212,23 @@ class TestRecoveryExceptionPaths:
         result = verify_backup(corrupt)
         assert result["valid"] is False
 
-    def test_checkpoint_wal_exception(self, tmp_path):
+    def test_checkpoint_wal_exception(self, fresh_db, tmp_path):
         """Lines 100-101: _checkpoint_wal exception handler."""
         import lab_system.app.services.recovery_service as rs_mod
-        orig = rs_mod.DB_PATH
-        dir_path = tmp_path / "adir"
-        dir_path.mkdir()
-        rs_mod.DB_PATH = dir_path / "subdir" / "nonexistent.db"
-        try:
-            rs_mod._checkpoint_wal()
-        finally:
-            rs_mod.DB_PATH = orig
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            object.__setattr__(
+                __import__("lab_system.app.settings.config", fromlist=["CONFIG"]).CONFIG,
+                "db_path", str(tmp_path / "nonexistent_dir" / "subdir" / "nonexistent.db"),
+            )
+            try:
+                rs_mod._checkpoint_wal()
+            finally:
+                object.__setattr__(
+                    __import__("lab_system.app.settings.config", fromlist=["CONFIG"]).CONFIG,
+                    "db_path", str(fresh_db),
+                )
 
     def test_restore_verification_fails(self, fresh_db, tmp_path):
         """Lines 130-133: post-restore verification fails with corrupted backup."""
@@ -1299,241 +1256,176 @@ class TestRecoveryExceptionPaths:
         """Lines 160-161: delete_backup exception handler."""
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import delete_backup
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            rs_mod.BACKUP_DIR = tmp_path / "bk"
-            rs_mod.BACKUP_DIR.mkdir()
-            try:
-                fake = rs_mod.BACKUP_DIR / "exists.db"
-                fake.write_bytes(b"data")
-                result = delete_backup(fake, user=ADMIN_USER)
-                assert result["success"] is True
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            fake = rs_mod._get_backup_dir() / "exists.db"
+            fake.write_bytes(b"data")
+            result = delete_backup(fake, user=ADMIN_USER)
+            assert result["success"] is True
 
     def test_create_snapshot_exception(self, fresh_db, tmp_path):
         """Lines 175-176: create_recovery_snapshot exception."""
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import create_recovery_snapshot
-        with _patch_db(fresh_db):
-            orig_snap = rs_mod.SNAPSHOT_DIR
-            rs_mod.SNAPSHOT_DIR = tmp_path / "snapshots"
-            try:
-                result = create_recovery_snapshot("test")
-                assert result["success"] is True
-            finally:
-                rs_mod.SNAPSHOT_DIR = orig_snap
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            result = create_recovery_snapshot("test")
+            assert result["success"] is True
 
     def test_auto_backup_exception(self, fresh_db, tmp_path):
         """Lines 210-211: auto_backup exception handler."""
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import auto_backup
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            rs_mod.BACKUP_DIR = tmp_path / "bk"
-            rs_mod.BACKUP_DIR.mkdir()
-            try:
-                result = auto_backup()
-                assert "success" in result
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            result = auto_backup()
+            assert "success" in result
 
     def test_detect_corruption_with_wal(self, fresh_db, tmp_path):
         """Lines 295-296, 299: detect_corruption integrity + WAL."""
         from lab_system.app.services.recovery_service import detect_corruption
-        with _patch_db(fresh_db):
+        with _patch_db(fresh_db, storage_dir=tmp_path):
             result = detect_corruption()
             assert result["ok"] is True
 
     def test_attempt_recovery_no_backup(self, fresh_db, tmp_path):
         """Lines 345-348: attempt_recovery with no backup available."""
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import attempt_recovery
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            rs_mod.BACKUP_DIR = tmp_path / "empty"
-            rs_mod.BACKUP_DIR.mkdir()
-            try:
-                result = attempt_recovery(user=ADMIN_USER)
-                assert "actions" in result
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            result = attempt_recovery(user=ADMIN_USER)
+            assert "actions" in result
 
     def test_attempt_recovery_wal_fails(self, fresh_db, tmp_path):
         """Lines 324-325: WAL checkpoint exception in attempt_recovery."""
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import attempt_recovery
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            orig_snap = rs_mod.SNAPSHOT_DIR
-            orig_db = rs_mod.DB_PATH
-            rs_mod.BACKUP_DIR = tmp_path / "bk"
-            rs_mod.SNAPSHOT_DIR = tmp_path / "snap"
-            rs_mod.BACKUP_DIR.mkdir()
-            rs_mod.SNAPSHOT_DIR.mkdir()
-            try:
-                import shutil
-                backup = rs_mod.BACKUP_DIR / "recovery.db"
-                shutil.copy2(str(fresh_db), str(backup))
-                result = attempt_recovery(user=ADMIN_USER)
-                assert result["success"] is True
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
-                rs_mod.SNAPSHOT_DIR = orig_snap
-                rs_mod.DB_PATH = orig_db
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            import shutil
+            backup = rs_mod._get_backup_dir() / "recovery.db"
+            shutil.copy2(str(fresh_db), str(backup))
+            result = attempt_recovery(user=ADMIN_USER)
+            assert result["success"] is True
 
     def test_list_snapshots_empty(self, fresh_db, tmp_path):
         """Line 182: list_snapshots with empty dir."""
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import list_snapshots
-        with _patch_db(fresh_db):
-            orig = rs_mod.SNAPSHOT_DIR
-            rs_mod.SNAPSHOT_DIR = tmp_path / "empty_snaps"
-            rs_mod.SNAPSHOT_DIR.mkdir()
-            try:
-                snaps = list_snapshots()
-                assert snaps == []
-            finally:
-                rs_mod.SNAPSHOT_DIR = orig
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            snaps = list_snapshots()
+            assert snaps == []
 
     def test_list_backups_with_non_db_files(self, fresh_db, tmp_path):
         """Lines 62-82: list_backups filters to .db files only."""
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import list_backups
-        with _patch_db(fresh_db):
-            orig = rs_mod.BACKUP_DIR
-            rs_mod.BACKUP_DIR = tmp_path / "mixed"
-            rs_mod.BACKUP_DIR.mkdir()
-            try:
-                (rs_mod.BACKUP_DIR / "good.db").write_bytes(b"data")
-                (rs_mod.BACKUP_DIR / "bad.txt").write_bytes(b"text")
-                (rs_mod.BACKUP_DIR / "also.db").write_bytes(b"more")
-                backups = list_backups()
-                assert len(backups) == 2
-            finally:
-                rs_mod.BACKUP_DIR = orig
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (rs_mod._get_backup_dir() / "good.db").write_bytes(b"data")
+            (rs_mod._get_backup_dir() / "bad.txt").write_bytes(b"text")
+            (rs_mod._get_backup_dir() / "also.db").write_bytes(b"more")
+            backups = list_backups()
+            assert len(backups) == 2
 
     def test_attempt_recovery_exception_wal(self, fresh_db, tmp_path):
         """Lines 324-325: WAL checkpoint throws exception."""
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import attempt_recovery
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            orig_snap = rs_mod.SNAPSHOT_DIR
-            orig_db = rs_mod.DB_PATH
-            rs_mod.BACKUP_DIR = tmp_path / "bk"
-            rs_mod.SNAPSHOT_DIR = tmp_path / "snap"
-            rs_mod.BACKUP_DIR.mkdir()
-            rs_mod.SNAPSHOT_DIR.mkdir()
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            import lab_system.app.settings.config as cfg_mod
+            orig_db = cfg_mod.CONFIG.db_path
+            object.__setattr__(cfg_mod.CONFIG, "db_path", str(tmp_path / "nonexistent_dir" / "db.sqlite"))
             try:
-                rs_mod.DB_PATH = tmp_path / "nonexistent_dir" / "db.sqlite"
                 result = attempt_recovery(user=ADMIN_USER)
                 assert "actions" in result
                 assert any("WAL checkpoint failed" in a for a in result["actions"])
             finally:
-                rs_mod.BACKUP_DIR = orig_bk
-                rs_mod.SNAPSHOT_DIR = orig_snap
-                rs_mod.DB_PATH = orig_db
+                object.__setattr__(cfg_mod.CONFIG, "db_path", orig_db)
 
     def test_detect_corruption_bad_db(self, fresh_db, tmp_path):
         """Lines 295-296: detect_corruption with corrupt DB."""
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import detect_corruption
-        with _patch_db(fresh_db):
-            orig_db = rs_mod.DB_PATH
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            import lab_system.app.settings.config as cfg_mod
+            orig_db = cfg_mod.CONFIG.db_path
+            object.__setattr__(cfg_mod.CONFIG, "db_path", str(tmp_path / "nonexistent_dir" / "db.sqlite"))
             try:
-                rs_mod.DB_PATH = tmp_path / "nonexistent_dir" / "db.sqlite"
                 result = detect_corruption()
                 assert result["ok"] is False
             finally:
-                rs_mod.DB_PATH = orig_db
+                object.__setattr__(cfg_mod.CONFIG, "db_path", orig_db)
 
     def test_create_snapshot_exception_real(self, fresh_db, tmp_path):
         """Lines 175-176: create_recovery_snapshot exception."""
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import create_recovery_snapshot
-        with _patch_db(fresh_db):
-            orig_snap = rs_mod.SNAPSHOT_DIR
-            orig_db = rs_mod.DB_PATH
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            import lab_system.app.settings.config as cfg_mod
+            orig_db = cfg_mod.CONFIG.db_path
+            object.__setattr__(cfg_mod.CONFIG, "db_path", str(tmp_path / "nonexistent_dir" / "db.sqlite"))
             try:
-                rs_mod.DB_PATH = tmp_path / "nonexistent_dir" / "db.sqlite"
                 result = create_recovery_snapshot("test")
                 assert result["success"] is False
             finally:
-                rs_mod.SNAPSHOT_DIR = orig_snap
-                rs_mod.DB_PATH = orig_db
+                object.__setattr__(cfg_mod.CONFIG, "db_path", orig_db)
 
     def test_delete_backup_exception_real(self, fresh_db, tmp_path):
         """Lines 160-161: delete_backup with non-existent file but DB exception."""
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import delete_backup
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            try:
-                rs_mod.BACKUP_DIR = tmp_path / "bk"
-                rs_mod.BACKUP_DIR.mkdir()
-                fake = rs_mod.BACKUP_DIR / "exists.db"
-                fake.write_bytes(b"data")
-                result = delete_backup(fake, user=ADMIN_USER)
-                assert result["success"] is True
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            fake = rs_mod._get_backup_dir() / "exists.db"
+            fake.write_bytes(b"data")
+            result = delete_backup(fake, user=ADMIN_USER)
+            assert result["success"] is True
 
     def test_auto_backup_exception_real(self, fresh_db, tmp_path):
         """Lines 210-211: auto_backup when backup creation fails."""
-        import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import auto_backup
         from unittest.mock import patch as _patch
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            try:
-                rs_mod.BACKUP_DIR = tmp_path / "bk"
-                rs_mod.BACKUP_DIR.mkdir()
-                with _patch("lab_system.app.services.backup_service.create_backup", side_effect=Exception("disk full")):
-                    result = auto_backup()
-                    assert result["success"] is False
-                    assert "error" in result
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            with _patch("lab_system.app.services.backup_service.create_backup", side_effect=Exception("disk full")):
+                result = auto_backup()
+                assert result["success"] is False
+                assert "error" in result
 
     def test_validate_recovery_exception_real(self, fresh_db, tmp_path):
         """Lines 277-278: validate_recovery exception path."""
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import validate_recovery
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            try:
-                rs_mod.BACKUP_DIR = tmp_path / "bk"
-                rs_mod.BACKUP_DIR.mkdir()
-                fake = rs_mod.BACKUP_DIR / "val.db"
-                fake.write_bytes(b"not a database at all, too small")
-                result = validate_recovery(fake, user=ADMIN_USER)
-                assert result["valid"] is False
-            finally:
-                rs_mod.BACKUP_DIR = orig_bk
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            fake = rs_mod._get_backup_dir() / "val.db"
+            fake.write_bytes(b"not a database at all, too small")
+            result = validate_recovery(fake, user=ADMIN_USER)
+            assert result["valid"] is False
 
     def test_attempt_recovery_backup_restore_fail(self, fresh_db, tmp_path):
         """Lines 327-342: attempt_recovery backup restore path fails."""
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import attempt_recovery
-        with _patch_db(fresh_db):
-            orig_bk = rs_mod.BACKUP_DIR
-            orig_snap = rs_mod.SNAPSHOT_DIR
-            orig_db = rs_mod.DB_PATH
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            fake_backup = rs_mod._get_backup_dir() / "bad_backup.db"
+            fake_backup.write_bytes(b"not a database")
+            import lab_system.app.settings.config as cfg_mod
+            orig_db = cfg_mod.CONFIG.db_path
+            object.__setattr__(cfg_mod.CONFIG, "db_path", str(tmp_path / "nonexistent_dir" / "db.sqlite"))
             try:
-                rs_mod.BACKUP_DIR = tmp_path / "bk"
-                rs_mod.SNAPSHOT_DIR = tmp_path / "snap"
-                rs_mod.BACKUP_DIR.mkdir()
-                rs_mod.SNAPSHOT_DIR.mkdir()
-                fake_backup = rs_mod.BACKUP_DIR / "bad_backup.db"
-                fake_backup.write_bytes(b"not a database")
-                rs_mod.DB_PATH = tmp_path / "nonexistent_dir" / "db.sqlite"
                 result = attempt_recovery(user=ADMIN_USER)
                 assert any("Backup restore failed" in a or "No backup" in a or "WAL checkpoint failed" in a for a in result["actions"])
             finally:
-                rs_mod.BACKUP_DIR = orig_bk
-                rs_mod.SNAPSHOT_DIR = orig_snap
-                rs_mod.DB_PATH = orig_db
+                object.__setattr__(cfg_mod.CONFIG, "db_path", orig_db)
 
 
 # ============================================================================
@@ -2023,3 +1915,130 @@ class TestAttachmentPathTraversal:
             finally:
                 att_mod.STORAGE_DIR = original_storage
                 att_mod._sanitize_filename = original_sanitize
+
+
+# ============================================================================
+# RECOVERY ROOT-CAUSE FIX — REGRESSION TESTS
+# ============================================================================
+
+class TestRecoveryRuntimeOverride:
+    def test_runtime_db_override(self, fresh_db, tmp_path):
+        """Runtime db_path override resolves correctly in restore_from_backup."""
+        import lab_system.app.services.recovery_service as rs_mod
+        from lab_system.app.services.recovery_service import restore_from_backup
+        from pathlib import Path
+        alt_db = tmp_path / "alt_db" / "test.db"
+        alt_db.parent.mkdir(parents=True)
+        import shutil
+        shutil.copy2(str(fresh_db), str(alt_db))
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            import lab_system.app.settings.config as cfg_mod
+            object.__setattr__(cfg_mod.CONFIG, "db_path", str(alt_db))
+            backup_file = rs_mod._get_backup_dir() / "good.db"
+            shutil.copy2(str(fresh_db), str(backup_file))
+            result = restore_from_backup(backup_file, user=ADMIN_USER)
+            assert result["success"] is True
+            assert Path(result["restored_path"]) == alt_db
+
+    def test_runtime_backup_override(self, fresh_db, tmp_path):
+        """Runtime backup_dir override resolves correctly in restore_from_backup."""
+        from lab_system.app.services.recovery_service import restore_from_backup
+        alt_storage = tmp_path / "alt_storage"
+        alt_bk_dir = alt_storage / "backups"
+        alt_bk_dir.mkdir(parents=True)
+        import shutil
+        backup_file = alt_bk_dir / "good.db"
+        shutil.copy2(str(fresh_db), str(backup_file))
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            import lab_system.app.settings.config as cfg_mod
+            object.__setattr__(cfg_mod.CONFIG, "storage_dir", alt_storage)
+            result = restore_from_backup(backup_file, user=ADMIN_USER)
+            assert result["success"] is True
+
+    def test_runtime_snapshot_override(self, fresh_db, tmp_path):
+        """Runtime snapshot_dir override resolves correctly in create_recovery_snapshot."""
+        from lab_system.app.services.recovery_service import create_recovery_snapshot
+        from pathlib import Path
+        alt_storage = tmp_path / "alt_storage"
+        alt_snap_dir = alt_storage / "snapshots"
+        alt_snap_dir.mkdir(parents=True)
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            import lab_system.app.settings.config as cfg_mod
+            object.__setattr__(cfg_mod.CONFIG, "storage_dir", alt_storage)
+            result = create_recovery_snapshot("test_runtime")
+            assert result["success"] is True
+            assert Path(result["path"]).parent == alt_snap_dir
+
+
+class TestRecoveryRootCauseFix:
+    def test_restore_success_valid_backup(self, fresh_db, tmp_path):
+        """Valid backup restoration returns success=True."""
+        import lab_system.app.services.recovery_service as rs_mod
+        from lab_system.app.services.recovery_service import restore_from_backup
+        import shutil
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            backup_file = rs_mod._get_backup_dir() / "valid_backup.db"
+            shutil.copy2(str(fresh_db), str(backup_file))
+            result = restore_from_backup(backup_file, user=ADMIN_USER)
+            assert result["success"] is True
+            assert result["restored_path"] is not None
+            assert result["error"] is None
+
+    def test_restore_after_snapshot(self, fresh_db_with_data, tmp_path):
+        """Restore works correctly after pre-restore snapshot is created."""
+        import lab_system.app.services.recovery_service as rs_mod
+        from lab_system.app.services.recovery_service import restore_from_backup
+        import shutil
+        with _patch_db(fresh_db_with_data, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            backup_file = rs_mod._get_backup_dir() / "snapshot_test.db"
+            shutil.copy2(str(fresh_db_with_data), str(backup_file))
+            result = restore_from_backup(backup_file, user=ADMIN_USER)
+            assert result["success"] is True
+            snapshot_dir = rs_mod._get_snapshot_dir()
+            snapshots = [f for f in snapshot_dir.iterdir() if f.suffix == ".db"]
+            assert len(snapshots) >= 1
+
+    def test_restore_corrupt_backup(self, fresh_db, tmp_path):
+        """Corrupted backup restoration returns success=False."""
+        from lab_system.app.services.recovery_service import restore_from_backup
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            corrupt = tmp_path / "backups" / "corrupt.db"
+            corrupt.write_bytes(b"not a valid sqlite database at all" + b"\x00" * 50)
+            result = restore_from_backup(corrupt, user=ADMIN_USER)
+            assert result["success"] is False
+            assert result["error"] is not None
+
+    def test_restore_missing_backup(self, fresh_db, tmp_path):
+        """Missing backup file returns success=False."""
+        from lab_system.app.services.recovery_service import restore_from_backup
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            missing = tmp_path / "backups" / "nonexistent.db"
+            result = restore_from_backup(missing, user=ADMIN_USER)
+            assert result["success"] is False
+            assert "File not found" in result["error"]
+
+    def test_restore_permission_denied(self, fresh_db, tmp_path):
+        """Restore without user permission raises AuthorizationError."""
+        from lab_system.app.services.recovery_service import restore_from_backup
+        from lab_system.app.utils.errors import AuthorizationError
+        with _patch_db(fresh_db, storage_dir=tmp_path):
+            (tmp_path / "backups").mkdir(exist_ok=True)
+            (tmp_path / "snapshots").mkdir(exist_ok=True)
+            bad_user = {"id": 1, "username": "user", "role": "User", "status": "Active"}
+            missing = tmp_path / "backups" / "test.db"
+            with pytest.raises(AuthorizationError):
+                restore_from_backup(missing, user=bad_user)

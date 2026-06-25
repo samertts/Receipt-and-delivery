@@ -81,6 +81,11 @@ if exe_path.exists():
 else:
     print(f"  MISSING: {exe_path}")
 
+dist_dir = ROOT / "dist"
+ok(dist_dir.is_dir(), f"dist/ directory not found: {dist_dir} — run PyInstaller build first")
+if not dist_dir.is_dir():
+    print(f"  MISSING: {dist_dir}")
+
 # -----------------------------------------------------------------------
 # 2. VERSION file
 # -----------------------------------------------------------------------
@@ -171,7 +176,7 @@ if iss_path.exists():
                 src_val = after_colon.split(";")[0].strip()
             src_posix = src_val.replace("\\", "/").rstrip("*")
             resolved = (iss_dir / src_posix).resolve()
-            parent_dir = resolved.parent if src_val.endswith("*") else resolved
+            parent_dir = resolved
             ok(
                 parent_dir.exists(),
                 f"Source path does not resolve: '{src_val}' → {resolved}",

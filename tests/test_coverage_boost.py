@@ -165,26 +165,34 @@ class TestRecoveryServiceCoverage:
     def test_list_backups_empty(self, tmp_path):
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import list_backups
+        import lab_system.app.settings.config as cfg_mod
         orig = rs_mod.BACKUP_DIR
         rs_mod.BACKUP_DIR = tmp_path / "empty"
+        orig_storage = cfg_mod.CONFIG.storage_dir
+        object.__setattr__(cfg_mod.CONFIG, "storage_dir", str(tmp_path / "empty"))
         try:
             assert list_backups() == []
         finally:
             rs_mod.BACKUP_DIR = orig
+            object.__setattr__(cfg_mod.CONFIG, "storage_dir", orig_storage)
 
     def test_list_backups_with_files(self, tmp_path):
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import list_backups
+        import lab_system.app.settings.config as cfg_mod
         d = tmp_path / "backups"
         d.mkdir()
         (d / "test.db").write_bytes(b"fake")
         orig = rs_mod.BACKUP_DIR
         rs_mod.BACKUP_DIR = d
+        orig_storage = cfg_mod.CONFIG.storage_dir
+        object.__setattr__(cfg_mod.CONFIG, "storage_dir", str(d.parent))
         try:
             backups = list_backups()
             assert len(backups) == 1
         finally:
             rs_mod.BACKUP_DIR = orig
+            object.__setattr__(cfg_mod.CONFIG, "storage_dir", orig_storage)
 
     def test_checkpoint_wal(self):
         from lab_system.app.services.recovery_service import _checkpoint_wal
@@ -193,27 +201,35 @@ class TestRecoveryServiceCoverage:
     def test_create_recovery_snapshot(self, fresh_db, tmp_path):
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import create_recovery_snapshot
+        import lab_system.app.settings.config as cfg_mod
         with _patch_db(fresh_db):
             orig_snap = rs_mod.SNAPSHOT_DIR
             rs_mod.SNAPSHOT_DIR = tmp_path / "snapshots"
+            orig_storage = cfg_mod.CONFIG.storage_dir
+            object.__setattr__(cfg_mod.CONFIG, "storage_dir", str(tmp_path))
             try:
                 result = create_recovery_snapshot("test")
                 assert result["success"] is True
             finally:
                 rs_mod.SNAPSHOT_DIR = orig_snap
+                object.__setattr__(cfg_mod.CONFIG, "storage_dir", orig_storage)
 
     def test_list_snapshots(self, tmp_path):
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import list_snapshots
+        import lab_system.app.settings.config as cfg_mod
         d = tmp_path / "snapshots"
         d.mkdir()
         (d / "snapshot_test.db").write_bytes(b"fake")
         orig = rs_mod.SNAPSHOT_DIR
         rs_mod.SNAPSHOT_DIR = d
+        orig_storage = cfg_mod.CONFIG.storage_dir
+        object.__setattr__(cfg_mod.CONFIG, "storage_dir", str(d.parent))
         try:
             assert len(list_snapshots()) == 1
         finally:
             rs_mod.SNAPSHOT_DIR = orig
+            object.__setattr__(cfg_mod.CONFIG, "storage_dir", orig_storage)
 
     def test_delete_backup_nonexistent(self, tmp_path):
         import lab_system.app.services.recovery_service as rs_mod

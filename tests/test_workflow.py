@@ -9,6 +9,11 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import lab_system.app.settings.config as _cfg
+
+ORIGINAL_DB_PATH = _cfg.CONFIG.db_path
+ORIGINAL_STORAGE_DIR = _cfg.CONFIG.storage_dir
+
 
 def _make_db():
     """Create a fresh test database and return the path."""
@@ -503,6 +508,7 @@ class TestBackupRecovery:
         import lab_system.app.database.db as _db_mod
         import lab_system.app.services.backup_service as _bs
         import lab_system.app.services.recovery_service as _rs
+        import lab_system.app.settings.config as _cfg
 
         cls.db_path = _make_db()
         _db_mod.get_conn = _make_get_conn(cls.db_path)
@@ -515,6 +521,8 @@ class TestBackupRecovery:
         _rs.STORAGE_DIR = test_storage
         _rs.BACKUP_DIR = test_storage / "backups"
         _rs.SNAPSHOT_DIR = test_storage / "snapshots"
+        object.__setattr__(_cfg.CONFIG, "db_path", str(cls.db_path))
+        object.__setattr__(_cfg.CONFIG, "storage_dir", str(test_storage))
         cls.backup_dir = _rs.BACKUP_DIR
         cls.snapshot_dir = _rs.SNAPSHOT_DIR
         cls.backup_dir.mkdir(parents=True, exist_ok=True)
@@ -522,6 +530,13 @@ class TestBackupRecovery:
         from lab_system.app.services.receipt_service import create_receipt
 
         create_receipt(_data(), [_item()], 1, user=ADMIN_USER)
+
+    @classmethod
+    def teardown_class(cls):
+        import lab_system.app.settings.config as _cfg
+
+        object.__setattr__(_cfg.CONFIG, "db_path", ORIGINAL_DB_PATH)
+        object.__setattr__(_cfg.CONFIG, "storage_dir", ORIGINAL_STORAGE_DIR)
 
     def test_create_backup(self):
         from lab_system.app.services.backup_service import create_backup
@@ -702,14 +717,21 @@ class TestBackupRecovery:
 
     def test_detect_corruption_on_bad_db(self):
         import lab_system.app.services.recovery_service as _rs
+        import lab_system.app.settings.config as _cfg
         from lab_system.app.services.recovery_service import detect_corruption
 
         old = _rs.DB_PATH
         bad_path = self.backup_dir / "corrupt.db"
         bad_path.write_bytes(b"\x00" * 512)
         _rs.DB_PATH = bad_path
-        result = detect_corruption()
-        assert result["ok"] is False
+        orig_db = _cfg.CONFIG.db_path
+        object.__setattr__(_cfg.CONFIG, "db_path", str(bad_path))
+        try:
+            result = detect_corruption()
+            assert result["ok"] is False
+        finally:
+            _rs.DB_PATH = old
+            object.__setattr__(_cfg.CONFIG, "db_path", orig_db)
         _rs.DB_PATH = old
         bad_path.unlink()
 

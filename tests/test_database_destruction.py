@@ -493,18 +493,24 @@ class TestInterruptedRecovery:
         """Simulate recovery failure - original DB should survive."""
         import lab_system.app.services.recovery_service as _rs
 
-        corrupted_backup = tmp_db_dir / "corrupted_for_test.db"
+        backups_dir = tmp_db_dir / "backups"
+        backups_dir.mkdir(exist_ok=True)
+        corrupted_backup = backups_dir / "corrupted_for_test.db"
         with open(str(corrupted_backup), "wb") as f:
             f.write(b"NOT_A_DATABASE" * 100)
 
         orig_backup_dir = _rs.BACKUP_DIR
-        _rs.BACKUP_DIR = tmp_db_dir
+        _rs.BACKUP_DIR = backups_dir
+        import lab_system.app.settings.config as _cfg
+        orig_storage = _cfg.CONFIG.storage_dir
+        object.__setattr__(_cfg.CONFIG, "storage_dir", str(tmp_db_dir))
         try:
             from lab_system.app.services.recovery_service import restore_from_backup
 
             result = restore_from_backup(corrupted_backup, user=ADMIN_USER)
         finally:
             _rs.BACKUP_DIR = orig_backup_dir
+            object.__setattr__(_cfg.CONFIG, "storage_dir", orig_storage)
 
         # Original DB should still be intact
         conn = sqlite3.connect(str(fresh_db))
@@ -1005,10 +1011,12 @@ class TestRecoveryServiceIntegration:
         """Verify detect_corruption finds corruption."""
         # Redirect DB_PATH for detect_corruption
         import lab_system.app.services.recovery_service as rs_mod
-        from lab_system.app.settings.config import DB_PATH as ORIG_DB_PATH
+        import lab_system.app.settings.config as _cfg
 
         # Patch DB_PATH temporarily
         rs_mod.DB_PATH = fresh_db
+        orig_db = _cfg.CONFIG.db_path
+        object.__setattr__(_cfg.CONFIG, "db_path", str(fresh_db))
         try:
             # First, verify healthy
             from lab_system.app.services.recovery_service import detect_corruption
@@ -1025,16 +1033,18 @@ class TestRecoveryServiceIntegration:
             corrupted = detect_corruption()
             assert not corrupted["ok"], "Corruption should be detected"
         finally:
-            rs_mod.DB_PATH = ORIG_DB_PATH
+            object.__setattr__(_cfg.CONFIG, "db_path", orig_db)
 
     def test_recovery_snapshot_created_before_restore(self, fresh_db, backup_db):
         """Verify snapshot is created before restore."""
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import create_recovery_snapshot
-        from lab_system.app.settings.config import DB_PATH as ORIG_DB_PATH
+        import lab_system.app.settings.config as _cfg
 
         # Redirect DB_PATH
         rs_mod.DB_PATH = fresh_db
+        orig_db = _cfg.CONFIG.db_path
+        object.__setattr__(_cfg.CONFIG, "db_path", str(fresh_db))
         try:
             snap = create_recovery_snapshot("test_restore")
             assert snap["success"], "Snapshot creation should succeed"
@@ -1047,14 +1057,16 @@ class TestRecoveryServiceIntegration:
             v = verify_backup(snap_path)
             assert v["valid"], "Snapshot should be a valid database"
         finally:
-            rs_mod.DB_PATH = ORIG_DB_PATH
+            object.__setattr__(_cfg.CONFIG, "db_path", orig_db)
 
     def test_verify_recovery_service_functions(self, fresh_db, backup_db, tmp_db_dir):
         """Test recovery_service functions with proper DB_PATH redirection."""
         import lab_system.app.services.recovery_service as rs_mod
-        from lab_system.app.settings.config import DB_PATH as ORIG_DB_PATH
+        import lab_system.app.settings.config as _cfg
 
         rs_mod.DB_PATH = fresh_db
+        orig_db = _cfg.CONFIG.db_path
+        object.__setattr__(_cfg.CONFIG, "db_path", str(fresh_db))
         try:
             from lab_system.app.services.recovery_service import (
                 detect_corruption,
@@ -1077,7 +1089,7 @@ class TestRecoveryServiceIntegration:
             bl = list_backups()
             assert len(bl) >= 1
         finally:
-            rs_mod.DB_PATH = ORIG_DB_PATH
+            object.__setattr__(_cfg.CONFIG, "db_path", orig_db)
 
 
 # ===========================================================================
@@ -1210,14 +1222,15 @@ class TestAutomaticRecoveryPaths:
 
         import lab_system.app.services.recovery_service as rs_mod
         from lab_system.app.services.recovery_service import _checkpoint_wal
+        import lab_system.app.settings.config as _cfg
 
         rs_mod.DB_PATH = fresh_db
+        orig_db = _cfg.CONFIG.db_path
+        object.__setattr__(_cfg.CONFIG, "db_path", str(fresh_db))
         try:
             _checkpoint_wal()
         finally:
-            from lab_system.app.settings.config import DB_PATH as ORIG
-
-            rs_mod.DB_PATH = ORIG
+            object.__setattr__(_cfg.CONFIG, "db_path", orig_db)
 
         conn = sqlite3.connect(str(fresh_db))
         row = conn.execute("SELECT value FROM meta WHERE key='wal_recovery'").fetchone()
@@ -1228,9 +1241,11 @@ class TestAutomaticRecoveryPaths:
     def test_detect_corruption_checks_wal(self, fresh_db):
         """Verify detect_corruption checks WAL file size."""
         import lab_system.app.services.recovery_service as rs_mod
-        from lab_system.app.settings.config import DB_PATH as ORIG
+        import lab_system.app.settings.config as _cfg
 
         rs_mod.DB_PATH = fresh_db
+        orig_db = _cfg.CONFIG.db_path
+        object.__setattr__(_cfg.CONFIG, "db_path", str(fresh_db))
         try:
             from lab_system.app.services.recovery_service import detect_corruption
 
@@ -1246,7 +1261,7 @@ class TestAutomaticRecoveryPaths:
             # The important assertion is that detect_corruption runs without error
             assert result["ok"], "DB should be OK"
         finally:
-            rs_mod.DB_PATH = ORIG
+            object.__setattr__(_cfg.CONFIG, "db_path", orig_db)
 
 
 # ===========================================================================

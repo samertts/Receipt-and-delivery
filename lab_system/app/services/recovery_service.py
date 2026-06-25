@@ -13,13 +13,29 @@ from pathlib import Path
 from lab_system.app.auth.permissions import with_permission
 from lab_system.app.database import db as _db
 from lab_system.app.database.db import rebuild_fts
-from lab_system.app.settings.config import DB_PATH, STORAGE_DIR
+from lab_system.app.settings.config import CONFIG, STORAGE_DIR
 from lab_system.app.utils.logging import setup_file_logging
 
 logger = setup_file_logging(STORAGE_DIR / "logs", "INFO")
 
 BACKUP_DIR = STORAGE_DIR / "backups"
 SNAPSHOT_DIR = STORAGE_DIR / "snapshots"
+DB_PATH = Path(CONFIG.db_path)
+
+
+def _get_db_path() -> Path:
+    """Resolve database path at runtime from CONFIG."""
+    return Path(CONFIG.db_path)
+
+
+def _get_backup_dir() -> Path:
+    """Resolve backup directory at runtime from CONFIG."""
+    return Path(CONFIG.storage_dir) / "backups"
+
+
+def _get_snapshot_dir() -> Path:
+    """Resolve snapshot directory at runtime from CONFIG."""
+    return Path(CONFIG.storage_dir) / "snapshots"
 
 
 def _validate_path_in_dir(path: Path, allowed_dir: Path) -> Path:
@@ -33,14 +49,17 @@ def _validate_path_in_dir(path: Path, allowed_dir: Path) -> Path:
 def verify_backup(path: Path | str) -> dict:
     """Check whether a backup file has a valid SQLite header and passes integrity check."""
     path = Path(path)
+    logger.info(f"verify_backup: checking path={path}")
     result = {"valid": False, "size": 0, "error": None, "integrity_ok": False}
     if not path.exists():
         result["error"] = "File not found"
+        logger.warning(f"verify_backup: file not found at {path}")
         return result
     file_size: int = path.stat().st_size
     result["size"] = file_size
     if file_size < 100:
         result["error"] = "File too small to be a valid database"
+        logger.warning(f"verify_backup: file too small ({file_size} bytes) at {path}")
         return result
     try:
         conn = sqlite3.connect(str(path))
@@ -50,22 +69,26 @@ def verify_backup(path: Path | str) -> dict:
             if row and row[0] == "ok":
                 result["integrity_ok"] = True
                 result["valid"] = True
+                logger.info(f"verify_backup: integrity OK for {path}")
             else:
                 result["error"] = f"Integrity check failed: {row}"
+                logger.warning(f"verify_backup: integrity FAILED for {path}: {row}")
         finally:
             conn.close()
     except Exception as e:
         result["error"] = str(e)
+        logger.error(f"verify_backup: exception verifying {path}: {e}")
     return result
 
 
 def list_backups() -> list[dict]:
     """Return metadata for all backup files stored in the backups directory."""
+    backup_dir = _get_backup_dir()
     records = []
-    if not BACKUP_DIR.exists():
+    if not backup_dir.exists():
         return records
     for f in sorted(
-        BACKUP_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True
+        backup_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True
     ):
         if f.suffix == ".db":
             info = f.stat()
@@ -92,49 +115,76 @@ def _get_backup_record(path: str) -> dict | None:
 
 
 def _checkpoint_wal():
+    db_path = _get_db_path()
+    logger.info(f"_checkpoint_wal: db_path={db_path}")
     try:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = sqlite3.connect(str(db_path))
         conn.execute("PRAGMA busy_timeout = 5000;")
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
         conn.close()
-    except Exception:
-        pass
+        logger.info("_checkpoint_wal: WAL checkpoint completed")
+    except Exception as e:
+        logger.error(f"_checkpoint_wal: exception: {e}")
 
 
 @with_permission("backup.restore")
 def restore_from_backup(backup_path: Path | str, user=None) -> dict:
     """Restore the production database from a verified backup file."""
-    backup_path = _validate_path_in_dir(Path(backup_path), BACKUP_DIR)
+    backup_dir = _get_backup_dir()
+    db_path = _get_db_path()
+    backup_path = _validate_path_in_dir(Path(backup_path), backup_dir)
+    logger.info(
+        f"restore_from_backup: backup_path={backup_path}, db_path={db_path}, "
+        f"backup_dir={backup_dir}"
+    )
     result = {"success": False, "error": None, "restored_path": None}
     verification = verify_backup(backup_path)
+    logger.info(f"restore_from_backup: verification={verification}")
     if not verification["valid"]:
         result["error"] = verification.get("error", "Backup verification failed")
+        logger.error(
+            f"restore_from_backup: backup verification FAILED: {result['error']}"
+        )
         return result
     try:
         snapshot_result = create_recovery_snapshot("pre_restore")
         result["pre_restore_snapshot"] = snapshot_result.get("path")
+        logger.info(
+            f"restore_from_backup: pre_restore_snapshot={snapshot_result.get('path')}"
+        )
 
         _checkpoint_wal()
 
-        dest = DB_PATH
+        dest = db_path
         backup_dest = dest.with_suffix(".db.corrupted")
         if dest.exists():
+            logger.info(f"restore_from_backup: moving current DB to {backup_dest}")
             shutil.move(str(dest), str(backup_dest))
+        logger.info(f"restore_from_backup: copying backup to {dest}")
         shutil.copy2(str(backup_path), str(dest))
         with _db.get_conn() as conn:
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA foreign_keys = ON;")
         rebuild_fts()
         verify = verify_backup(dest)
+        logger.info(f"restore_from_backup: post-restore verification={verify}")
         if not verify["valid"]:
             if backup_dest.exists():
+                logger.info(
+                    f"restore_from_backup: restoring original DB from {backup_dest}"
+                )
                 shutil.move(str(backup_dest), str(dest))
             result["error"] = "Restored database failed integrity check"
+            logger.error(
+                "restore_from_backup: post-restore verification FAILED"
+            )
             return result
         result["success"] = True
         result["restored_path"] = str(dest)
+        logger.info(f"restore_from_backup: SUCCESS restored to {dest}")
     except Exception as e:
         result["error"] = str(e)
+        logger.error(f"restore_from_backup: exception: {e}")
     return result
 
 
@@ -145,7 +195,7 @@ def delete_backup(backup_path: Path | str, user=None) -> dict:
     backup_path = Path(backup_path)
     if backup_path.exists():
         try:
-            backup_path = _validate_path_in_dir(backup_path, BACKUP_DIR)
+            backup_path = _validate_path_in_dir(backup_path, _get_backup_dir())
         except ValueError as e:
             result["error"] = str(e)
             return result
@@ -164,24 +214,33 @@ def delete_backup(backup_path: Path | str, user=None) -> dict:
 
 def create_recovery_snapshot(reason="manual") -> dict:
     """Create a point-in-time snapshot of the current database."""
-    SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    snapshot_dir = _get_snapshot_dir()
+    db_path = _get_db_path()
+    logger.info(
+        f"create_recovery_snapshot: reason={reason}, snapshot_dir={snapshot_dir}, "
+        f"db_path={db_path}"
+    )
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     name = f"snapshot_{reason}_{ts}.db"
-    target = SNAPSHOT_DIR / name
+    target = snapshot_dir / name
     try:
         _checkpoint_wal()
-        shutil.copy2(str(DB_PATH), str(target))
+        shutil.copy2(str(db_path), str(target))
+        logger.info(f"create_recovery_snapshot: snapshot created at {target}")
         return {"success": True, "path": str(target), "name": name}
     except Exception as e:
+        logger.error(f"create_recovery_snapshot: exception: {e}")
         return {"success": False, "error": str(e)}
 
 
 def list_snapshots() -> list[dict]:
+    snapshot_dir = _get_snapshot_dir()
     records = []
-    if not SNAPSHOT_DIR.exists():
+    if not snapshot_dir.exists():
         return records
     for f in sorted(
-        SNAPSHOT_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True
+        snapshot_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True
     ):
         if f.suffix == ".db":
             info = f.stat()
@@ -228,7 +287,7 @@ def enforce_retention(max_backups=30) -> int:
 @with_permission("backup.verify")
 def validate_recovery(backup_path: Path | str, user=None) -> dict:
     """Validate that a backup can be restored successfully (dry run)."""
-    backup_path = _validate_path_in_dir(Path(backup_path), BACKUP_DIR)
+    backup_path = _validate_path_in_dir(Path(backup_path), _get_backup_dir())
     result = {"valid": False, "checks": []}
 
     v = verify_backup(backup_path)
@@ -285,16 +344,17 @@ def validate_recovery(backup_path: Path | str, user=None) -> dict:
 
 def detect_corruption() -> dict:
     """Check current database for corruption."""
+    db_path = _get_db_path()
     result = {"ok": True, "errors": []}
     try:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = sqlite3.connect(str(db_path))
         conn.execute("PRAGMA busy_timeout = 3000;")
         try:
             row = conn.execute("PRAGMA integrity_check;").fetchone()
             if not row or row[0] != "ok":
                 result["ok"] = False
                 result["errors"].append(f"Integrity: {row}")
-            wal_path = DB_PATH.with_name(DB_PATH.name + "-wal")
+            wal_path = db_path.with_name(db_path.name + "-wal")
             if wal_path.exists() and wal_path.stat().st_size > 0:
                 result["wal_size"] = wal_path.stat().st_size
         finally:
@@ -308,10 +368,11 @@ def detect_corruption() -> dict:
 @with_permission("backup.restore")
 def attempt_recovery(user=None) -> dict:
     """Attempt to recover the database from WAL or latest backup."""
+    db_path = _get_db_path()
     result = {"success": False, "actions": []}
 
     try:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = sqlite3.connect(str(db_path))
         conn.execute("PRAGMA busy_timeout = 5000;")
         conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
         conn.close()

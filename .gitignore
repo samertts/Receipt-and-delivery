@@ -19,5 +19,6 @@ installer/Output/
 *.log
 .coverage
 coverage.xml
+coverage.json
 htmlcov/
 .generated_secret_key.json
