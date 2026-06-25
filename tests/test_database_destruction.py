@@ -283,7 +283,7 @@ class TestMissingIndexes:
         indexes = conn.execute(
             "SELECT name, sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL"
         ).fetchall()
-        for name, sql in indexes:
+        for name, _sql in indexes:
             try:
                 conn.execute(f"DROP INDEX IF EXISTS {name}")
             except Exception:
@@ -763,7 +763,7 @@ class TestDatabaseLockHandling:
 
     def test_wal_mode_persists_across_connections(self, fresh_db):
         """Verify WAL mode is set on every new connection."""
-        for i in range(5):
+        for _i in range(5):
             conn = sqlite3.connect(str(fresh_db))
             conn.execute("PRAGMA journal_mode").fetchone()
             conn.close()
@@ -782,7 +782,7 @@ class TestConnectionPoolExhaustion:
         connections = []
         errors = []
 
-        for i in range(50):
+        for _i in range(50):
             try:
                 c = sqlite3.connect(str(fresh_db), timeout=2)
                 c.execute("PRAGMA busy_timeout = 2000;")
@@ -949,7 +949,7 @@ class TestDataPreservation:
         ).fetchall()
 
         chain_valid = True
-        for i, (action, ph) in enumerate(rows):
+        for i, (_action, ph) in enumerate(rows):
             if i == 0:
                 if ph != "":
                     chain_valid = False

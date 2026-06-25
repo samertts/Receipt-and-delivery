@@ -150,7 +150,7 @@ class AboutDialog(QDialog):
         super().__init__()
         self.setWindowTitle("حول النظام")
         self.setLayoutDirection(Qt.RightToLeft)
-        self.setFixedSize(500, 400)
+        self.setFixedSize(500, 450)
         layout = QVBoxLayout(self)
 
         title = QLabel(APP_NAME)
@@ -162,27 +162,28 @@ class AboutDialog(QDialog):
         about_tab = QWidget()
         about_layout = QVBoxLayout(about_tab)
         try:
-            from lab_system.app.settings.config import STORAGE_DIR
-
-            version_path = STORAGE_DIR.parent.parent / "VERSION"
-            ver = (
-                version_path.read_text().strip()
-                if version_path.exists()
-                else "1.2.0-dev"
-            )
+            from lab_system.app.settings.config import CONFIG
+            ver = CONFIG.app_version
         except Exception:
-            ver = "1.2.0-dev"
+            ver = "unknown"
+        try:
+            from lab_system.app import build_metadata
+            build_info = build_metadata.get_build_info()
+        except Exception:
+            build_info = {}
+
         for text in [
             f"الإصدار: {ver}",
+            f"تاريخ البناء: {build_info.get('build_date', 'N/A')}",
+            f"التفديع: {build_info.get('git_commit', 'N/A')[:12]}",
+            f"الفرع: {build_info.get('git_branch', 'N/A')}",
+            f"رقم البناء: {build_info.get('build_number', 'N/A')}",
+            f"بايثون: {build_info.get('python_version', 'N/A')}",
+            "",
             "نظام إدارة استلام وتسليم العينات المخبرية",
             "لجنة الصحة العراقية - دائرة المختبرات",
             "",
             "© 2026 جميع الحقوق محفوظة",
-            "",
-            "تم التطوير باستخدام:",
-            "• PySide6 لواجهة المستخدم",
-            "• FastAPI لخدمات الويب",
-            "• SQLite / PostgreSQL لقواعد البيانات",
         ]:
             lbl = QLabel(text)
             lbl.setStyleSheet("font-size:12pt;")
@@ -194,12 +195,18 @@ class AboutDialog(QDialog):
         import platform
         import sys as _sys
 
-        for label, value in [
+        sys_info = [
             ("نظام التشغيل", platform.platform()),
             ("بايثون", _sys.version.split()[0]),
             ("المعالج", platform.machine()),
             ("المستخدم", platform.node()),
-        ]:
+        ]
+        if build_info:
+            sys_info.extend([
+                ("نوع البناء", build_info.get("build_type", "N/A")),
+                ("معرف التفديع", build_info.get("git_commit", "N/A")[:12]),
+            ])
+        for label, value in sys_info:
             row = QHBoxLayout()
             lbl = QLabel(f"{label}:")
             lbl.setStyleSheet("font-weight:600;")

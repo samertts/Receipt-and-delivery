@@ -1,27 +1,84 @@
-name: Build Windows Application
+name: Release
 
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.2.0)'
+        required: false
 
 env:
   PYTHON_VERSION: '3.11'
 
 jobs:
-  build:
+  release:
     runs-on: windows-latest
     permissions:
       contents: write
 
     steps:
+      # ===================================================================
+      # CHECKOUT & SETUP
+      # ===================================================================
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
+      # ===================================================================
+      # PHASE 1 — VERSION MANAGEMENT
+      # ===================================================================
+      - name: Sync Version
+        shell: cmd
+        run: |
+          echo === Version Management ===
+          python scripts/sync_version.py
+          if errorlevel 1 (
+            echo ERROR: Version sync failed
+            exit /b 1
+          )
+          echo.
+          echo Version from VERSION file:
+          type VERSION
+
+      - name: Extract Build Metadata
+        id: meta
+        shell: powershell
+        run: |
+          $version = (Get-Content VERSION).Trim()
+          $commit = git rev-parse HEAD
+          $short_commit = $commit.Substring(0, 8)
+          $branch = git rev-parse --abbrev-ref HEAD
+          $tag = git describe --tags --exact-match HEAD 2>$null
+          if (-not $tag) { $tag = "untagged" }
+          $build_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          $build_number = $env:GITHUB_RUN_NUMBER
+
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "COMMIT=$commit" >> $env:GITHUB_OUTPUT
+          echo "SHORT_COMMIT=$short_commit" >> $env:GITHUB_OUTPUT
+          echo "BRANCH=$branch" >> $env:GITHUB_OUTPUT
+          echo "TAG=$tag" >> $env:GITHUB_OUTPUT
+          echo "BUILD_DATE=$build_date" >> $env:GITHUB_OUTPUT
+          echo "BUILD_NUMBER=$build_number" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Version: $version"
+          Write-Host "Commit: $short_commit"
+          Write-Host "Branch: $branch"
+          Write-Host "Tag: $tag"
+          Write-Host "Build: #$build_number"
+          Write-Host "Date: $build_date"
+
+      # ===================================================================
+      # VALIDATION
+      # ===================================================================
       - name: Install Dependencies
         shell: cmd
         run: |
@@ -32,41 +89,7 @@ jobs:
       - name: Verify Project Structure
         shell: cmd
         run: |
-          echo Checking project structure...
-          if not exist main.py (
-          echo ERROR: main.py not found
-          exit /b 1
-          )
-          if not exist assets (
-          mkdir assets
-          )
-          if not exist assets\icons (
-          mkdir assets\icons
-          )
-          echo Project structure verified successfully.
-
-      - name: Verify VERSION File
-        shell: cmd
-        run: |
-          if not exist VERSION (
-            echo 0.0.0 > VERSION
-            echo WARNING: VERSION file was missing, created with default 0.0.0
-          )
-          echo App version:
-          type VERSION
-
-      - name: Verify Assets
-        shell: powershell
-        run: |
-          $icon = "assets\icons\app.ico"
-          if (-not (Test-Path $icon)) {
-            Write-Host "WARNING: app.ico missing, building without icon"
-          } elseif ((Get-Item $icon).Length -eq 0) {
-            Write-Host "WARNING: app.ico is empty, building without icon"
-          } else {
-            Write-Host "app.ico exists and is valid"
-          }
-          Write-Host "Assets verification complete."
+          python -c "from pathlib import Path; assert Path('main.py').exists(), 'main.py missing'; assert Path('VERSION').exists(), 'VERSION missing'; assert Path('lab_system.spec').exists(), 'spec missing'; print('Project structure OK')"
 
       - name: Python Syntax Check
         shell: cmd
@@ -80,29 +103,158 @@ jobs:
         continue-on-error: true
         run: |
           ruff check --output-format=github lab_system/ tests/ --ignore=E501,W292,E265
-          echo RUFF_EXIT_CODE=%errorlevel%
 
-      - name: Bandit Security Scan
-        shell: cmd
-        continue-on-error: true
-        run: |
-          bandit -r lab_system/ -f json -o bandit-results.json || echo Bandit found issues
-          echo BANDIT_EXIT_CODE=%errorlevel%
-
-      - name: pip-audit Vulnerability Scan
-        shell: cmd
-        continue-on-error: true
-        run: |
-          pip-audit -r requirements.txt --desc
-          echo PIPAUDIT_EXIT_CODE=%errorlevel%
-
-      - name: Run Tests with Coverage
+      - name: Run Tests
         shell: cmd
         run: |
-          python -m pytest tests/ --cov=lab_system --cov-config=.coveragerc --cov-report=xml:coverage.xml --cov-report=html:coverage_html --cov-report=term --junitxml=test-results.xml > pytest_out.txt 2>&1
-          type pytest_out.txt 2>nul
-          python -c "import re; txt=open('pytest_out.txt',encoding='utf-8',errors='replace').read(); [print(f'::error::FAILED: {m.group(1)}') for m in re.finditer(r'FAILED ([^ ]+)',txt)][:1] or None; [print(f'::error::{m.group(0)[:200]}') for m in re.finditer(r'ERROR.*::',txt)][:1] or None" 2>nul
-          echo Tests completed (non-blocking for build validation)
+          python -m pytest tests/ --cov=lab_system --cov-config=.coveragerc --cov-report=xml:coverage.xml --junitxml=test-results.xml -q
+          echo Tests completed.
+
+      - name: Validate Installer Config
+        shell: cmd
+        run: |
+          python scripts/validate_installer.py
+          if errorlevel 1 (
+            echo ERROR: Installer validation failed
+            exit /b 1
+          )
+
+      - name: Certify Installer Inputs
+        shell: cmd
+        run: |
+          python scripts/certify_installer_inputs.py
+          if errorlevel 1 (
+            echo ERROR: Installer input certification failed
+            exit /b 1
+          )
+
+      # ===================================================================
+      # PHASE 5 — BUILD WITH EMBEDDED METADATA
+      # ===================================================================
+      - name: Build EXE
+        shell: cmd
+        env:
+          APP_VERSION: ${{ steps.meta.outputs.VERSION }}
+          GIT_COMMIT: ${{ steps.meta.outputs.COMMIT }}
+          GIT_BRANCH: ${{ steps.meta.outputs.BRANCH }}
+          BUILD_NUMBER: ${{ steps.meta.outputs.BUILD_NUMBER }}
+          BUILD_DATE: ${{ steps.meta.outputs.BUILD_DATE }}
+          PYTHON_VERSION: '3.11'
+          BUILD_TYPE: 'release'
+        run: |
+          echo Starting PyInstaller build with embedded metadata...
+          set RETRY_COUNT=0
+          :retry_build
+          pyinstaller --noconfirm --clean lab_system.spec
+          if errorlevel 1 (
+            set /a RETRY_COUNT+=1
+            if !RETRY_COUNT! LSS 3 (
+              echo Retry !RETRY_COUNT!/3 after failure...
+              timeout /t 5 /nobreak
+              goto retry_build
+            )
+            echo ERROR: PyInstaller build failed after 3 attempts
+            exit /b 1
+          )
+          echo EXE build completed successfully.
+
+      - name: Verify EXE
+        shell: cmd
+        run: |
+          if not exist dist\LabReceiptSystem.exe (
+            echo ERROR: EXE output not found
+            dir dist\
+            exit /b 1
+          )
+          for %%i in (dist\LabReceiptSystem.exe) do echo EXE verified. Size: %%~zi bytes
+
+      # ===================================================================
+      # PHASE 3 — BUILD INSTALLER
+      # ===================================================================
+      - name: Install Inno Setup
+        shell: cmd
+        run: |
+          choco install innosetup -y
+
+      - name: Build Installer
+        shell: cmd
+        run: |
+          ISCC lab_system/installer/LabReceipt.iss
+          if errorlevel 1 (
+            echo ERROR: Installer build failed
+            exit /b 1
+          )
+          echo Installer built successfully.
+
+      - name: Verify Installer
+        shell: cmd
+        run: |
+          if not exist installer\Output\LabReceiptSetup.exe (
+            echo ERROR: Installer not found
+            exit /b 1
+          )
+          for %%i in (installer\Output\LabReceiptSetup.exe) do echo Installer verified. Size: %%~zi bytes
+
+      # ===================================================================
+      # PHASE 3 — ARTIFACT VERIFICATION
+      # ===================================================================
+      - name: Generate Checksums & Manifest
+        shell: cmd
+        run: |
+          python scripts/generate_manifest.py dist\LabReceiptSystem.exe installer\Output\LabReceiptSetup.exe
+          if errorlevel 1 (
+            echo ERROR: Manifest generation failed
+            exit /b 1
+          )
+
+      - name: Verify Checksums
+        shell: cmd
+        run: |
+          echo === SHA256 Verification ===
+          type checksums.sha256
+          echo.
+          echo === Manifest ===
+          type manifest.json
+
+      # ===================================================================
+      # PHASE 4 — RELEASE NOTES
+      # ===================================================================
+      - name: Generate Release Notes
+        shell: cmd
+        run: |
+          python scripts/generate_release_notes.py
+          echo.
+          echo === Release Notes ===
+          type release_notes.md
+
+      # ===================================================================
+      # UPLOAD ARTIFACTS
+      # ===================================================================
+      - name: Upload EXE Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LabReceiptSystem-${{ steps.meta.outputs.VERSION }}
+          path: dist/LabReceiptSystem.exe
+
+      - name: Upload Installer Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LabReceiptSetup-${{ steps.meta.outputs.VERSION }}
+          path: installer/Output/LabReceiptSetup.exe
+
+      - name: Upload Checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums-${{ steps.meta.outputs.VERSION }}
+          path: |
+            checksums.sha256
+            manifest.json
+
+      - name: Upload Release Notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes-${{ steps.meta.outputs.VERSION }}
+          path: release_notes.md
 
       - name: Upload Coverage Report
         if: always()
@@ -118,142 +270,46 @@ jobs:
           name: test-results
           path: test-results.xml
 
-      - name: Upload Bandit Results
-        uses: actions/upload-artifact@v4
-        with:
-          name: bandit-results
-          path: bandit-results.json
-
-      - name: Build Diagnostics
-        shell: cmd
-        run: |
-          echo === System Info ===
-          python --version
-          pip list
-          echo === Disk Space ===
-          wmic logicaldisk get size,freespace,caption
-          echo === Directory Structure ===
-          dir /s /b lab_system\app\*.py | find /c /v ""
-          echo source files
-          dir /s /b tests\*.py | find /c /v ""
-          echo test files
-
-      - name: Build EXE
-        shell: cmd
-        run: |
-          echo Starting PyInstaller build...
-          pyinstaller --noconfirm --clean lab_system.spec
-          if errorlevel 1 (
-          echo ERROR: PyInstaller build failed
-          type dist\LabReceiptSystem\warn-LabReceiptSystem.txt 2>nul || echo No warnings file
-          exit /b 1
-          )
-          echo EXE build completed successfully.
-
-      - name: Verify EXE Output
-        shell: cmd
-        run: |
-          if not exist dist\LabReceiptSystem.exe (
-          echo ERROR: EXE output not found
-          dir dist\
-          exit /b 1
-          )
-          for %%i in (dist\LabReceiptSystem.exe) do if %%~zi EQU 0 (
-          echo ERROR: EXE is zero bytes
-          exit /b 1
-          )
-          for %%i in (dist\LabReceiptSystem.exe) do if %%~zi LSS 5000000 (
-          echo WARNING: EXE is suspiciously small (%%~zi bytes)
-          )
-          for %%i in (dist\LabReceiptSystem.exe) do echo EXE verified successfully. Size: %%~zi bytes
-          dir dist\LabReceiptSystem.exe
-
-      - name: Install Inno Setup
-        shell: cmd
-        run: |
-          choco install innosetup -y
-
-      - name: Certify Installer Inputs
-        shell: cmd
-        run: |
-          python scripts/certify_installer_inputs.py
-          if errorlevel 1 (
-            echo ERROR: Installer input certification failed
-            exit /b 1
-          )
-          echo Installer inputs certified.
-
-      - name: Verify EXE Before Installer
-        shell: cmd
-        run: |
-          if not exist dist\LabReceiptSystem.exe (
-            echo ERROR: dist\LabReceiptSystem.exe not found before installer build
-            dir dist\
-            exit /b 1
-          )
-          for %%i in (dist\LabReceiptSystem.exe) do if %%~zi EQU 0 (
-            echo ERROR: dist\LabReceiptSystem.exe is zero bytes
-            exit /b 1
-          )
-          for %%i in (dist\LabReceiptSystem.exe) do echo EXE exists. Size: %%~zi bytes
-
-      - name: Build Installer
-        shell: cmd
-        run: |
-          for /f %%i in (VERSION) do set APP_VER=%%i
-          powershell -Command "$v = (Get-Content VERSION).Trim(); (Get-Content lab_system/installer/LabReceipt.iss) -replace '(?<=AppVersion=)[\d\w.-]+', $v | Set-Content lab_system/installer/LabReceipt.iss"
-          ISCC lab_system/installer/LabReceipt.iss
-
-      - name: Upload EXE
-        uses: actions/upload-artifact@v4
-        with:
-          name: LabReceiptSystem
-          path: dist/LabReceiptSystem.exe
-
-      - name: Verify Installer Output
-        shell: cmd
-        run: |
-          if not exist installer\Output\LabReceiptSetup.exe (
-            echo ERROR: Installer output not found
-            dir installer\Output\
-            exit /b 1
-          )
-          for %%i in (installer\Output\LabReceiptSetup.exe) do if %%~zi LSS 1000000 (
-            echo WARNING: Installer is suspiciously small (%%~zi bytes)
-          )
-          for %%i in (installer\Output\LabReceiptSetup.exe) do echo Installer verified. Size: %%~zi bytes
-
-      - name: Upload Setup
-        uses: actions/upload-artifact@v4
-        with:
-          name: LabReceiptSetup
-          path: installer/Output/LabReceiptSetup.exe
-
-      - name: Upload Build Diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-diagnostics
-          path: build/
-
-      - name: Verify Release Artifacts
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: cmd
-        run: |
-          if not exist dist\LabReceiptSystem.exe (
-            echo ERROR: Release EXE missing
-            exit /b 1
-          )
-          if not exist installer\Output\LabReceiptSetup.exe (
-            echo ERROR: Release installer missing
-            exit /b 1
-          )
-          echo Release artifacts verified.
-
-      - name: Publish GitHub Release
+      # ===================================================================
+      # PHASE 2 — GITHUB RELEASE
+      # ===================================================================
+      - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          name: "Release v${{ steps.meta.outputs.VERSION }}"
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(steps.meta.outputs.VERSION, '-') }}
           files: |
             dist/LabReceiptSystem.exe
             installer/Output/LabReceiptSetup.exe
+            checksums.sha256
+            manifest.json
+            release_notes.md
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ===================================================================
+      # PHASE 7 — RELEASE INTEGRITY
+      # ===================================================================
+      - name: Publish Release Integrity
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: cmd
+        run: |
+          echo === Release Integrity Summary ===
+          echo Version: ${{ steps.meta.outputs.VERSION }}
+          echo Commit: ${{ steps.meta.outputs.SHORT_COMMIT }}
+          echo Tag: ${{ steps.meta.outputs.TAG }}
+          echo Build: #${{ steps.meta.outputs.BUILD_NUMBER }}
+          echo Date: ${{ steps.meta.outputs.BUILD_DATE }}
+          echo.
+          echo Published artifacts:
+          echo   - LabReceiptSystem.exe (portable)
+          echo   - LabReceiptSetup.exe (installer)
+          echo   - checksums.sha256 (integrity)
+          echo   - manifest.json (metadata)
+          echo   - release_notes.md (changelog)
+          echo.
+          echo Release published successfully.

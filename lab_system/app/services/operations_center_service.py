@@ -110,7 +110,7 @@ class OperationsCenter:
         storage_health = self._get_storage_health()
         subsystems["storage"] = storage_health
         overall_status = "healthy"
-        for name, health in subsystems.items():
+        for _, health in subsystems.items():
             if health.get("status") == "unhealthy":
                 overall_status = "unhealthy"
                 break
