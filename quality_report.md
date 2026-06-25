@@ -10,11 +10,10 @@
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| New tests written | **70** | PASS |
-| All new tests passing | **70/70 (100%)** | PASS |
-| Overall coverage (new tests) | **16.3%** | PASS (baseline) |
-| Modules at 100% coverage | **9** | PASS |
-| Modules >50% coverage | **13** | PASS |
+| Total tests passing | **147** | PASS |
+| Overall coverage | **23%** | PASS (improved from 16%) |
+| Modules at 100% coverage | **10** | PASS |
+| Modules >50% coverage | **14** | PASS |
 | Ruff lint | **Clean** | PASS |
 | Security (Bandit High) | **0** | PASS |
 | CI quality gates | **Added** | PASS |
@@ -48,9 +47,9 @@
 ### Partial Coverage (need more tests)
 | Module | Lines | Coverage |
 |--------|-------|----------|
-| `services/receipt_service.py` | 73/230 | 31.7% |
-| `services/report_service.py` | 27/107 | 25.2% |
-| `services/recovery_service.py` | 43/263 | 16.3% |
+| `services/receipt_service.py` | 168/230 | 73% |
+| `services/report_service.py` | 66/107 | 62% |
+| `services/recovery_service.py` | 109/263 | 41% |
 | `database/db.py` | 21/159 | 13.2% |
 | `sync/service.py` | 59/136 | 43.4% |
 | `sync/api_client.py` | 36/93 | 38.7% |
@@ -69,7 +68,12 @@
 | `test_performance.py` | 8 | Performance — Benchmarks |
 | `test_security_extended.py` | 11 | Security — Injection/auth |
 | `test_end_to_end.py` | 8 | E2E — Full workflows |
-| **Total** | **70** | |
+| `test_receipt_service.py` | 30 | Integration — Receipt CRUD/transitions |
+| `test_recovery_service.py` | 10 | Integration — Backup/restore/snapshot |
+| `test_report_service.py` | 15 | Integration — Reports/statistics/CSV |
+| `test_user_service.py` | 14 | Unit — User auth/CRUD/lockout |
+| `test_audit_logger.py` | 8 | Unit — Audit logging/chain |
+| **Total** | **147** | |
 
 ---
 
@@ -116,12 +120,12 @@
 
 ## Recommendations for Coverage Improvement
 
-### Priority 1 (High Impact)
-1. Add integration tests for `receipt_service.py` (31.7% → target 60%)
-2. Add tests for `recovery_service.py` (16.3% → target 40%)
-3. Add tests for `report_service.py` (25.2% → target 50%)
+### Priority 1 (High Impact) — DONE
+1. ~~Add tests for `receipt_service.py`~~ (73% — achieved)
+2. ~~Add tests for `recovery_service.py`~~ (41% — achieved)
+3. ~~Add tests for `report_service.py`~~ (62% — achieved)
 
-### Priority 2 (Medium Impact)
+### Priority 2 (Medium Impact) — IN PROGRESS
 4. Add tests for `sync/service.py` (43.4% → target 60%)
 5. Add tests for `sync/api_client.py` (38.7% → target 50%)
 6. Add tests for `database/db.py` (13.2% → target 30%)
@@ -140,7 +144,7 @@
 - `tests/conftest.py` — Fixed `password_hash` column name
 - `lab_system/installer/LabReceipt.iss` — Fixed version to 1.2.0
 
-### Created (QA Framework)
+### Created (QA Framework — 13 test files)
 - `tests/test_auth_service.py`
 - `tests/test_org_service.py`
 - `tests/test_dashboard_service.py`
@@ -149,4 +153,9 @@
 - `tests/test_performance.py`
 - `tests/test_security_extended.py`
 - `tests/test_end_to_end.py`
+- `tests/test_receipt_service.py`
+- `tests/test_recovery_service.py`
+- `tests/test_report_service.py`
+- `tests/test_user_service.py`
+- `tests/test_audit_logger.py`
 - `quality_report.md` (this file)
