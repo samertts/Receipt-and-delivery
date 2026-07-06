@@ -164,7 +164,7 @@ class SyncService:
             cur = conn.execute(
                 f"""DELETE FROM {SYNC_QUEUE_TABLE}
                     WHERE status = ? AND synced_at < datetime('now', ?)""",
-                (SYNC_STATUS_SYNCED, f"-{max(older_than_seconds, 1)} seconds"),
+                (SYNC_STATUS_SYNCED, f"-{max(older_than_seconds, 0)} seconds"),
             )
             return cur.rowcount
 

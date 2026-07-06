@@ -21,6 +21,9 @@ logger = setup_file_logging(STORAGE_DIR / "logs", "INFO")
 BACKUP_DIR = STORAGE_DIR / "backups"
 SNAPSHOT_DIR = STORAGE_DIR / "snapshots"
 DB_PATH = Path(CONFIG.db_path)
+_DEFAULT_STORAGE_DIR = Path(CONFIG.storage_dir)
+_DEFAULT_BACKUP_DIR = BACKUP_DIR
+_DEFAULT_SNAPSHOT_DIR = SNAPSHOT_DIR
 
 
 def _get_db_path() -> Path:
@@ -29,13 +32,19 @@ def _get_db_path() -> Path:
 
 
 def _get_backup_dir() -> Path:
-    """Resolve backup directory at runtime from CONFIG."""
-    return Path(CONFIG.storage_dir) / "backups"
+    """Resolve backup directory at runtime from CONFIG or an explicit module override."""
+    configured = Path(CONFIG.storage_dir) / "backups"
+    if Path(CONFIG.storage_dir) == _DEFAULT_STORAGE_DIR and BACKUP_DIR != _DEFAULT_BACKUP_DIR:
+        return Path(BACKUP_DIR)
+    return configured
 
 
 def _get_snapshot_dir() -> Path:
-    """Resolve snapshot directory at runtime from CONFIG."""
-    return Path(CONFIG.storage_dir) / "snapshots"
+    """Resolve snapshot directory at runtime from CONFIG or an explicit module override."""
+    configured = Path(CONFIG.storage_dir) / "snapshots"
+    if Path(CONFIG.storage_dir) == _DEFAULT_STORAGE_DIR and SNAPSHOT_DIR != _DEFAULT_SNAPSHOT_DIR:
+        return Path(SNAPSHOT_DIR)
+    return configured
 
 
 def _validate_path_in_dir(path: Path, allowed_dir: Path) -> Path:

@@ -1,14 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authApi } from '../api'
+import { clearSession, getSessionUser, setSession, updateAccessToken, updateRefreshToken } from '../api/tokenStore'
 
-// SECURITY NOTE: Tokens are stored in localStorage which is vulnerable to XSS.
-// TODO: Migrate to httpOnly cookies set by the server.
-// For now, ensure CSP headers are set to mitigate XSS risks.
 export const useAuthStore = defineStore('auth', () => {
-  const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
-  const token = ref(localStorage.getItem('access_token') || '')
-  const refreshToken = ref(localStorage.getItem('refresh_token') || '')
+  const user = ref(getSessionUser())
+  const token = ref('')
+  const refreshToken = ref('')
 
   const isAuthenticated = computed(() => !!token.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
@@ -18,12 +16,9 @@ export const useAuthStore = defineStore('auth', () => {
     const response = await authApi.login({ username, password })
     token.value = response.data.access_token
     refreshToken.value = response.data.refresh_token || ''
-    localStorage.setItem('access_token', response.data.access_token)
-    if (refreshToken.value) localStorage.setItem('refresh_token', refreshToken.value)
-
     const payload = JSON.parse(atob(response.data.access_token.split('.')[1]))
     user.value = { username: payload.sub, role: payload.role }
-    localStorage.setItem('user', JSON.stringify(user.value))
+    setSession({ accessToken: token.value, refreshToken: refreshToken.value, user: user.value })
     return user.value
   }
 
@@ -33,8 +28,8 @@ export const useAuthStore = defineStore('auth', () => {
       const response = await authApi.refresh({ refresh_token: refreshToken.value })
       token.value = response.data.access_token
       refreshToken.value = response.data.refresh_token || ''
-      localStorage.setItem('access_token', response.data.access_token)
-      if (refreshToken.value) localStorage.setItem('refresh_token', refreshToken.value)
+      updateAccessToken(token.value)
+      updateRefreshToken(refreshToken.value)
       return token.value
     } catch {
       logout()
@@ -51,9 +46,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     token.value = ''
     refreshToken.value = ''
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('user')
+    clearSession()
   }
 
   async function changePassword(currentPassword, newPassword) {

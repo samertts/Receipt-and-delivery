@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.exceptions import ForbiddenError, UnauthorizedError
 from app.db.session import get_db
+from app.models.blacklisted_token import BlacklistedToken
 from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
@@ -42,11 +43,16 @@ def get_current_user(
             settings.effective_secret_key,
             algorithms=[settings.algorithm],
         )
+        if payload.get("type") != "access":
+            raise UnauthorizedError("نوع الرمز غير صحيح")
         username: str = payload.get("sub", "")
         if not username:
             raise UnauthorizedError("رمز غير صالح")
     except JWTError as exc:
         raise UnauthorizedError("رمز غير صالح أو منتهي الصلاحية") from exc
+
+    if db.query(BlacklistedToken).filter(BlacklistedToken.token == token).first():
+        raise UnauthorizedError("تم إبطال الرمز")
 
     user = db.query(User).filter(User.username == username).first()
     if not user:
