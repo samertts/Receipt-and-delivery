@@ -134,6 +134,14 @@ except (ImportError, Exception) as e:
 
 async def rate_limit_middleware(request: Request, call_next):
     if os.environ.get("RATE_LIMIT_DISABLED"):
+        if settings.environment.lower() in {"prod", "production", "staging"}:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": "Rate limiting cannot be disabled in this environment",
+                    "error_code": "RATE_LIMIT_REQUIRED",
+                },
+            )
         return await call_next(request)
 
     client_ip = request.client.host if request.client else "unknown"
