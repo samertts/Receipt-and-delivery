@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     app_name: str = "نظام إدارة المعاملات المختبرية"
     app_version: str = _read_app_version()
     debug: bool = False
+    environment: str = "development"
 
     secret_key: str = ""
     access_token_expire_minutes: int = 30
@@ -76,7 +77,9 @@ class Settings(BaseSettings):
     @property
     def effective_secret_key(self) -> str:
         if not self.secret_key or self.secret_key == "change-me":
-            # Persist auto-generated key so it survives restarts
+            if self.environment.lower() in {"prod", "production", "staging"}:
+                raise ValueError("SECRET_KEY must be configured securely outside development")
+            # Persist auto-generated key only for local development so it survives restarts.
             return _load_or_persist_secret_key()
         return self.secret_key
 

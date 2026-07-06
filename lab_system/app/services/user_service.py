@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 from lab_system.app.auth.permissions import with_permission
 from lab_system.app.auth.security import hash_password, verify_password
 from lab_system.app.database import db as _db
-from lab_system.app.utils.errors import AuthenticationError
+from lab_system.app.utils.errors import AuthenticationError, ValidationError
+from lab_system.app.utils.validators import validate_password
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def seed_default_users():
     admin_password = ""
     with _db.get_conn() as conn:
         if conn.execute("SELECT COUNT(*) c FROM users").fetchone()["c"] == 0:
-            now = datetime.now().isoformat(timespec="seconds")
+            now = datetime.now().isoformat(timespec="microseconds")
             admin_password = _generate_admin_password()
             conn.execute(
                 "INSERT INTO users(full_name,username,password_hash,role,status,password_changed_at) VALUES(?,?,?,?,?,?)",
@@ -58,7 +59,7 @@ def record_login_attempt(username, success):
             (
                 username,
                 1 if success else 0,
-                datetime.now().isoformat(timespec="seconds"),
+                datetime.now().isoformat(timespec="microseconds"),
             ),
         )
 
@@ -76,7 +77,7 @@ def get_recent_failures(username, minutes=5):
 def authenticate(username, password, max_attempts=5, lockout_minutes=5):
     import platform
 
-    now = datetime.now().isoformat(timespec="seconds")
+    now = datetime.now().isoformat(timespec="microseconds")
     with _db.get_conn() as conn:
         since = (datetime.now() - timedelta(minutes=lockout_minutes)).isoformat(
             timespec="seconds"
@@ -130,7 +131,14 @@ def needs_password_change(user):
     return len(changed_at) == 0
 
 
+def _require_strong_password(password):
+    error = validate_password(password)
+    if error:
+        raise ValidationError(error)
+
+
 def change_password(user_id, old_password, new_password):
+    _require_strong_password(new_password)
     with _db.get_conn() as conn:
         row = conn.execute(
             "SELECT password_hash FROM users WHERE id=?", (user_id,)
@@ -141,7 +149,7 @@ def change_password(user_id, old_password, new_password):
             "UPDATE users SET password_hash=?, password_changed_at=? WHERE id=?",
             (
                 hash_password(new_password),
-                datetime.now().isoformat(timespec="seconds"),
+                datetime.now().isoformat(timespec="microseconds"),
                 user_id,
             ),
         )
@@ -169,6 +177,7 @@ def create_user(
     notes="",
     user=None,
 ):
+    _require_strong_password(password)
     with _db.get_conn() as conn:
         conn.execute(
             "INSERT INTO users(full_name,username,password_hash,role,institution_id,phone,notes,status,password_changed_at) VALUES(?,?,?,?,?,?,?,?,?)",
@@ -181,7 +190,7 @@ def create_user(
                 phone,
                 notes,
                 "Active",
-                datetime.now().isoformat(timespec="seconds"),
+                datetime.now().isoformat(timespec="microseconds"),
             ),
         )
 
@@ -200,12 +209,13 @@ def enable_user(user_id, user=None):
 
 @with_permission("users.reset_password")
 def reset_password(user_id, new_password, user=None):
+    _require_strong_password(new_password)
     with _db.get_conn() as conn:
         conn.execute(
             "UPDATE users SET password_hash=?, password_changed_at=? WHERE id=?",
             (
                 hash_password(new_password),
-                datetime.now().isoformat(timespec="seconds"),
+                datetime.now().isoformat(timespec="microseconds"),
                 user_id,
             ),
         )
