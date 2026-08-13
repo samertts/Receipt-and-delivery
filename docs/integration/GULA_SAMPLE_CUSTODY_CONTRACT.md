@@ -22,6 +22,12 @@ The authoritative transition map is implemented in `backend/app/domain/chain_of_
 
 The terminal states are `completed`, `rejected`, `lost`, and `cancelled`. A terminal sample cannot be reopened or silently edited. Any correction must be represented by a new auditable event or an explicit resolution workflow.
 
+## Operational endpoint
+
+`POST /api/v1/transactions/{transaction_id}/custody` records one validated transition. The caller supplies `sample_id`, `current_state`, `target_state`, `idempotency_key`, and an optional reason. The endpoint requires the existing `edit_transaction` permission and returns the persisted event.
+
+The service rejects an idempotency key reused for another transaction and rejects a stale `current_state` when a newer event exists for the sample.
+
 ## Integration boundary
 
 Receipt-and-delivery emits custody events. GULA consumes them to update the sample context. Neither receipt processing nor a custody event may approve a clinical result. Result approval remains restricted to the authorized clinical workflow in GULA.

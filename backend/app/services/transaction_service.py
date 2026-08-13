@@ -6,10 +6,13 @@ import json
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.core.audit import log_audit
 from app.core.exceptions import NotFoundError, ValidationError
+from app.domain.chain_of_custody import SampleState, create_custody_event
+from app.models.custody_event import CustodyEvent
 from app.models.transaction import Transaction
 from app.models.transaction_item import TransactionItem
 from app.models.user import User
@@ -201,6 +204,84 @@ class TransactionService:
             changes_json=json.dumps(changes) if changes else "",
         )
         return txn
+
+    def transition_custody(
+        self,
+        txn_id: str,
+        payload: dict[str, Any],
+        request: Any = None,
+        current_user: User | None = None,
+    ) -> CustodyEvent:
+        txn = self.repo.get(txn_id)
+        if not txn:
+            raise NotFoundError("المعاملة غير موجودة")
+
+        try:
+            current = SampleState(payload["current_state"])
+            target = SampleState(payload["target_state"])
+        except (KeyError, ValueError) as exc:
+            raise ValidationError("حالة العينة غير معروفة") from exc
+
+        idempotency_key = payload["idempotency_key"]
+        existing = (
+            self.db.query(CustodyEvent)
+            .filter(CustodyEvent.idempotency_key == idempotency_key)
+            .first()
+        )
+        if existing:
+            if str(existing.transaction_id) != str(txn.id):
+                raise ValidationError("مفتاح idempotency مستخدم لمعاملة أخرى")
+            return existing
+
+        latest = (
+            self.db.query(CustodyEvent)
+            .filter(CustodyEvent.sample_id == payload["sample_id"])
+            .order_by(desc(CustodyEvent.occurred_at), desc(CustodyEvent.created_at))
+            .first()
+        )
+        if latest and latest.to_state != current.value:
+            raise ValidationError(
+                f"تعارض في نسخة حالة العينة: الحالة الحالية هي {latest.to_state}"
+            )
+
+        event_data = create_custody_event(
+            sample_id=payload["sample_id"],
+            actor_id=str(current_user.id) if current_user else "system",
+            current=current,
+            target=target,
+            idempotency_key=idempotency_key,
+            reason=payload.get("reason", ""),
+            occurred_at=payload.get("occurred_at"),
+        )
+        event = CustodyEvent(
+            sample_id=event_data.sample_id,
+            transaction_id=str(txn.id),
+            actor_id=event_data.actor_id,
+            from_state=event_data.from_state.value,
+            to_state=event_data.to_state.value,
+            occurred_at=event_data.occurred_at,
+            idempotency_key=event_data.idempotency_key,
+            reason=event_data.reason,
+        )
+        self.db.add(event)
+        self.db.commit()
+        self.db.refresh(event)
+        log_audit(
+            user_id=str(current_user.id) if current_user else "system",
+            action_type="sample_custody_transition",
+            request=request,
+            details=f"انتقال عينة {event.sample_id}: {event.from_state} -> {event.to_state}",
+            db=self.db,
+            changes_json=json.dumps(
+                {
+                    "sample_id": event.sample_id,
+                    "from_state": event.from_state,
+                    "to_state": event.to_state,
+                    "idempotency_key": event.idempotency_key,
+                }
+            ),
+        )
+        return event
 
     def delete_transaction(
         self,

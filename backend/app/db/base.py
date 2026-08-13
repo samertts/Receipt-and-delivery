@@ -1,5 +1,6 @@
 from app.db.session import Base
 from app.models.attachment import Attachment
+from app.models.custody_event import CustodyEvent
 from app.models.audit_log import AuditLog
 from app.models.blacklisted_token import BlacklistedToken
 from app.models.organization import Organization
@@ -10,6 +11,7 @@ from app.models.user import User
 
 __all__ = [
     "Attachment",
+    "CustodyEvent",
     "AuditLog",
     "Base",
     "BlacklistedToken",

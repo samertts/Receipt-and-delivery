@@ -7,6 +7,8 @@ from app.core.response_envelope import paginated_response
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.transaction import (
+    CustodyEventResponse,
+    CustodyTransitionRequest,
     TransactionCreate,
     TransactionResponse,
     TransactionUpdate,
@@ -76,6 +78,23 @@ def update_transaction(
     return svc.update_transaction(
         txn_id,
         update_data=payload.model_dump(exclude_unset=True),
+        request=request,
+        current_user=current_user,
+    )
+
+
+@router.post("/{txn_id}/custody", response_model=CustodyEventResponse, status_code=201)
+def transition_custody(
+    txn_id: str,
+    payload: CustodyTransitionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("edit_transaction")),
+):
+    svc = get_transaction_service(db)
+    return svc.transition_custody(
+        txn_id,
+        payload=payload.model_dump(exclude_none=True),
         request=request,
         current_user=current_user,
     )
