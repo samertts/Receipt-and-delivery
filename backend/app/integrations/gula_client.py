@@ -21,7 +21,7 @@ class GulaEventClient:
         self.timeout = timeout
         self.max_retries = max_retries
 
-    def publish_custody_transition(
+    def build_custody_transition_envelope(
         self,
         *,
         sample_id: str,
@@ -35,7 +35,7 @@ class GulaEventClient:
         reason: str = "",
     ) -> dict[str, Any]:
         event_id = "evt-" + hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()[:32]
-        envelope = {
+        return {
             "event_id": event_id,
             "event_type": "sample.custody.transitioned",
             "schema_version": 1,
@@ -54,6 +54,31 @@ class GulaEventClient:
                 "reason": reason,
             },
         }
+
+    def publish_custody_transition(
+        self,
+        *,
+        sample_id: str,
+        transaction_id: str,
+        actor_id: str,
+        from_state: str,
+        to_state: str,
+        idempotency_key: str,
+        occurred_at: datetime,
+        tenant_id: str,
+        reason: str = "",
+    ) -> dict[str, Any]:
+        envelope = self.build_custody_transition_envelope(
+            sample_id=sample_id,
+            transaction_id=transaction_id,
+            actor_id=actor_id,
+            from_state=from_state,
+            to_state=to_state,
+            idempotency_key=idempotency_key,
+            occurred_at=occurred_at,
+            tenant_id=tenant_id,
+            reason=reason,
+        )
         headers = {"Authorization": f"Bearer {self.access_token}"}
         last_error: Exception | None = None
         for attempt in range(1, self.max_retries + 1):
@@ -66,7 +91,7 @@ class GulaEventClient:
                 )
                 response.raise_for_status()
                 return response.json()
-            except Exception as exc:
+            except (httpx.HTTPError, ValueError) as exc:
                 last_error = exc
                 if attempt < self.max_retries:
                     time.sleep(2 ** (attempt - 1))

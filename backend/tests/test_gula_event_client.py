@@ -42,3 +42,36 @@ def test_custody_transition_uses_canonical_envelope(monkeypatch):
     assert envelope["tenant_id"] == "tenant-1"
     assert envelope["idempotency_key"] == "custody-key-1"
     assert envelope["payload"]["to_state"] == "collected"
+
+
+
+def test_custody_envelope_is_stable_for_replay():
+    client = GulaEventClient("https://gula.example", "token")
+    occurred_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    first = client.build_custody_transition_envelope(
+        sample_id="sample-2",
+        transaction_id="txn-2",
+        actor_id="user-2",
+        from_state="collected",
+        to_state="in_transit",
+        idempotency_key="custody-replay-key",
+        occurred_at=occurred_at,
+        tenant_id="tenant-1",
+        reason="dispatch",
+    )
+    second = client.build_custody_transition_envelope(
+        sample_id="sample-2",
+        transaction_id="txn-2",
+        actor_id="user-2",
+        from_state="collected",
+        to_state="in_transit",
+        idempotency_key="custody-replay-key",
+        occurred_at=occurred_at,
+        tenant_id="tenant-1",
+        reason="dispatch",
+    )
+
+    assert first == second
+    assert first["event_id"].startswith("evt-")
+    assert first["payload"]["to_state"] == "in_transit"
