@@ -37,8 +37,19 @@ def get_organization_service(db: Session):
 
 def get_transaction_service(db: Session):
     from app.services.transaction_service import TransactionService
+    from app.core.config import settings
 
-    return TransactionService(db)
+    gula_client = None
+    if settings.gula_base_url and settings.gula_access_token:
+        from app.integrations.gula_client import GulaEventClient
+
+        gula_client = GulaEventClient(
+            base_url=settings.gula_base_url,
+            access_token=settings.gula_access_token,
+            timeout=settings.gula_timeout_seconds,
+            max_retries=settings.gula_max_retries,
+        )
+    return TransactionService(db, gula_client=gula_client, tenant_id=settings.gula_tenant_id)
 
 
 def get_audit_service(db: Session):

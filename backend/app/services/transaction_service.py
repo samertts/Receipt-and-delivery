@@ -20,9 +20,11 @@ from app.repositories import TransactionRepository
 
 
 class TransactionService:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, gula_client=None, tenant_id: str = "") -> None:
         self.db = db
         self.repo = TransactionRepository(db)
+        self.gula_client = gula_client
+        self.tenant_id = tenant_id
 
     def list_transactions(
         self,
@@ -266,6 +268,26 @@ class TransactionService:
         self.db.add(event)
         self.db.commit()
         self.db.refresh(event)
+        if self.gula_client and self.tenant_id:
+            delivery = self.gula_client.publish_custody_transition(
+                sample_id=event.sample_id,
+                transaction_id=str(txn.id),
+                actor_id=event.actor_id,
+                from_state=event.from_state,
+                to_state=event.to_state,
+                idempotency_key=event.idempotency_key,
+                occurred_at=event.occurred_at,
+                tenant_id=self.tenant_id,
+                reason=event.reason,
+            )
+            if delivery.get("status") == "failed":
+                # The local custody record remains authoritative for this service;
+                # retry/reconciliation can safely replay the same idempotency key.
+                import logging
+                logging.getLogger("receipt.gula").error(
+                    "GULA custody event delivery failed sample_id=%s", event.sample_id
+                )
+
         log_audit(
             user_id=str(current_user.id) if current_user else "system",
             action_type="sample_custody_transition",

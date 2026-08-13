@@ -65,6 +65,12 @@ class Settings(BaseSettings):
 
     redis_url: str = ""
 
+    gula_base_url: str = ""
+    gula_access_token: str = ""
+    gula_tenant_id: str = ""
+    gula_timeout_seconds: float = 5.0
+    gula_max_retries: int = 3
+
     backup_retention_days: int = 30
     auto_backup_enabled: bool = False
 
