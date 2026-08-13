@@ -80,6 +80,30 @@ class TransactionUpdate(BaseModel):
     items: Optional[list[TransactionItemUpdate]] = None
 
 
+class CustodyTransitionRequest(BaseModel):
+    sample_id: str = Field(..., min_length=1, max_length=120)
+    current_state: str = Field(..., min_length=1, max_length=40)
+    target_state: str = Field(..., min_length=1, max_length=40)
+    idempotency_key: str = Field(..., min_length=1, max_length=160)
+    reason: str = Field(default="", max_length=2000)
+    occurred_at: Optional[datetime] = None
+
+
+class CustodyEventResponse(BaseModel):
+    id: str
+    sample_id: str
+    transaction_id: Optional[str] = None
+    actor_id: str
+    from_state: str
+    to_state: str
+    occurred_at: datetime
+    idempotency_key: str
+    reason: str
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
 class TransactionResponse(BaseModel):
     id: str
     transaction_no: str

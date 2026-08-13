@@ -1,4 +1,5 @@
 from app.models.attachment import Attachment as Attachment  # noqa: F401
+from app.models.custody_event import CustodyEvent as CustodyEvent  # noqa: F401
 from app.models.audit_log import AuditLog as AuditLog  # noqa: F401
 from app.models.blacklisted_token import BlacklistedToken as BlacklistedToken  # noqa: F401
 from app.models.organization import Organization as Organization  # noqa: F401
