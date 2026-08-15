@@ -36,7 +36,7 @@ def log_audit(
     changes_json: str = "",
     db: Optional[Session] = None,
 ) -> None:
-    ip_address = request.client.host if request and request.client else "0.0.0.0"
+    ip_address = request.client.host if request and request.client else "unknown"
     close_db = False
     if db is None:
         db = SessionLocal()
