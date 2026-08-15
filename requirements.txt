@@ -1,5 +1,5 @@
 PySide6==6.9.0
-reportlab==4.4.0
+reportlab==4.5.1
 qrcode==8.2
 python-barcode==0.15.1
 Pillow==12.3.0
@@ -11,3 +11,7 @@ pytest-cov==6.1.1
 ruff==0.11.0
 bandit==1.8.3
 pip-audit==2.9.0
+pypdf==6.16.1
+xhtml2pdf==0.2.17
+setuptools==84.0.0
+wheel==0.48.0
