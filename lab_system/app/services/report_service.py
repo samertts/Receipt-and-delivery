@@ -8,32 +8,47 @@ EXPORT_DIR = STORAGE_DIR / "exports"
 
 
 def _where_clause(date_from="", date_to=""):
-    where = ["(r.deleted_at IS NULL OR r.deleted_at = '')"]
-    params = []
-    if date_from:
-        where.append("r.created_at >= ?")
-        params.append(f"{date_from}T00:00:00")
-    if date_to:
-        where.append("r.created_at <= ?")
-        params.append(f"{date_to}T23:59:59")
-    return " AND ".join(where), params
+    """Return a fixed SQL predicate and bound values for optional date filters."""
+    params = [
+        date_from,
+        f"{date_from}T00:00:00" if date_from else "",
+        date_to,
+        f"{date_to}T23:59:59" if date_to else "",
+    ]
+    return (
+        "(r.deleted_at IS NULL OR r.deleted_at = '') "
+        "AND (? = '' OR r.created_at >= ?) "
+        "AND (? = '' OR r.created_at <= ?)",
+        params,
+    )
 
 
 def receipt_summary(date_from="", date_to="", group_by="day"):
     clauses, params = _where_clause(date_from, date_to)
     with _db.get_conn() as conn:
         by_status = conn.execute(
-            f"SELECT r.status, COUNT(*) cnt FROM receipts r WHERE {clauses} GROUP BY r.status",
+            """SELECT r.status, COUNT(*) cnt
+                FROM receipts r
+                WHERE (r.deleted_at IS NULL OR r.deleted_at = '')
+                    AND (? = '' OR r.created_at >= ?)
+                    AND (? = '' OR r.created_at <= ?)
+                GROUP BY r.status""",
             params,
         ).fetchall()
         by_type = conn.execute(
-            f"""SELECT t.name tx_type, COUNT(*) cnt
+            """SELECT t.name tx_type, COUNT(*) cnt
                 FROM receipts r JOIN transaction_types t ON t.id=r.tx_type_id
-                WHERE {clauses} GROUP BY t.name""",
+                WHERE (r.deleted_at IS NULL OR r.deleted_at = '')
+                    AND (? = '' OR r.created_at >= ?)
+                    AND (? = '' OR r.created_at <= ?) GROUP BY t.name""",
             params,
         ).fetchall()
         total = conn.execute(
-            f"SELECT COUNT(*) c FROM receipts r WHERE {clauses}",
+            """SELECT COUNT(*) c
+                FROM receipts r
+                WHERE (r.deleted_at IS NULL OR r.deleted_at = '')
+                    AND (? = '' OR r.created_at >= ?)
+                    AND (? = '' OR r.created_at <= ?)""",
             params,
         ).fetchone()["c"]
     return {
@@ -47,11 +62,13 @@ def daily_report(date_from="", date_to=""):
     clauses, params = _where_clause(date_from, date_to)
     with _db.get_conn() as conn:
         rows = conn.execute(
-            f"""SELECT DATE(r.created_at) day,
+            """SELECT DATE(r.created_at) day,
                        COUNT(*) total,
                        SUM(CASE WHEN r.status='Approved' THEN 1 ELSE 0 END) approved,
                        SUM(CASE WHEN r.status='Rejected' THEN 1 ELSE 0 END) rejected
-                FROM receipts r WHERE {clauses}
+                FROM receipts r WHERE (r.deleted_at IS NULL OR r.deleted_at = '')
+                    AND (? = '' OR r.created_at >= ?)
+                    AND (? = '' OR r.created_at <= ?)
                 GROUP BY day ORDER BY day DESC""",
             params,
         ).fetchall()
@@ -60,17 +77,18 @@ def daily_report(date_from="", date_to=""):
 
 def monthly_report(year=None):
     clauses, params = _where_clause()
-    year_filter = ""
-    if year:
-        year_filter = " AND SUBSTR(r.created_at,1,4)=?"
-        params.append(str(year))
+    year_value = str(year) if year is not None else ""
+    params.extend([year_value, year_value])
     with _db.get_conn() as conn:
         rows = conn.execute(
-            f"""SELECT SUBSTR(r.created_at,1,7) month,
+            """SELECT SUBSTR(r.created_at,1,7) month,
                        COUNT(*) total,
                        SUM(CASE WHEN r.status='Approved' THEN 1 ELSE 0 END) approved,
                        SUM(CASE WHEN r.status='Rejected' THEN 1 ELSE 0 END) rejected
-                FROM receipts r WHERE {clauses} {year_filter}
+                FROM receipts r WHERE (r.deleted_at IS NULL OR r.deleted_at = '')
+                    AND (? = '' OR r.created_at >= ?)
+                    AND (? = '' OR r.created_at <= ?)
+                    AND (? = '' OR SUBSTR(r.created_at,1,4) = ?)
                 GROUP BY month ORDER BY month DESC""",
             params,
         ).fetchall()
@@ -81,15 +99,19 @@ def institution_statistics(date_from="", date_to=""):
     clauses, params = _where_clause(date_from, date_to)
     with _db.get_conn() as conn:
         senders = conn.execute(
-            f"""SELECT so.name org_name, COUNT(*) cnt
+            """SELECT so.name org_name, COUNT(*) cnt
                 FROM receipts r JOIN organizations so ON so.id=r.sender_org_id
-                WHERE {clauses} GROUP BY so.name ORDER BY cnt DESC""",
+                WHERE (r.deleted_at IS NULL OR r.deleted_at = '')
+                    AND (? = '' OR r.created_at >= ?)
+                    AND (? = '' OR r.created_at <= ?) GROUP BY so.name ORDER BY cnt DESC""",
             params,
         ).fetchall()
         receivers = conn.execute(
-            f"""SELECT ro.name org_name, COUNT(*) cnt
+            """SELECT ro.name org_name, COUNT(*) cnt
                 FROM receipts r JOIN organizations ro ON ro.id=r.receiver_org_id
-                WHERE {clauses} GROUP BY ro.name ORDER BY cnt DESC""",
+                WHERE (r.deleted_at IS NULL OR r.deleted_at = '')
+                    AND (? = '' OR r.created_at >= ?)
+                    AND (? = '' OR r.created_at <= ?) GROUP BY ro.name ORDER BY cnt DESC""",
             params,
         ).fetchall()
     return {
@@ -102,14 +124,16 @@ def rejection_statistics(date_from="", date_to=""):
     clauses, params = _where_clause(date_from, date_to)
     with _db.get_conn() as conn:
         rows = conn.execute(
-            f"""SELECT st.name sample_name,
+            """SELECT st.name sample_name,
                        SUM(ri.rejected_count) total_rejected,
                        SUM(ri.total_count) total_samples,
                        ROUND(CAST(SUM(ri.rejected_count) AS REAL) / NULLIF(SUM(ri.total_count),0) * 100, 1) rejection_pct
                 FROM receipt_items ri
                 JOIN receipts r ON r.id=ri.receipt_id
                 JOIN sample_types st ON st.id=ri.sample_type_id
-                WHERE {clauses}
+                WHERE (r.deleted_at IS NULL OR r.deleted_at = '')
+                    AND (? = '' OR r.created_at >= ?)
+                    AND (? = '' OR r.created_at <= ?)
                 GROUP BY st.name ORDER BY total_rejected DESC""",
             params,
         ).fetchall()
@@ -120,14 +144,16 @@ def damage_statistics(date_from="", date_to=""):
     clauses, params = _where_clause(date_from, date_to)
     with _db.get_conn() as conn:
         rows = conn.execute(
-            f"""SELECT st.name sample_name,
+            """SELECT st.name sample_name,
                        SUM(ri.damaged_count) total_damaged,
                        SUM(ri.total_count) total_samples,
                        ROUND(CAST(SUM(ri.damaged_count) AS REAL) / NULLIF(SUM(ri.total_count),0) * 100, 1) damage_pct
                 FROM receipt_items ri
                 JOIN receipts r ON r.id=ri.receipt_id
                 JOIN sample_types st ON st.id=ri.sample_type_id
-                WHERE {clauses}
+                WHERE (r.deleted_at IS NULL OR r.deleted_at = '')
+                    AND (? = '' OR r.created_at >= ?)
+                    AND (? = '' OR r.created_at <= ?)
                 GROUP BY st.name ORDER BY total_damaged DESC""",
             params,
         ).fetchall()
@@ -138,7 +164,7 @@ def sample_summary(date_from="", date_to=""):
     clauses, params = _where_clause(date_from, date_to)
     with _db.get_conn() as conn:
         rows = conn.execute(
-            f"""SELECT st.name sample_name,
+            """SELECT st.name sample_name,
                        SUM(ri.total_count) total,
                        SUM(ri.valid_count) valid,
                        SUM(ri.damaged_count) damaged,
@@ -147,7 +173,9 @@ def sample_summary(date_from="", date_to=""):
                 FROM receipt_items ri
                 JOIN receipts r ON r.id=ri.receipt_id
                 JOIN sample_types st ON st.id=ri.sample_type_id
-                WHERE {clauses}
+                WHERE (r.deleted_at IS NULL OR r.deleted_at = '')
+                    AND (? = '' OR r.created_at >= ?)
+                    AND (? = '' OR r.created_at <= ?)
                 GROUP BY st.name ORDER BY total DESC""",
             params,
         ).fetchall()

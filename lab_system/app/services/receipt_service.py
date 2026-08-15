@@ -473,7 +473,7 @@ def list_receipts(
             f"""SELECT COUNT(*) c FROM receipts r
                 JOIN organizations so ON so.id=r.sender_org_id
                 JOIN organizations ro ON ro.id=r.receiver_org_id
-                WHERE {clauses}""",
+                WHERE {clauses}""",  # nosec B608 - clauses are assembled from fixed fragments and bound values
             params,
         ).fetchone()["c"]
         rows = conn.execute(
@@ -483,7 +483,7 @@ def list_receipts(
                 JOIN organizations ro ON ro.id=r.receiver_org_id
                 JOIN transaction_types t ON t.id=r.tx_type_id
                 WHERE {clauses}
-                ORDER BY r.id DESC LIMIT ? OFFSET ?""",
+                ORDER BY r.id DESC LIMIT ? OFFSET ?""",  # nosec B608 - clauses are assembled from fixed fragments and bound values
             [*params, page_size, off],
         ).fetchall()
     return [dict(r) for r in rows], total

@@ -334,11 +334,25 @@ class NationalNetworkService:
                 result["error"] = f"Referral {referral_no} not found"
                 return result
             now = datetime.now().isoformat(timespec="seconds")
-            timestamp_field = f"{new_status}_at" if new_status != "pending" else ""
-            conn.execute(
-                f"UPDATE referrals SET status=?, {timestamp_field}=? WHERE referral_no=?",
-                (new_status, now, referral_no),
-            )
+            timestamp_fields = {
+                "accepted": "accepted_at",
+                "in_transit": "in_transit_at",
+                "received": "received_at",
+                "completed": "completed_at",
+                "rejected": "rejected_at",
+                "cancelled": "cancelled_at",
+            }
+            timestamp_field = timestamp_fields.get(new_status)
+            if timestamp_field:
+                conn.execute(
+                    f"UPDATE referrals SET status=?, {timestamp_field}=? WHERE referral_no=?",  # nosec B608
+                    (new_status, now, referral_no),
+                )
+            else:
+                conn.execute(
+                    "UPDATE referrals SET status=? WHERE referral_no=?",
+                    (new_status, referral_no),
+                )
             conn.commit()
             result["success"] = True
         except Exception as e:

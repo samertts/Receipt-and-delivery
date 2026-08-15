@@ -127,9 +127,13 @@ def check_network(host: str = "https://google.com", timeout: int = 5) -> dict:
     try:
         import time
 
+        parsed = urllib.parse.urlparse(host)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            result["error"] = "host must be an absolute http(s) URL"
+            return result
         start = time.time()
         req = urllib.request.Request(host, method="HEAD")
-        with urllib.request.urlopen(req, timeout=timeout):
+        with urllib.request.urlopen(req, timeout=timeout):  # nosec B310
             result["latency_ms"] = int((time.time() - start) * 1000)
             result["reachable"] = True
     except (urllib.error.URLError, urllib.error.HTTPError, OSError) as e:

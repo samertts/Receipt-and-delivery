@@ -46,6 +46,9 @@ class APIClient:
         return self._enabled
 
     def enable(self, base_url: str, token: str = "", timeout: int = 30) -> None:
+        parsed = urllib.parse.urlparse(base_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("base_url must be an absolute http(s) URL")
         self.base_url = base_url.rstrip("/")
         self._token = token
         self.timeout = timeout
@@ -91,7 +94,8 @@ class APIClient:
         for attempt in range(max_retries):
             req = urllib.request.Request(url, data=body, headers=headers, method=method)
             try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                # The URL scheme is validated in enable(); urllib remains the transport.
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # nosec B310
                     resp_body = resp.read().decode("utf-8")
                     resp_data: dict[str, Any] = {}
                     if resp_body:

@@ -408,8 +408,10 @@ def migrate_db(conn: sqlite3.Connection) -> None:
 
 
 def _recreate_table_with_fk(conn: sqlite3.Connection, table: str) -> None:
+    if not table or not table.replace("_", "").isalnum() or table[0].isdigit():
+        raise ValueError("invalid SQLite table identifier")
     fk_map = {"user_id": "users(id)", "created_by": "users(id)"}
-    cols = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    cols = conn.execute(f"PRAGMA table_info({table})").fetchall()  # nosec B608
     if not cols:
         return
     col_defs = []
@@ -430,12 +432,12 @@ def _recreate_table_with_fk(conn: sqlite3.Connection, table: str) -> None:
             parts.append(f"REFERENCES {ref}")
         col_defs.append(" ".join(parts))
     ddl = f"CREATE TABLE IF NOT EXISTS _new ({', '.join(col_defs)})"
-    conn.execute(f"SAVEPOINT sp_fk_{table}")
-    conn.execute(ddl)
-    conn.execute(f"INSERT OR IGNORE INTO _new SELECT * FROM {table}")
-    conn.execute(f"DROP TABLE {table}")
-    conn.execute(f"ALTER TABLE _new RENAME TO {table}")
-    conn.execute(f"RELEASE sp_fk_{table}")
+    conn.execute(f"SAVEPOINT sp_fk_{table}")  # nosec B608
+    conn.execute(ddl)  # nosec B608
+    conn.execute(f"INSERT OR IGNORE INTO _new SELECT * FROM {table}")  # nosec B608
+    conn.execute(f"DROP TABLE {table}")  # nosec B608
+    conn.execute(f"ALTER TABLE _new RENAME TO {table}")  # nosec B608
+    conn.execute(f"RELEASE sp_fk_{table}")  # nosec B608
 
 
 def _backup_before_migration():

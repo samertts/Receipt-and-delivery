@@ -81,7 +81,7 @@ class SyncService:
         idempotency_key = str(uuid.uuid4())
         with _db.get_conn() as conn:
             conn.execute(
-                f"""INSERT INTO {SYNC_QUEUE_TABLE}
+                """INSERT INTO sync_queue
                     (entity_type, entity_id, action, payload, idempotency_key, status, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (
@@ -100,7 +100,7 @@ class SyncService:
         """Return pending entries that have not exceeded max retries and are eligible for retry."""
         with _db.get_conn() as conn:
             rows = conn.execute(
-                f"""SELECT * FROM {SYNC_QUEUE_TABLE}
+                """SELECT * FROM sync_queue
                     WHERE status = ?
                       AND retry_count < ?
                       AND (synced_at = '' OR
@@ -119,7 +119,7 @@ class SyncService:
     def mark_synced(self, entry_id: int) -> None:
         with _db.get_conn() as conn:
             conn.execute(
-                f"UPDATE {SYNC_QUEUE_TABLE} SET status=?, retry_count=0, synced_at=? WHERE id=?",
+                "UPDATE sync_queue SET status=?, retry_count=0, synced_at=? WHERE id=?",
                 (SYNC_STATUS_SYNCED, _utcnow(), entry_id),
             )
 
@@ -132,7 +132,7 @@ class SyncService:
                 conn.execute("BEGIN")
                 for entry_id in entry_ids:
                     conn.execute(
-                        f"UPDATE {SYNC_QUEUE_TABLE} SET status=?, retry_count=0, synced_at=? WHERE id=?",
+                        "UPDATE sync_queue SET status=?, retry_count=0, synced_at=? WHERE id=?",
                         (SYNC_STATUS_SYNCED, _utcnow(), entry_id),
                     )
                 conn.commit()
@@ -143,18 +143,18 @@ class SyncService:
     def mark_conflict(self, entry_id: int, details: str = "") -> None:
         with _db.get_conn() as conn:
             conn.execute(
-                f"UPDATE {SYNC_QUEUE_TABLE} SET status=?, payload=? WHERE id=?",
+                "UPDATE sync_queue SET status=?, payload=? WHERE id=?",
                 (SYNC_STATUS_CONFLICT, details, entry_id),
             )
 
     def increment_retry(self, entry_id: int) -> int:
         with _db.get_conn() as conn:
             conn.execute(
-                f"UPDATE {SYNC_QUEUE_TABLE} SET retry_count = retry_count + 1, synced_at=? WHERE id=?",
+                "UPDATE sync_queue SET retry_count = retry_count + 1, synced_at=? WHERE id=?",
                 (_utcnow(), entry_id),
             )
             row = conn.execute(
-                f"SELECT retry_count FROM {SYNC_QUEUE_TABLE} WHERE id=?",
+                "SELECT retry_count FROM sync_queue WHERE id=?",
                 (entry_id,),
             ).fetchone()
             return row["retry_count"] if row else 0
@@ -162,7 +162,7 @@ class SyncService:
     def clear_synced(self, older_than_seconds: int = 0) -> int:
         with _db.get_conn() as conn:
             cur = conn.execute(
-                f"""DELETE FROM {SYNC_QUEUE_TABLE}
+                """DELETE FROM sync_queue
                     WHERE status = ? AND synced_at < datetime('now', ?)""",
                 (SYNC_STATUS_SYNCED, f"-{max(older_than_seconds, 0)} seconds"),
             )
@@ -171,8 +171,8 @@ class SyncService:
     def get_stats(self) -> dict[str, int]:
         with _db.get_conn() as conn:
             rows = conn.execute(
-                f"""SELECT status, COUNT(*) as cnt
-                    FROM {SYNC_QUEUE_TABLE}
+                """SELECT status, COUNT(*) as cnt
+                    FROM sync_queue
                     GROUP BY status""",
             ).fetchall()
         stats: dict[str, int] = {}
