@@ -133,6 +133,9 @@ except (ImportError, Exception) as e:
 
 
 async def rate_limit_middleware(request: Request, call_next):
+    if os.environ.get("TESTING") and not os.environ.get("RATE_LIMIT_FORCE_ENABLED"):
+        return await call_next(request)
+
     if os.environ.get("RATE_LIMIT_DISABLED"):
         if settings.environment.lower() in {"prod", "production", "staging"}:
             return JSONResponse(

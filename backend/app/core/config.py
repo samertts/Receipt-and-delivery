@@ -82,7 +82,7 @@ class Settings(BaseSettings):
 
     @property
     def effective_secret_key(self) -> str:
-        if not self.secret_key or self.secret_key == "change-me":
+        if not self.secret_key or self.secret_key == "change-me":  # nosec B105 - development sentinel only
             if self.environment.lower() in {"prod", "production", "staging"}:
                 raise ValueError("SECRET_KEY must be configured securely outside development")
             # Persist auto-generated key only for local development so it survives restarts.

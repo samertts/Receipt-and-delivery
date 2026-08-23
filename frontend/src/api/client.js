@@ -30,10 +30,30 @@ function processQueue(error, token = null) {
 }
 
 client.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const envelope = response.data
+    if (
+      envelope &&
+      typeof envelope === 'object' &&
+      envelope.success === true &&
+      Object.prototype.hasOwnProperty.call(envelope, 'data')
+    ) {
+      response.envelope = envelope
+      response.meta = envelope.meta || {}
+      response.message = envelope.message || ''
+      response.data = envelope.data
+    }
+    return response
+  },
   async (error) => {
-    const originalRequest = error.config
-    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url.endsWith('/auth/refresh')) {
+    const originalRequest = error.config || {}
+    const errorPayload = error.response?.data
+    if (errorPayload && typeof errorPayload === 'object') {
+      error.apiMessage = errorPayload.message || errorPayload.detail || 'حدث خطأ غير متوقع'
+      error.apiErrorCode = errorPayload.meta?.error_code || errorPayload.error_code || ''
+      if (!errorPayload.detail) errorPayload.detail = error.apiMessage
+    }
+    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.endsWith('/auth/refresh')) {
       originalRequest._retry = true
       const refreshToken = getRefreshToken()
       if (!refreshToken) {

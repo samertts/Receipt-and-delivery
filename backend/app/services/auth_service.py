@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 from jose import jwt, ExpiredSignatureError, JWTError
 from sqlalchemy.orm import Session
@@ -113,7 +113,7 @@ class AuthService:
         current_password: str,
         new_password: str,
         current_user: User,
-        token: str = "",
+        token: Optional[str] = None,
         request: Any = None,
     ) -> None:
         if not verify_password(current_password, current_user.password_hash):
