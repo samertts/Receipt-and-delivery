@@ -11,6 +11,7 @@ from app.api.v1 import (
     attachments,
     dashboard,
     health,
+    notifications,
     organizations,
     reports,
     sync,
@@ -160,6 +161,7 @@ app.include_router(audit.router, prefix="/api")
 app.include_router(sync.router, prefix="/api")
 app.include_router(attachments.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 
 app.include_router(auth.router, prefix="/api/v1")
@@ -170,6 +172,7 @@ app.include_router(audit.router, prefix="/api/v1")
 app.include_router(sync.router, prefix="/api/v1")
 app.include_router(attachments.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
+app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(health.router, prefix="/api")
 app.include_router(health.router, prefix="/api/v1")

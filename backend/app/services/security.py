@@ -1,12 +1,26 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from jose import jwt
+from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def decode_access_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(
+            token,
+            settings.effective_secret_key,
+            algorithms=[settings.algorithm],
+        )
+    except JWTError:
+        return {}
+    if payload.get("type") != "access" or not payload.get("sub"):
+        return {}
+    return payload
 
 
 def verify_password(plain: str, hashed: str) -> bool:

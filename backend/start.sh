@@ -9,7 +9,7 @@ echo "Starting uvicorn..."
 exec uvicorn app.main:app \
     --host 0.0.0.0 \
     --port 8000 \
-    --workers 4 \
+    --workers "${WEB_CONCURRENCY:-1}" \
     --log-level info \
     --proxy-headers \
     --forwarded-allow-ips='*'

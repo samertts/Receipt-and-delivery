@@ -1,6 +1,7 @@
 <template>
   <div class="min-h-screen bg-slate-50" dir="rtl">
     <div v-if="auth.isAuthenticated" class="flex h-screen overflow-hidden">
+      <NotificationCenter />
       <Sidebar
         :collapsed="ui.sidebarCollapsed"
         @toggle="ui.toggleSidebar"
@@ -21,6 +22,7 @@ import { useAuthStore } from '../stores/auth'
 import { useUiStore } from '../stores/ui'
 import Sidebar from './Sidebar.vue'
 import Toast from './Toast.vue'
+import NotificationCenter from './NotificationCenter.vue'
 
 const auth = useAuthStore()
 const ui = useUiStore()

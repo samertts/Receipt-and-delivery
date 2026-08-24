@@ -73,6 +73,39 @@ Authenticate user and receive JWT token.
 
 ---
 
+## Real-time Notifications
+
+### WebSocket /api/ws/notifications
+
+يفتح المستخدم المصادق عليه اتصال WebSocket لاستقبال تغيّرات المعاملات فور حدوثها. بسبب قيود متصفح WebSocket، يُمرَّر access token في query parameter أثناء المصافحة:
+
+```text
+ws://localhost:8000/api/ws/notifications?token=<access-token>
+```
+
+في الإنتاج يُستخدم `wss://` تلقائيًا عبر نفس مضيف الواجهة. يرسل الخادم رسالة `connected` بعد نجاح الاتصال، ويدعم رسالة `ping` من العميل ويرد عليها بـ `pong` للحفاظ على الاتصال.
+
+**رسالة تغيير معاملة:**
+
+```json
+{
+  "id": "notification-uuid",
+  "type": "transaction",
+  "event": "created|updated|status_changed|deleted",
+  "title": "تم تحديث معاملة",
+  "message": "TXN-... — الحالة: approved",
+  "transaction_id": "uuid",
+  "transaction_no": "TXN-...",
+  "status": "approved",
+  "actor_username": "admin",
+  "created_at": "2026-08-24T20:00:00+00:00"
+}
+```
+
+يتم رفض الرموز المنتهية أو المبطلَة والحسابات غير النشطة برمز إغلاق WebSocket `1008`. التشغيل الافتراضي يستخدم عامل Backend واحدًا للحفاظ على مشاركة اتصالات WebSocket داخل العملية؛ عند استخدام عدة عمال أو عدة نسخ يجب إضافة broker مركزي مثل Redis للبث بين العمليات.
+
+---
+
 ## Transactions
 
 ### GET /api/transactions
