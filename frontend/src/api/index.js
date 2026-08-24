@@ -39,6 +39,12 @@ export const dashboardApi = {
   summary: (params = {}) => client.get('/dashboard/summary', { params }),
 }
 
+export const reportsApi = {
+  summary: (params = {}) => client.get('/reports/summary', { params }),
+  exportExcel: (params = {}) => client.get('/reports/transactions.xlsx', { params, responseType: 'blob' }),
+  exportPdf: (params = {}) => client.get('/reports/transactions.pdf', { params, responseType: 'blob' }),
+}
+
 export const healthApi = {
   check: () => client.get('/health'),
 }
