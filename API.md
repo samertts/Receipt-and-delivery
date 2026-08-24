@@ -30,6 +30,49 @@ Authenticate user and receive JWT token.
 
 ---
 
+## Dashboard
+
+### GET /api/dashboard/summary
+
+إرجاع مؤشرات لوحة التحكم وبيانات الرسوم البيانية للمستخدمين المصرح لهم برؤية لوحة التحكم.
+
+**Query Parameters:**
+
+| Param | Type | Description |
+|---|---|---|
+| days | int | عدد أيام الاتجاه اليومي، من 7 إلى 90، والقيمة الافتراضية 7 |
+
+**Response data:**
+
+```json
+{
+  "summary": {
+    "total_transactions": 125,
+    "total_organizations": 18,
+    "by_status": {
+      "approved": 80,
+      "draft": 20,
+      "rejected": 10,
+      "archived": 10,
+      "cancelled": 5
+    }
+  },
+  "trends": {
+    "total": 12,
+    "approved": 8,
+    "draft": -4,
+    "orgs": 3
+  },
+  "trend": [{"date": "2026-08-24", "count": 16}],
+  "by_type": [{"key": "استلام", "count": 70}],
+  "recent_transactions": []
+}
+```
+
+تُرجع الواجهة الخلفية هذه البيانات داخل غلاف الاستجابة القياسي `{success, message, data, meta}`. يتطلب endpoint صلاحية `view_dashboard`.
+
+---
+
 ## Transactions
 
 ### GET /api/transactions

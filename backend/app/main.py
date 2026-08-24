@@ -9,6 +9,7 @@ from app.api.v1 import (
     audit,
     auth,
     attachments,
+    dashboard,
     health,
     organizations,
     reports,
@@ -158,6 +159,7 @@ app.include_router(transactions.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 app.include_router(sync.router, prefix="/api")
 app.include_router(attachments.router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 
 app.include_router(auth.router, prefix="/api/v1")
@@ -167,6 +169,7 @@ app.include_router(transactions.router, prefix="/api/v1")
 app.include_router(audit.router, prefix="/api/v1")
 app.include_router(sync.router, prefix="/api/v1")
 app.include_router(attachments.router, prefix="/api/v1")
+app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(health.router, prefix="/api")
 app.include_router(health.router, prefix="/api/v1")

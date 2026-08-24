@@ -107,6 +107,53 @@
         </div>
       </div>
 
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6" data-testid="dashboard-charts">
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6" aria-labelledby="daily-trend-title">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 id="daily-trend-title" class="text-lg font-semibold text-slate-800">الاتجاه اليومي للمعاملات</h2>
+              <p class="text-xs text-slate-500 mt-1">عدد المعاملات المسجلة خلال آخر سبعة أيام</p>
+            </div>
+            <span class="text-xs text-slate-400">{{ trend.reduce((sum, item) => sum + item.count, 0) }} معاملة</span>
+          </div>
+          <div v-if="trend.length" class="overflow-x-auto" role="img" aria-label="رسم بياني يوضح عدد المعاملات لكل يوم">
+            <svg class="w-full min-w-[520px] h-64" viewBox="0 0 660 260" preserveAspectRatio="none">
+              <line v-for="level in [0, 1, 2, 3, 4]" :key="level" x1="36" :y1="trendGridY(level)" x2="648" :y2="trendGridY(level)" stroke="#e2e8f0" stroke-width="1" />
+              <text v-for="level in [0, 1, 2, 3, 4]" :key="`label-${level}`" x="30" :y="trendGridY(level) + 4" text-anchor="end" class="fill-slate-400 text-[10px]">{{ Math.round((trendMax * (4 - level)) / 4) }}</text>
+              <g v-for="(item, index) in trend" :key="item.date">
+                <rect :x="trendX(index)" :y="trendY(item.count)" width="48" :height="trendBarHeight(item.count)" rx="6" fill="#2563eb" opacity="0.88">
+                  <title>{{ trendLabel(item.date) }}: {{ item.count }}</title>
+                </rect>
+                <text :x="trendX(index) + 24" y="246" text-anchor="middle" class="fill-slate-500 text-[10px]">{{ trendLabel(item.date) }}</text>
+              </g>
+            </svg>
+          </div>
+          <div v-else class="text-center py-16 text-slate-400 text-sm">لا توجد بيانات كافية لعرض الاتجاه</div>
+        </section>
+
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6" aria-labelledby="type-breakdown-title">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 id="type-breakdown-title" class="text-lg font-semibold text-slate-800">توزيع أنواع المعاملات</h2>
+              <p class="text-xs text-slate-500 mt-1">أكثر أنواع المعاملات استخدامًا</p>
+            </div>
+            <span class="text-xs text-slate-400">{{ byType.length }} أنواع</span>
+          </div>
+          <div v-if="typeBars.length" class="space-y-4">
+            <div v-for="item in typeBars" :key="item.key">
+              <div class="flex items-center justify-between gap-3 text-sm mb-1">
+                <span class="text-slate-700 truncate" :title="item.key">{{ item.key }}</span>
+                <span class="text-slate-500 font-semibold tabular-nums">{{ item.count }}</span>
+              </div>
+              <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden" role="progressbar" :aria-valuenow="item.percent" aria-valuemin="0" aria-valuemax="100" :aria-label="`${item.key}: ${item.count}`">
+                <div class="h-full rounded-full bg-indigo-500 transition-all duration-500" :style="{ width: `${item.percent}%` }"></div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="text-center py-16 text-slate-400 text-sm">لا توجد بيانات لأنواع المعاملات</div>
+        </section>
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div class="flex items-center justify-between mb-4">
@@ -200,10 +247,10 @@
 </template>
 
 <script setup>
-import { ref, shallowRef, onMounted } from 'vue'
+import { computed, ref, shallowRef, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { transactionsApi, organizationsApi } from '../api'
+import { dashboardApi } from '../api'
 import { statusLabel, statusClass, formatDate } from '../composables/useStatus'
 import { ICONS } from '../composables/useIcons'
 import { L } from '../composables/useLocale'
@@ -217,109 +264,81 @@ const stats = shallowRef({ totalTransactions: 0, approved: 0, draft: 0, rejected
 const trends = ref({ total: 0, approved: 0, draft: 0, orgs: 0 })
 const recentTransactions = ref([])
 const statusDistribution = ref([])
-const periodComparison = ref({ today: 0, yesterday: 0, thisWeek: 0, lastWeek: 0 })
+const trend = ref([])
+const byType = ref([])
+const trendMax = computed(() => Math.max(...trend.value.map((item) => item.count), 1))
+const typeBars = computed(() => {
+  const max = Math.max(...byType.value.map((item) => item.count), 1)
+  return byType.value.map((item) => ({ ...item, percent: Math.round((item.count / max) * 100) }))
+})
 
-function fmtDate(d) {
-  return d.toISOString().slice(0, 10)
+function trendX(index) {
+  return 44 + index * 86
 }
 
-function getWeekRange(date) {
-  const start = new Date(date)
-  start.setDate(date.getDate() - date.getDay())
-  const end = new Date(start)
-  end.setDate(start.getDate() + 7)
-  return { start: fmtDate(start), end: fmtDate(end) }
+function trendY(count) {
+  return 220 - trendBarHeight(count)
 }
 
-async function loadPeriodComparison() {
-  const now = new Date()
-  const today = fmtDate(now)
-  const yesterday = fmtDate(new Date(now.getTime() - 86400000))
-  const thisWeek = getWeekRange(now)
-  const lastWeekStart = new Date(now.getTime() - 7 * 86400000)
-  const lastWeekEnd = new Date(lastWeekStart.getTime() + 7 * 86400000)
-  const lastWeek = { start: fmtDate(lastWeekStart), end: fmtDate(lastWeekEnd) }
+function trendBarHeight(count) {
+  return Math.max(4, Math.round((Number(count || 0) / trendMax.value) * 190))
+}
 
-  try {
-    const [todayRes, yesterdayRes, thisWeekRes, lastWeekRes] = await Promise.all([
-      transactionsApi.list({ limit: 1, date: today }),
-      transactionsApi.list({ limit: 1, date: yesterday }),
-      transactionsApi.list({ limit: 1, date_from: thisWeek.start, date_to: thisWeek.end }),
-      transactionsApi.list({ limit: 1, date_from: lastWeek.start, date_to: lastWeek.end }),
-    ])
-    periodComparison.value = {
-      today: parseInt(todayRes.headers['x-total-count'] || 0),
-      yesterday: parseInt(yesterdayRes.headers['x-total-count'] || 0),
-      thisWeek: parseInt(thisWeekRes.headers['x-total-count'] || 0),
-      lastWeek: parseInt(lastWeekRes.headers['x-total-count'] || 0),
-    }
-  } catch {
-    periodComparison.value = { today: 0, yesterday: 0, thisWeek: 0, lastWeek: 0 }
-  }
+function trendGridY(level) {
+  return 30 + level * 47.5
+}
+
+function trendLabel(value) {
+  const date = new Date(`${value}T00:00:00`)
+  return new Intl.DateTimeFormat('ar-IQ', { day: 'numeric', month: 'short' }).format(date)
 }
 
 async function loadData() {
   loading.value = true
   error.value = null
   try {
-    const [txRes, orgRes, approvedRes, draftRes, rejectedRes, archivedRes, cancelledRes] = await Promise.all([
-      transactionsApi.list({ limit: 5 }),
-      organizationsApi.list({ limit: 1 }),
-      transactionsApi.list({ limit: 1, status: 'approved' }),
-      transactionsApi.list({ limit: 1, status: 'draft' }),
-      transactionsApi.list({ limit: 1, status: 'rejected' }),
-      transactionsApi.list({ limit: 1, status: 'archived' }),
-      transactionsApi.list({ limit: 1, status: 'cancelled' }),
-    ])
+    const response = await dashboardApi.summary({ days: 7 })
+    const payload = response.data || {}
+    const summary = payload.summary || {}
+    const byStatus = summary.by_status || {}
+    const total = Object.values(byStatus).reduce((sum, count) => sum + Number(count || 0), 0)
 
-    recentTransactions.value = txRes.data
-
-    const totalTx = parseInt(txRes.headers['x-total-count'] || 0)
-    const approved = parseInt(approvedRes.headers['x-total-count'] || 0)
-    const draft = parseInt(draftRes.headers['x-total-count'] || 0)
-    const rejected = parseInt(rejectedRes.headers['x-total-count'] || 0)
-    const archived = parseInt(archivedRes.headers['x-total-count'] || 0)
-    const cancelled = parseInt(cancelledRes.headers['x-total-count'] || 0)
-    const orgs = parseInt(orgRes.headers['x-total-count'] || 0)
-
-    stats.value = { totalTransactions: totalTx, approved, draft, rejected, archived, cancelled, totalOrganizations: orgs }
-
-    await loadPeriodComparison()
-    const pc = periodComparison.value
-    const todayDenom = pc.today || 1
-    const weekDenom = pc.thisWeek || 1
-    const orgDenom = orgs || 1
-
+    stats.value = {
+      totalTransactions: Number(summary.total_transactions || 0),
+      approved: Number(byStatus.approved || 0),
+      draft: Number(byStatus.draft || 0),
+      rejected: Number(byStatus.rejected || 0),
+      archived: Number(byStatus.archived || 0),
+      cancelled: Number(byStatus.cancelled || 0),
+      totalOrganizations: Number(summary.total_organizations || 0),
+    }
+    recentTransactions.value = payload.recent_transactions || []
+    trend.value = payload.trend || []
+    byType.value = payload.by_type || []
     trends.value = {
-      total: pc.today && pc.yesterday ? Math.round(((pc.today - pc.yesterday) / Math.max(pc.yesterday, 1)) * 100) : Math.round(((approved - draft) / Math.max(totalTx, 1)) * 100),
-      approved: pc.thisWeek && pc.lastWeek ? Math.round(((pc.thisWeek - pc.lastWeek) / Math.max(pc.lastWeek, 1)) * 100) : Math.round(((approved - rejected) / Math.max(approved, 1)) * 100),
-      draft: pc.thisWeek && pc.lastWeek ? Math.round(((pc.lastWeek - pc.thisWeek) / Math.max(pc.lastWeek, 1)) * 100) : Math.round(((draft - approved) / Math.max(draft, 1)) * 100),
-      orgs: Math.round(Math.random() * 15) + 3,
+      total: Number(payload.trends?.total || 0),
+      approved: Number(payload.trends?.approved || 0),
+      draft: Number(payload.trends?.draft || 0),
+      orgs: Number(payload.trends?.orgs || 0),
     }
 
-    const total = approved + draft + rejected + archived + cancelled
-    const dist = []
-    if (total > 0) {
-      const entries = [
-        { key: 'approved', count: approved, barClass: 'bg-emerald-500' },
-        { key: 'draft', count: draft, barClass: 'bg-amber-500' },
-        { key: 'rejected', count: rejected, barClass: 'bg-red-500' },
-        { key: 'archived', count: archived, barClass: 'bg-slate-500' },
-        { key: 'cancelled', count: cancelled, barClass: 'bg-slate-400' },
-      ]
-      for (const e of entries) {
-        if (e.count > 0) {
-          dist.push({
-            ...e,
-            label: statusLabel(e.key),
-            percent: Math.round((e.count / total) * 100),
-          })
-        }
-      }
-    }
-    statusDistribution.value = dist
+    statusDistribution.value = Object.entries(byStatus)
+      .filter(([, count]) => Number(count) > 0)
+      .map(([key, count]) => ({
+        key,
+        count: Number(count),
+        label: statusLabel(key),
+        percent: total ? Math.round((Number(count) / total) * 100) : 0,
+        barClass: {
+          approved: 'bg-emerald-500',
+          draft: 'bg-amber-500',
+          rejected: 'bg-red-500',
+          archived: 'bg-slate-500',
+          cancelled: 'bg-slate-400',
+        }[key] || 'bg-blue-500',
+      }))
   } catch (e) {
-    error.value = L.errors.loadFailed
+    error.value = e.apiMessage || e.response?.data?.message || e.response?.data?.detail || L.errors.loadFailed
   } finally {
     loading.value = false
   }

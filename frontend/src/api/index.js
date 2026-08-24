@@ -35,6 +35,10 @@ export const auditLogsApi = {
   list: (params) => client.get('/audit-logs', { params }),
 }
 
+export const dashboardApi = {
+  summary: (params = {}) => client.get('/dashboard/summary', { params }),
+}
+
 export const healthApi = {
   check: () => client.get('/health'),
 }
