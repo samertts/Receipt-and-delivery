@@ -76,7 +76,7 @@ async function handleLogin() {
     await auth.login(username.value, password.value)
     router.push('/dashboard')
   } catch (e) {
-    error.value = e.response?.data?.detail || 'فشل تسجيل الدخول'
+    error.value = e.apiMessage || e.response?.data?.message || e.response?.data?.detail || 'فشل تسجيل الدخول'
   } finally {
     loading.value = false
   }

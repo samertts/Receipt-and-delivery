@@ -14,10 +14,14 @@ export const useTransactionStore = defineStore('transactions', () => {
     error.value = null
     try {
       const response = await transactionsApi.list(params)
-      items.value = response.data
-      total.value = parseInt(response.headers['x-total-count'] || response.data.length)
+      items.value = Array.isArray(response.data) ? response.data : []
+      total.value = Number(
+        response.meta?.total ??
+        response.headers?.['x-total-count'] ??
+        items.value.length,
+      )
     } catch (e) {
-      error.value = e.response?.data?.detail || 'فشل في تحميل المعاملات'
+      error.value = e.apiMessage || e.response?.data?.message || e.response?.data?.detail || 'فشل في تحميل المعاملات'
       throw e
     } finally {
       loading.value = false
@@ -32,7 +36,7 @@ export const useTransactionStore = defineStore('transactions', () => {
       current.value = response.data
       return response.data
     } catch (e) {
-      error.value = e.response?.data?.detail || 'فشل في تحميل المعاملة'
+      error.value = e.apiMessage || e.response?.data?.message || e.response?.data?.detail || 'فشل في تحميل المعاملة'
       throw e
     } finally {
       loading.value = false
@@ -47,7 +51,7 @@ export const useTransactionStore = defineStore('transactions', () => {
       items.value.unshift(response.data)
       return response.data
     } catch (e) {
-      error.value = e.response?.data?.detail || 'فشل في إنشاء المعاملة'
+      error.value = e.apiMessage || e.response?.data?.message || e.response?.data?.detail || 'فشل في إنشاء المعاملة'
       throw e
     } finally {
       loading.value = false
@@ -64,7 +68,7 @@ export const useTransactionStore = defineStore('transactions', () => {
       current.value = response.data
       return response.data
     } catch (e) {
-      error.value = e.response?.data?.detail || 'فشل في تحديث المعاملة'
+      error.value = e.apiMessage || e.response?.data?.message || e.response?.data?.detail || 'فشل في تحديث المعاملة'
       throw e
     } finally {
       loading.value = false
@@ -78,7 +82,7 @@ export const useTransactionStore = defineStore('transactions', () => {
       await transactionsApi.delete(id)
       items.value = items.value.filter((i) => i.id !== id)
     } catch (e) {
-      error.value = e.response?.data?.detail || 'فشل في حذف المعاملة'
+      error.value = e.apiMessage || e.response?.data?.message || e.response?.data?.detail || 'فشل في حذف المعاملة'
       throw e
     } finally {
       loading.value = false

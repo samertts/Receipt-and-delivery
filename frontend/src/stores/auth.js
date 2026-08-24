@@ -1,12 +1,20 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authApi } from '../api'
-import { clearSession, getSessionUser, setSession, updateAccessToken, updateRefreshToken } from '../api/tokenStore'
+import {
+  clearSession,
+  getAccessToken,
+  getRefreshToken,
+  getSessionUser,
+  setSession,
+  updateAccessToken,
+  updateRefreshToken,
+} from '../api/tokenStore'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(getSessionUser())
-  const token = ref('')
-  const refreshToken = ref('')
+  const token = ref(getAccessToken())
+  const refreshToken = ref(getRefreshToken())
 
   const isAuthenticated = computed(() => !!token.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
