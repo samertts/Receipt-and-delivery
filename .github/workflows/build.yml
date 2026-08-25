@@ -56,8 +56,8 @@ jobs:
           $commit = git rev-parse HEAD
           $short_commit = $commit.Substring(0, 8)
           $branch = git rev-parse --abbrev-ref HEAD
-          $tag = git describe --tags --exact-match HEAD 2>&1
-          if ($LASTEXITCODE -ne 0) { $tag = "untagged" } else { $tag = "$tag".Trim() }
+          $tag = (git tag --points-at HEAD | Select-Object -First 1)
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = "untagged" } else { $tag = "$tag".Trim() }
           $build_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
           $build_number = $env:GITHUB_RUN_NUMBER
 
