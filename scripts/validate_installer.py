@@ -73,13 +73,20 @@ def main():
             output_dir = output_match.group(1).strip()
             print(f"  OutputDir: {output_dir}")
 
-        # Check version
+        # Check version. Inno Setup may receive MyAppVersion via /D in CI.
         ver_match = re.search(r"AppVersion=(.+)", setup)
         if ver_match:
             ver = ver_match.group(1).strip()
             version_content = (ROOT / "VERSION").read_text().strip()
-            ok(ver == version_content, f"AppVersion mismatch: ISS={ver} != VERSION={version_content}")
-            print(f"  AppVersion: {ver}")
+            effective_ver = ver
+            if ver == "{#MyAppVersion}":
+                define_match = re.search(r'#define\s+MyAppVersion\s+"([^"]+)"', text)
+                effective_ver = define_match.group(1) if define_match else ""
+            ok(
+                effective_ver == version_content,
+                f"AppVersion mismatch: ISS={effective_ver or ver} != VERSION={version_content}",
+            )
+            print(f"  AppVersion: {ver} (effective: {effective_ver})")
 
     print()
 

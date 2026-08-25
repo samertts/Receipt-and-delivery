@@ -110,15 +110,6 @@ jobs:
           python -m pytest tests/ --cov=lab_system --cov-config=.coveragerc --cov-report=xml:coverage.xml --junitxml=test-results.xml -q
           echo Tests completed.
 
-      - name: Validate Installer Config
-        shell: cmd
-        run: |
-          python scripts/validate_installer.py
-          if errorlevel 1 (
-            echo ERROR: Installer validation failed
-            exit /b 1
-          )
-
       # ===================================================================
       # PHASE 5 — BUILD WITH EMBEDDED METADATA
       # ===================================================================
@@ -158,6 +149,15 @@ jobs:
             exit /b 1
           )
           for %%i in (dist\LabReceiptSystem.exe) do echo EXE verified. Size: %%~zi bytes
+
+      - name: Validate Installer Config
+        shell: cmd
+        run: |
+          python scripts/validate_installer.py
+          if errorlevel 1 (
+            echo ERROR: Installer validation failed
+            exit /b 1
+          )
 
       - name: Certify Installer Inputs
         shell: cmd
