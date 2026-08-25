@@ -38,12 +38,13 @@ def _get_process_memory_mb() -> float:
 
             counters = ProcessMemoryCounters()
             counters.cb = ctypes.sizeof(ProcessMemoryCounters)
-            ctypes.windll.psapi.GetProcessMemoryInfo(
+            success = ctypes.windll.psapi.GetProcessMemoryInfo(
                 ctypes.windll.kernel32.GetCurrentProcess(),
                 ctypes.byref(counters),
                 counters.cb,
             )
-            return counters.WorkingSetSize / (1024 * 1024)
+            if success and counters.WorkingSetSize > 0:
+                return counters.WorkingSetSize / (1024 * 1024)
         except (AttributeError, OSError, TypeError):
             pass
 

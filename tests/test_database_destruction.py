@@ -257,9 +257,9 @@ class TestMissingWALFile:
         if wal_path.exists():
             if os.name == "nt":
                 conn1.close()
-                wal_path.unlink()
+                wal_path.unlink(missing_ok=True)
             else:
-                wal_path.unlink()
+                wal_path.unlink(missing_ok=True)
                 conn1.close()
         else:
             conn1.close()
