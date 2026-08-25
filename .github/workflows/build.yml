@@ -91,6 +91,17 @@ jobs:
         run: |
           python -c "from pathlib import Path; assert Path('main.py').exists(), 'main.py missing'; assert Path('VERSION').exists(), 'VERSION missing'; assert Path('lab_system.spec').exists(), 'spec missing'; print('Project structure OK')"
 
+      - name: Prepare Update Public Key
+        shell: cmd
+        env:
+          LAB_UPDATE_PUBLIC_KEY_B64: ${{ secrets.LAB_UPDATE_PUBLIC_KEY_B64 }}
+        run: |
+          if /I "%GITHUB_REF:~0,10%"=="refs/tags/" (
+            python scripts/write_update_public_key.py --required
+          ) else (
+            python scripts/write_update_public_key.py
+          )
+
       - name: Python Syntax Check
         shell: cmd
         run: |
@@ -216,6 +227,19 @@ jobs:
           echo === Manifest ===
           type manifest.json
 
+      - name: Generate Signed Update Manifest
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: cmd
+        env:
+          LAB_UPDATE_PRIVATE_KEY_B64: ${{ secrets.LAB_UPDATE_PRIVATE_KEY_B64 }}
+        run: |
+          python scripts/generate_update_manifest.py installer\Output\LabReceiptSetup.exe --url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/LabReceiptSetup.exe" --output update.json --release-notes "See the release notes attached to this GitHub release."
+          if errorlevel 1 (
+            echo ERROR: Signed update manifest generation failed
+            exit /b 1
+          )
+          type update.json
+
       # ===================================================================
       # PHASE 4 — RELEASE NOTES
       # ===================================================================
@@ -256,6 +280,13 @@ jobs:
           name: release-notes-${{ steps.meta.outputs.VERSION }}
           path: release_notes.md
 
+      - name: Upload Signed Update Manifest
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-manifest-${{ steps.meta.outputs.VERSION }}
+          path: update.json
+
       - name: Upload Coverage Report
         if: always()
         uses: actions/upload-artifact@v4
@@ -286,6 +317,7 @@ jobs:
             installer/Output/LabReceiptSetup.exe
             checksums.sha256
             manifest.json
+            update.json
             release_notes.md
           fail_on_unmatched_files: true
         env:

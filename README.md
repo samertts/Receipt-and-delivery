@@ -79,7 +79,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\scripts\build_windows.ps1
 ```
 
-التفاصيل ومسار GitHub Actions موضحان في [دليل بناء Windows](docs/WINDOWS_BUILD.md). لا يمكن إنتاج Windows EXE موثوق من Linux مباشرة عبر PyInstaller.
+التفاصيل ومسار GitHub Actions موضحان في [دليل بناء Windows](docs/WINDOWS_BUILD.md). لا يمكن إنتاج Windows EXE موثوق من Linux مباشرة عبر PyInstaller. لإعداد التحديثات الآلية الموقعة راجع [دليل Auto-updater](docs/AUTO_UPDATER.md).
 
 ### واجهة الويب (API)
 
@@ -118,6 +118,7 @@ docker compose up -d
 | [CONTRIBUTING.md](CONTRIBUTING.md) | دليل المساهمة |
 | [CHANGELOG.md](CHANGELOG.md) | سجل التغييرات |
 | [DEVICE_INTEGRATION.md](DEVICE_INTEGRATION.md) | تكامل الكاميرا والباركود وOCR وNFC والطباعة والجسر المحلي |
+| [docs/AUTO_UPDATER.md](docs/AUTO_UPDATER.md) | إعداد التحديثات الآلية الموقعة لتطبيق Windows |
 | [docs/WINDOWS_BUILD.md](docs/WINDOWS_BUILD.md) | بناء نسخة Windows EXE والمثبت |
 
 ---

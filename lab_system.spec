@@ -24,6 +24,8 @@ a = Analysis(
     ],
     hiddenimports=[
         'lab_system.app.ui.app',
+        'lab_system.app.updater',
+        'lab_system.app.update_public_key',
         'lab_system.app.ui.receipts_page',
         'lab_system.app.ui.receipt_dialog',
         'lab_system.app.ui.receipt_detail_dialog',
@@ -70,6 +72,8 @@ a = Analysis(
         'PIL',
         'PIL._imaging',
         'openpyxl',
+        'cryptography',
+        'cryptography.hazmat.primitives.asymmetric.ed25519',
     ],
     hookspath=[],
     hooksconfig={},

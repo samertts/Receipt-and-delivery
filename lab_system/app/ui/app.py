@@ -1,4 +1,6 @@
-from PySide6.QtCore import Qt, QTimer
+from pathlib import Path
+
+from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal, Slot
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
@@ -29,7 +31,13 @@ from lab_system.app.diagnostics.startup import (
 from lab_system.app.services.auth_service import AuthService
 from lab_system.app.services.catalog_service import seed_defaults
 from lab_system.app.services.seed_service import seed_organizations
-from lab_system.app.services.user_service import seed_default_users
+from lab_system.app.services.seed_service import seed_default_users
+from lab_system.app.updater import (
+    UpdateError,
+    check_for_update,
+    download_installer,
+    launch_installer,
+)
 from lab_system.app.ui.audit_page import AuditPage
 from lab_system.app.ui.backup_page import BackupPage
 from lab_system.app.ui.dashboard_page import DashboardPage
@@ -44,6 +52,34 @@ from lab_system.app.utils.constants import APP_NAME, DEFAULT_WINDOW_SIZE, THEME
 from lab_system.app.utils.errors import AuthenticationError, SessionExpiredError
 
 SESSION_CHECK_INTERVAL = 30000
+
+
+class UpdateWorker(QObject):
+    """Run network and file work away from the Qt GUI thread."""
+
+    result = Signal(object)
+    finished = Signal()
+
+    def __init__(self, mode: str, manifest: dict | None = None):
+        super().__init__()
+        self.mode = mode
+        self.manifest = manifest
+
+    @Slot()
+    def run(self):
+        try:
+            if self.mode == "check":
+                result = {"mode": self.mode, "update": check_for_update()}
+            elif self.mode == "download" and self.manifest:
+                installer = download_installer(self.manifest)
+                result = {"mode": self.mode, "installer": str(installer)}
+            else:
+                raise UpdateError("Invalid updater operation")
+            self.result.emit(result)
+        except Exception as exc:
+            self.result.emit({"mode": self.mode, "error": str(exc)})
+        finally:
+            self.finished.emit()
 
 
 class ChangePasswordDialog(QDialog):
@@ -302,7 +338,10 @@ class MainWindow(QMainWindow):
         self._sync_timer.timeout.connect(sync_service.sync_pending)
         self._sync_timer.start(60000)
 
+        self._update_thread = None
+        self._update_worker = None
         self._setup_shortcuts()
+        self._setup_update_action()
 
     def _setup_shortcuts(self):
         refresh_action = QAction("تحديث", self)
@@ -344,6 +383,86 @@ class MainWindow(QMainWindow):
         users_action.setShortcut(QKeySequence(Qt.ALT | Qt.Key_4))
         users_action.triggered.connect(lambda: self._navigate_to("users"))
         self.addAction(users_action)
+
+    def _setup_update_action(self):
+        self._update_action = QAction("التحقق من التحديثات", self)
+        self._update_action.setShortcut(QKeySequence(Qt.CTRL | Qt.SHIFT | Qt.Key_U))
+        self._update_action.setToolTip("التحقق من إصدار جديد بأمان")
+        self._update_action.triggered.connect(self._check_for_updates)
+        help_menu = self.menuBar().addMenu("مساعدة")
+        help_menu.addAction(self._update_action)
+
+    def _run_update_worker(self, mode: str, manifest: dict | None = None):
+        thread = QThread(self)
+        worker = UpdateWorker(mode, manifest)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.result.connect(self._handle_update_result)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(lambda: setattr(self, "_update_thread", None))
+        self._update_thread = thread
+        self._update_worker = worker
+        thread.start()
+
+    def _check_for_updates(self):
+        if self._update_thread and self._update_thread.isRunning():
+            return
+        self._update_action.setEnabled(False)
+        self.statusBar().showMessage("جارٍ التحقق من التحديثات...")
+        self._run_update_worker("check")
+
+    def _handle_update_result(self, result):
+        mode = result.get("mode")
+        if mode == "check":
+            if result.get("error"):
+                self._finish_update_action()
+                QMessageBox.warning(self, "التحديثات", result["error"])
+                return
+            update = result.get("update")
+            if not update:
+                self._finish_update_action()
+                QMessageBox.information(self, "التحديثات", "أنت تستخدم أحدث إصدار متاح.")
+                return
+            version = update.get("version", "غير معروف")
+            notes = update.get("release_notes", "")
+            detail = f"الإصدار الجديد: {version}"
+            if notes:
+                detail += f"\n\n{notes}"
+            answer = QMessageBox.question(
+                self,
+                "تحديث متاح",
+                f"{detail}\n\nهل تريد تنزيل التحديث والتحقق منه؟",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes,
+            )
+            if answer == QMessageBox.Yes:
+                self.statusBar().showMessage("جارٍ تنزيل التحديث والتحقق من بصمته...")
+                self._run_update_worker("download", update)
+            else:
+                self._finish_update_action()
+            return
+
+        self._finish_update_action()
+        if result.get("error"):
+            QMessageBox.warning(self, "التحديثات", result["error"])
+            return
+        try:
+            launch_installer(Path(result["installer"]))
+        except UpdateError as exc:
+            QMessageBox.warning(self, "التحديثات", str(exc))
+            return
+        QMessageBox.information(
+            self,
+            "التحديثات",
+            "تم تنزيل التحديث والتحقق منه. سيُغلق التطبيق الآن لبدء التثبيت.",
+        )
+        QApplication.instance().quit()
+
+    def _finish_update_action(self):
+        self._update_action.setEnabled(True)
+        self.statusBar().clearMessage()
 
     def _refresh_current(self):
         page = self.pages.currentWidget()
