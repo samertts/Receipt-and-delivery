@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/auth'
 const routes = [
   { path: '/', name: 'Login', component: () => import('../pages/Login.vue'), meta: { guest: true } },
   { path: '/forbidden', name: 'Forbidden', component: () => import('../pages/Forbidden.vue'), meta: { requiresAuth: true } },
+  { path: '/devices', name: 'Devices', component: () => import('../pages/Devices.vue'), meta: { requiresAuth: true, permission: 'use_devices' } },
   { path: '/dashboard', name: 'Dashboard', component: () => import('../pages/Dashboard.vue'), meta: { requiresAuth: true, permission: 'view_dashboard' } },
   { path: '/newtransaction', name: 'NewTransaction', component: () => import('../pages/NewTransaction.vue'), meta: { requiresAuth: true, permission: 'create_transaction' } },
   { path: '/transactionslist', name: 'TransactionsList', component: () => import('../pages/TransactionsList.vue'), meta: { requiresAuth: true, permission: 'view_transactions' } },

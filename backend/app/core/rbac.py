@@ -15,6 +15,7 @@ PERMISSION_ROLES: dict[str, tuple[str, ...]] = {
     "manage_settings": ("admin",),
     "manage_backups": ("admin",),
     "sync_data": ("admin",),
+    "use_devices": ("admin", "supervisor", "user"),
 }
 
 ROLE_PERMISSIONS: dict[str, tuple[str, ...]] = {

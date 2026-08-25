@@ -125,6 +125,7 @@ const navGroups = computed(() => [
     title: L.nav.system,
     items: [
       { path: '/settings', label: L.nav.settings, icon: ICONS.settings, permission: 'manage_settings' },
+      { path: '/devices', label: L.nav.devices, icon: ICONS.settings, permission: 'use_devices' },
     ],
   },
 ].map((group) => ({

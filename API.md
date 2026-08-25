@@ -149,10 +149,21 @@ ws://localhost:8000/api/ws/notifications?token=<access-token>
 | `view_audit_logs` | admin, auditor |
 | `manage_organizations` | admin, supervisor |
 | `manage_settings` | admin |
+| `use_devices` | admin, supervisor, user |
 
 ### User management
 
 يدعم `GET /api/users` معاملات `role` و`status=active|inactive` للتصفية. يدعم `PUT /api/users/{id}` تعديل `full_name` و`role` و`password` و`status`. لا يمكن تعطيل المستخدم الحالي أو إزالة آخر مدير نظام نشط.
+
+---
+
+## Device integrations
+
+لا تضيف تكاملات الأجهزة الحالية endpoints جديدة إلى Backend؛ تتم الكاميرا والباركود وOCR وNFC والطباعة من المتصفح بعد إذن المستخدم عبر `/devices`. يدعم قارئ USB الذي يعمل كلوحة مفاتيح إرسال الرمز ثم `Enter`، وتبقى نتيجة OCR نصًا قابلًا للتحرير ولا تُحفظ تلقائيًا.
+
+يتطلب مسار الواجهة صلاحية `use_devices`. تحتاج الكاميرا إلى سياق آمن (`HTTPS` أو `localhost`)، بينما Web NFC اختياري وغير متاح في أغلب بيئات سطح المكتب وiOS. تستخدم الطباعة `window.print()` للطابعات المسجلة في نظام التشغيل. التحكم الخام بالطابعات الحرارية أو USB/Serial غير متاح مباشرة للمتصفح، ويجب تنفيذه لاحقًا عبر جسر محلي موثوق يستمع إلى `127.0.0.1` ويصادق كل طلب.
+
+لخطوات الإعداد والتوافق والأمان راجع [DEVICE_INTEGRATION.md](DEVICE_INTEGRATION.md).
 
 ---
 
