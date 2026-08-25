@@ -5,12 +5,60 @@ Provides lazy loading, background workers, query optimization,
 memory optimization, and startup profiling.
 """
 
+import os
 import sqlite3
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
+
+
+def _get_process_memory_mb() -> float:
+    """Return resident memory in MB on Windows, Linux, and macOS."""
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class ProcessMemoryCounters(ctypes.Structure):
+                _fields_ = [
+                    ("cb", wintypes.DWORD),
+                    ("PageFaultCount", wintypes.DWORD),
+                    ("PeakWorkingSetSize", ctypes.c_size_t),
+                    ("WorkingSetSize", ctypes.c_size_t),
+                    ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                    ("PagefileUsage", ctypes.c_size_t),
+                    ("PeakPagefileUsage", ctypes.c_size_t),
+                ]
+
+            counters = ProcessMemoryCounters()
+            counters.cb = ctypes.sizeof(ProcessMemoryCounters)
+            ctypes.windll.psapi.GetProcessMemoryInfo(
+                ctypes.windll.kernel32.GetCurrentProcess(),
+                ctypes.byref(counters),
+                counters.cb,
+            )
+            return counters.WorkingSetSize / (1024 * 1024)
+        except (AttributeError, OSError, TypeError):
+            pass
+
+    try:
+        import resource
+
+        usage = resource.getrusage(resource.RUSAGE_SELF)
+        divisor = 1024 * 1024 if os.sys.platform == "darwin" else 1024
+        return usage.ru_maxrss / divisor
+    except (ImportError, AttributeError, OSError):
+        try:
+            import psutil
+
+            return psutil.Process().memory_info().rss / (1024 * 1024)
+        except (ImportError, AttributeError, OSError):
+            return 0.0
 
 
 class PerformanceMonitor:
@@ -24,10 +72,10 @@ class PerformanceMonitor:
         self._worker_pool: ThreadPoolExecutor | None = None
 
     def start_startup_timer(self):
-        self._start_time = time.monotonic()
+        self._start_time = time.perf_counter()
 
     def end_startup_timer(self):
-        self._startup_complete = time.monotonic()
+        self._startup_complete = time.perf_counter()
 
     @property
     def startup_time_ms(self) -> float:
@@ -59,17 +107,7 @@ class PerformanceMonitor:
         return sorted_times[min(idx, len(sorted_times) - 1)]
 
     def get_memory_usage_mb(self) -> float:
-        try:
-            import resource
-            usage = resource.getrusage(resource.RUSAGE_SELF)
-            return usage.ru_maxrss / 1024
-        except (ImportError, AttributeError):
-            try:
-                import psutil
-                process = psutil.Process()
-                return process.memory_info().rss / (1024 * 1024)
-            except (ImportError, Exception):
-                return 0.0
+        return _get_process_memory_mb()
 
     def get_startup_report(self) -> dict:
         return {
@@ -182,17 +220,7 @@ class MemoryOptimizer:
 
     @staticmethod
     def get_process_memory_mb() -> float:
-        try:
-            import resource
-            usage = resource.getrusage(resource.RUSAGE_SELF)
-            return usage.ru_maxrss / 1024
-        except (ImportError, AttributeError):
-            try:
-                import psutil
-                process = psutil.Process()
-                return process.memory_info().rss / (1024 * 1024)
-            except (ImportError, Exception):
-                return 0.0
+        return _get_process_memory_mb()
 
     @staticmethod
     def get_memory_report() -> dict:
