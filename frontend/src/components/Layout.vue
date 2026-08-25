@@ -1,13 +1,13 @@
 <template>
   <div class="min-h-screen bg-slate-50" :dir="direction">
-    <div v-if="auth.isAuthenticated" class="flex h-screen overflow-hidden">
+    <div v-if="auth.isAuthenticated" class="flex h-screen min-h-0 overflow-hidden">
       <NotificationCenter />
       <Sidebar
         :collapsed="ui.sidebarCollapsed"
         @toggle="ui.toggleSidebar"
       />
-      <main class="flex-1 overflow-y-auto bg-slate-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main class="flex-1 min-w-0 min-h-0 bg-slate-50 app-scroll-container">
+        <div class="w-full min-w-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <router-view />
         </div>
       </main>

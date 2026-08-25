@@ -9,7 +9,7 @@
       </div>
     </div>
 
-    <form v-else @submit.prevent="submitForm" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6">
+    <form v-else @submit.prevent="submitForm" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-6 min-w-0 overflow-visible">
       <div v-if="error" class="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-lg flex items-center gap-2">
         <span v-html="icons.alert"></span>
         <span>{{ error }}</span>
@@ -22,7 +22,7 @@
         </router-link>
       </div>
 
-      <div v-if="!success" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div v-if="!success" class="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="md:col-span-2">
           <label class="gov-label">{{ L.form.transactionType }}</label>
           <select v-model="form.transaction_type" required class="gov-select">
@@ -58,7 +58,7 @@
               class="gov-input"
             />
             <ul v-if="senderDropdownOpen && filteredSenderOrgs.length"
-              class="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto"
+              class="absolute z-30 mt-1 w-full min-w-[min(100%,18rem)] bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-y-auto overscroll-contain"
             >
               <li v-for="org in filteredSenderOrgs" :key="org.id"
                 @click="selectSenderOrg(org)"
@@ -80,7 +80,7 @@
               class="gov-input"
             />
             <ul v-if="receiverDropdownOpen && filteredReceiverOrgs.length"
-              class="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto"
+              class="absolute z-30 mt-1 w-full min-w-[min(100%,18rem)] bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-y-auto overscroll-contain"
             >
               <li v-for="org in filteredReceiverOrgs" :key="org.id"
                 @click="selectReceiverOrg(org)"
@@ -113,9 +113,9 @@
           </button>
         </div>
         <div v-for="(item, idx) in form.items" :key="idx"
-          class="bg-slate-50 rounded-lg p-4 mb-3 border border-slate-200"
+          class="relative z-0 bg-slate-50 rounded-lg p-4 mb-3 border border-slate-200 min-w-0"
         >
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="form-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 min-w-0">
             <div class="relative">
               <label class="block text-xs text-slate-500 mb-1">{{ L.form.sampleType }}</label>
               <div class="relative">
@@ -124,10 +124,10 @@
                   @focus="sampleDropdownIdx = idx"
                   @input="sampleDropdownIdx = idx"
                   :placeholder="L.form.chooseOrType" required
-                  class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm"
+                  class="w-full min-w-0 px-3 py-1.5 border border-slate-300 rounded text-sm"
                 />
                 <ul v-if="sampleDropdownIdx === idx && filteredSampleTypes.length"
-                  class="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-32 overflow-y-auto"
+                  class="absolute z-30 mt-1 w-full min-w-[min(100%,16rem)] bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto overscroll-contain"
                 >
                   <li v-for="st in filteredSampleTypes" :key="st"
                     @click="selectSampleType(idx, st)"
@@ -185,7 +185,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { transactionsApi, organizationsApi } from '../api'
 import { useUiStore } from '../stores/ui'
 import { ICONS } from '../composables/useIcons'
@@ -253,13 +253,16 @@ function selectSampleType(idx, st) {
   sampleDropdownIdx.value = -1
 }
 
-document.addEventListener('click', (e) => {
+function closeDropdowns(e) {
   if (!e.target.closest('.relative')) {
     senderDropdownOpen.value = false
     receiverDropdownOpen.value = false
     sampleDropdownIdx.value = -1
   }
-})
+}
+
+document.addEventListener('click', closeDropdowns)
+onBeforeUnmount(() => document.removeEventListener('click', closeDropdowns))
 
 function resetForm() {
   form.value = {

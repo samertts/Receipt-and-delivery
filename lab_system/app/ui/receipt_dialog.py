@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QScrollArea,
     QPushButton,
     QSpinBox,
     QTabWidget,
@@ -54,8 +55,8 @@ class ReceiptDialog(QDialog):
         self.receipt_id = receipt_id
         self.editing = receipt_id is not None
         self.setWindowTitle("تعديل الاستلام" if self.editing else "استلام جديد")
-        self.setMinimumWidth(880)
-        self.setMinimumHeight(620)
+        self.setMinimumSize(480, 400)
+        self.resize(920, 700)
         self.setLayoutDirection(Qt.RightToLeft)
 
         self._build_form()
@@ -103,7 +104,13 @@ class ReceiptDialog(QDialog):
                 color: {THEME["primary"]};
             }}
         """)
-        main.addWidget(self.tabs)
+        self.tabs_scroll = QScrollArea()
+        self.tabs_scroll.setWidgetResizable(True)
+        self.tabs_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.tabs_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.tabs_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        self.tabs_scroll.setWidget(self.tabs)
+        main.addWidget(self.tabs_scroll, 1)
 
         self.tabs.addTab(self._build_info_tab(), "المعلومات الأساسية")
         self.tabs.addTab(self._build_samples_tab(), "العينات")

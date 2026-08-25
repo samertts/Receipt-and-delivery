@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QScrollArea,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -98,7 +99,8 @@ class OrgDialog(QDialog):
         self.current_user = current_user
         self.editing = org_data is not None
         self.setWindowTitle("تعديل جهة" if self.editing else "إضافة جهة جديدة")
-        self.setMinimumWidth(500)
+        self.setMinimumSize(440, 360)
+        self.resize(560, 620)
         self.setLayoutDirection(Qt.RightToLeft)
         self._build_form()
         if self.editing:
@@ -111,7 +113,11 @@ class OrgDialog(QDialog):
             super().keyPressEvent(event)
 
     def _build_form(self):
-        form = QFormLayout(self)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(12, 12, 12, 12)
+        content = QWidget()
+        form = QFormLayout(content)
+        form.setContentsMargins(0, 0, 0, 0)
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("اسم الجهة")
         self.code_input = QLineEdit()
@@ -149,6 +155,14 @@ class OrgDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         btn_row.addWidget(cancel_btn)
         form.addRow(btn_row)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        scroll.setWidget(content)
+        root.addWidget(scroll)
 
     def _populate(self):
         d = self.org_data

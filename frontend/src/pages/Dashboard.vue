@@ -154,6 +154,31 @@
         </section>
       </div>
 
+      <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-6" aria-labelledby="smart-insights-title" data-testid="smart-insights">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div>
+            <h2 id="smart-insights-title" class="text-lg font-semibold text-slate-800">{{ L.dashboard.smartInsights }}</h2>
+            <p class="text-xs text-slate-500 mt-1">{{ L.dashboard.smartSubtitle }}</p>
+          </div>
+          <span class="gov-badge bg-blue-50 text-blue-700">{{ smartInsights.length }} {{ L.dashboard.insightCount }}</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <article v-for="insight in smartInsights" :key="insight.key" class="rounded-lg border p-4 min-w-0" :class="insight.cardClass">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <span class="text-[11px] font-semibold uppercase tracking-wide" :class="insight.textClass">{{ insight.priority }}</span>
+                <h3 class="font-semibold text-sm text-slate-800 mt-1 break-words">{{ insight.title }}</h3>
+              </div>
+              <span class="shrink-0 text-lg" aria-hidden="true">{{ insight.icon }}</span>
+            </div>
+            <p class="text-xs text-slate-600 mt-2 leading-5">{{ insight.text }}</p>
+            <router-link v-if="insight.to" :to="insight.to" class="inline-flex mt-3 text-xs font-medium text-blue-700 hover:text-blue-900">
+              {{ insight.action }}
+            </router-link>
+          </article>
+        </div>
+      </section>
+
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div class="flex items-center justify-between mb-4">
@@ -271,6 +296,62 @@ const trendMax = computed(() => Math.max(...trend.value.map((item) => item.count
 const typeBars = computed(() => {
   const max = Math.max(...byType.value.map((item) => item.count), 1)
   return byType.value.map((item) => ({ ...item, percent: Math.round((item.count / max) * 100) }))
+})
+const smartInsights = computed(() => {
+  const items = []
+  if (stats.value.draft > 0) {
+    items.push({
+      key: 'drafts',
+      priority: stats.value.draft >= 5 ? L.dashboard.priorityHigh : L.dashboard.priorityMedium,
+      title: `${L.dashboard.smartDraftTitle} (${stats.value.draft})`,
+      text: L.dashboard.smartDraftText,
+      action: L.dashboard.openDrafts,
+      to: '/transactionslist?status=draft',
+      icon: '!',
+      cardClass: stats.value.draft >= 5 ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50',
+      textClass: 'text-amber-700',
+    })
+  }
+  if (stats.value.rejected > 0) {
+    items.push({
+      key: 'rejected',
+      priority: L.dashboard.priorityHigh,
+      title: `${L.dashboard.smartRejectedTitle} (${stats.value.rejected})`,
+      text: L.dashboard.smartRejectedText,
+      action: L.dashboard.openRejected,
+      to: '/transactionslist?status=rejected',
+      icon: '!',
+      cardClass: 'border-red-300 bg-red-50',
+      textClass: 'text-red-700',
+    })
+  }
+  if (trends.value.total < 0) {
+    items.push({
+      key: 'trend',
+      priority: L.dashboard.priorityMedium,
+      title: L.dashboard.smartTrendTitle,
+      text: L.dashboard.smartTrendText,
+      action: L.dashboard.searchTransactions,
+      to: '/transactionslist',
+      icon: '↘',
+      cardClass: 'border-blue-200 bg-blue-50',
+      textClass: 'text-blue-700',
+    })
+  }
+  if (!items.length) {
+    items.push({
+      key: 'healthy',
+      priority: L.dashboard.priorityLow,
+      title: L.dashboard.smartHealthyTitle,
+      text: L.dashboard.smartHealthyText,
+      action: L.dashboard.viewAll,
+      to: '/reports',
+      icon: '✓',
+      cardClass: 'border-emerald-200 bg-emerald-50',
+      textClass: 'text-emerald-700',
+    })
+  }
+  return items.slice(0, 3)
 })
 
 function trendX(index) {

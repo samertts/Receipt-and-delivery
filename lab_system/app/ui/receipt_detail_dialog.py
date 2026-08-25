@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
     QFormLayout,
+    QScrollArea,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -12,6 +13,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
+    QWidget,
 )
 
 from lab_system.app.attachments.manager import save_attachment
@@ -68,8 +70,8 @@ class ReceiptDetailDialog(QDialog):
         self.current_user = current_user
         self.receipt_id = receipt_id
         self.setWindowTitle("تفاصيل الإيصال")
-        self.setMinimumWidth(800)
-        self.setMinimumHeight(580)
+        self.setMinimumSize(480, 400)
+        self.resize(900, 680)
         self.setLayoutDirection(Qt.RightToLeft)
         self._build_ui()
         self._load()
@@ -91,14 +93,19 @@ class ReceiptDetailDialog(QDialog):
         main.setContentsMargins(12, 12, 12, 12)
         main.setSpacing(4)
 
+        content = QWidget()
+        body = QVBoxLayout(content)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(4)
+
         self.title_label = QLabel()
         self.title_label.setStyleSheet("font-size:15px;font-weight:700;")
-        main.addWidget(self.title_label)
+        body.addWidget(self.title_label)
 
         self.status_label = QLabel()
-        main.addWidget(self.status_label)
+        body.addWidget(self.status_label)
 
-        main.addWidget(self._section_header("بيانات المعاملة"))
+        body.addWidget(self._section_header("بيانات المعاملة"))
         f1 = QFormLayout()
         f1.setSpacing(4)
         f1.setContentsMargins(0, 0, 0, 0)
@@ -108,9 +115,9 @@ class ReceiptDetailDialog(QDialog):
         f1.addRow("نوع المعاملة:", self.tx_type_label)
         f1.addRow("الجهة المرسلة:", self.sender_org_label)
         f1.addRow("الجهة المستقبلة:", self.receiver_org_label)
-        main.addLayout(f1)
+        body.addLayout(f1)
 
-        main.addWidget(self._section_header("جهات الاتصال"))
+        body.addWidget(self._section_header("جهات الاتصال"))
         f2 = QFormLayout()
         f2.setSpacing(4)
         f2.setContentsMargins(0, 0, 0, 0)
@@ -122,9 +129,9 @@ class ReceiptDetailDialog(QDialog):
         f2.addRow("اسم المستلم:", self.receiver_name_label)
         f2.addRow("مسمى وظيفة المرسل:", self.sender_job_label)
         f2.addRow("مسمى وظيفة المستلم:", self.receiver_job_label)
-        main.addLayout(f2)
+        body.addLayout(f2)
 
-        main.addWidget(self._section_header("الوثيقة"))
+        body.addWidget(self._section_header("الوثيقة"))
         f3 = QFormLayout()
         f3.setSpacing(4)
         f3.setContentsMargins(0, 0, 0, 0)
@@ -134,9 +141,9 @@ class ReceiptDetailDialog(QDialog):
         f3.addRow("رقم الوثيقة:", self.auth_doc_label)
         f3.addRow("تاريخ الوثيقة:", self.auth_date_label)
         f3.addRow("تاريخ الإنشاء:", self.created_label)
-        main.addLayout(f3)
+        body.addLayout(f3)
 
-        main.addWidget(self._section_header("ملاحظات"))
+        body.addWidget(self._section_header("ملاحظات"))
         f4 = QFormLayout()
         f4.setSpacing(4)
         f4.setContentsMargins(0, 0, 0, 0)
@@ -146,9 +153,9 @@ class ReceiptDetailDialog(QDialog):
         f4.addRow("ملاحظات:", self.notes_label)
         f4.addRow("معلومات النقل:", self.transport_label)
         f4.addRow("تعليقات إضافية:", self.comments_label)
-        main.addLayout(f4)
+        body.addLayout(f4)
 
-        main.addWidget(self._section_header("العينات"))
+        body.addWidget(self._section_header("العينات"))
         self.items_table = QTableWidget()
         self.items_table.setColumnCount(8)
         self.items_table.setHorizontalHeaderLabels(
@@ -173,9 +180,9 @@ class ReceiptDetailDialog(QDialog):
         self.items_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.items_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.items_table.setStyleSheet(TABLE_STYLE)
-        main.addWidget(self.items_table)
+        body.addWidget(self.items_table)
 
-        main.addWidget(self._section_header("المرفقات"))
+        body.addWidget(self._section_header("المرفقات"))
         self.attachments_table = QTableWidget()
         self.attachments_table.setColumnCount(3)
         self.attachments_table.setHorizontalHeaderLabels(
@@ -197,7 +204,15 @@ class ReceiptDetailDialog(QDialog):
         self.attachments_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.attachments_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.attachments_table.setStyleSheet(TABLE_STYLE)
-        main.addWidget(self.attachments_table)
+        body.addWidget(self.attachments_table)
+
+        self.content_scroll = QScrollArea()
+        self.content_scroll.setWidgetResizable(True)
+        self.content_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.content_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.content_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        self.content_scroll.setWidget(content)
+        main.addWidget(self.content_scroll, 1)
 
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)

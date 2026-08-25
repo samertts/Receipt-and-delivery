@@ -60,6 +60,8 @@ describe('dashboard UI/API integration', () => {
     expect(wrapper.text()).toContain('توزيع أنواع المعاملات')
     expect(wrapper.text()).toContain('استلام')
     expect(wrapper.find('[data-testid="dashboard-charts"] svg').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="smart-insights"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('توجد معاملات مرفوضة')
     expect(wrapper.findAll('[role="progressbar"]')).toHaveLength(5)
   })
 
