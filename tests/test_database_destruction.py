@@ -6,6 +6,7 @@ This test suite breaks everything on purpose and checks if the system can surviv
 """
 
 import hashlib
+import os
 import shutil
 import sqlite3
 import threading
@@ -252,11 +253,16 @@ class TestMissingWALFile:
         conn1.execute("INSERT INTO meta(key, value) VALUES('uncommitted', 'lost')")
         # DO NOT COMMIT
 
-        # Delete WAL if it exists
+        # Windows keeps the WAL file locked while the connection is open.
         if wal_path.exists():
-            wal_path.unlink()
-
-        conn1.close()
+            if os.name == "nt":
+                conn1.close()
+                wal_path.unlink()
+            else:
+                wal_path.unlink()
+                conn1.close()
+        else:
+            conn1.close()
 
         # Verify - committed data should survive, DB should remain accessible
         conn2 = sqlite3.connect(str(fresh_db))
@@ -750,13 +756,17 @@ class TestDatabaseLockHandling:
         """Verify connections are properly closed even on exceptions."""
         import lab_system.app.database.db as db_mod
 
-        # The get_conn context manager should close connections even on exceptions
-        with pytest.raises(ValueError, match="Simulated error"):
-            with db_mod.get_conn() as conn:
-                conn.execute(
-                    "INSERT INTO meta(key, value) VALUES('cleanup_test', 'ok')"
-                )
-                raise ValueError("Simulated error")
+        # The get_conn context manager should close connections even on exceptions.
+        original_config = _redirect_db(fresh_db)
+        try:
+            with pytest.raises(ValueError, match="Simulated error"):
+                with db_mod.get_conn() as conn:
+                    conn.execute(
+                        "INSERT INTO meta(key, value) VALUES('cleanup_test', 'ok')"
+                    )
+                    raise ValueError("Simulated error")
+        finally:
+            db_mod.CONFIG = original_config
 
         # Verify connection was closed (no leak)
         # If we get here without error, connection was properly cleaned up

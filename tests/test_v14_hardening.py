@@ -395,16 +395,16 @@ class TestLongTermOperation:
 
     def test_no_memory_degradation(self, v14_db):
         """No memory degradation over extended operation."""
-        import resource
+        from lab_system.app.services.performance_service import MemoryOptimizer
         gc.collect()
-        start_mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        start_mem = MemoryOptimizer.get_process_memory_mb() * 1024
         conn = sqlite3.connect(str(v14_db))
         conn.row_factory = sqlite3.Row
         for _ in range(500):
             conn.execute("SELECT * FROM receipts LIMIT 10").fetchall()
         conn.close()
         gc.collect()
-        end_mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        end_mem = MemoryOptimizer.get_process_memory_mb() * 1024
         growth_mb = (end_mem - start_mem) / 1024
         assert growth_mb < 20, f"Memory grew {growth_mb:.1f}MB over extended operation"
 
@@ -702,27 +702,25 @@ class TestLowHardwareCertification:
 
     def test_2gb_ram_simulation(self, v14_db):
         """System remains usable with limited RAM."""
-        import resource
+        from lab_system.app.services.performance_service import MemoryOptimizer
         conn = sqlite3.connect(str(v14_db))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA cache_size=-2000")
         for _ in range(100):
             conn.execute("SELECT * FROM receipts LIMIT 10").fetchall()
-        usage = resource.getrusage(resource.RUSAGE_SELF)
-        ram_mb = usage.ru_maxrss / 1024
+        ram_mb = MemoryOptimizer.get_process_memory_mb()
         conn.close()
         assert ram_mb < 200, f"RAM usage {ram_mb:.1f}MB on 2GB simulation"
 
     def test_4gb_ram_simulation(self, v14_db_large):
         """System performs well with 4GB RAM."""
-        import resource
+        from lab_system.app.services.performance_service import MemoryOptimizer
         conn = sqlite3.connect(str(v14_db_large))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA cache_size=-8000")
         for _ in range(200):
             conn.execute("SELECT * FROM receipts LIMIT 20").fetchall()
-        usage = resource.getrusage(resource.RUSAGE_SELF)
-        ram_mb = usage.ru_maxrss / 1024
+        ram_mb = MemoryOptimizer.get_process_memory_mb()
         conn.close()
         assert ram_mb < 200, f"RAM usage {ram_mb:.1f}MB on 4GB simulation"
 

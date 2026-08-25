@@ -287,15 +287,14 @@ class TestOperationalMetrics:
 
     def test_ram_usage_tracking(self, pilot_db):
         """Track memory usage during operations."""
-        import resource
+        from lab_system.app.services.performance_service import MemoryOptimizer
         with _patch_db(pilot_db):
             conn = sqlite3.connect(str(pilot_db))
             conn.row_factory = sqlite3.Row
             for _ in range(10):
                 conn.execute("SELECT * FROM receipts LIMIT 100").fetchall()
             conn.close()
-            usage = resource.getrusage(resource.RUSAGE_SELF)
-            ram_mb = usage.ru_maxrss / 1024
+            ram_mb = MemoryOptimizer.get_process_memory_mb()
             assert ram_mb < 200, f"RAM usage {ram_mb:.1f}MB, target < 200MB"
 
     def test_concurrent_operations(self, pilot_db):
@@ -739,15 +738,14 @@ class TestLowSpecHardware:
 
     def test_ram_usage_under_200mb(self, pilot_db):
         """RAM usage stays under 200MB."""
-        import resource
+        from lab_system.app.services.performance_service import MemoryOptimizer
         conn = sqlite3.connect(str(pilot_db))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL;")
         for _ in range(10):
             conn.execute("SELECT * FROM receipts LIMIT 100").fetchall()
         conn.close()
-        usage = resource.getrusage(resource.RUSAGE_SELF)
-        ram_mb = usage.ru_maxrss / 1024
+        ram_mb = MemoryOptimizer.get_process_memory_mb()
         assert ram_mb < 200, f"RAM usage {ram_mb:.1f}MB, target < 200MB"
 
     def test_search_latency_under_500ms(self, pilot_db_large):

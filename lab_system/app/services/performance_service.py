@@ -6,6 +6,7 @@ memory optimization, and startup profiling.
 """
 
 import os
+import sys
 import sqlite3
 import time
 import threading
@@ -50,7 +51,7 @@ def _get_process_memory_mb() -> float:
         import resource
 
         usage = resource.getrusage(resource.RUSAGE_SELF)
-        divisor = 1024 * 1024 if os.sys.platform == "darwin" else 1024
+        divisor = 1024 * 1024 if sys.platform == "darwin" else 1024
         return usage.ru_maxrss / divisor
     except (ImportError, AttributeError, OSError):
         try:

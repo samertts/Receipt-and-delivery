@@ -189,7 +189,7 @@ class TestLowSpecOptimization:
 
     def test_ram_usage_under_200mb(self, v13_db):
         """RAM usage stays under 200MB."""
-        import resource
+        from lab_system.app.services.performance_service import MemoryOptimizer
         conn = sqlite3.connect(str(v13_db))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL;")
@@ -197,22 +197,20 @@ class TestLowSpecOptimization:
         for _ in range(50):
             conn.execute("SELECT * FROM receipts LIMIT 100").fetchall()
         conn.close()
-        usage = resource.getrusage(resource.RUSAGE_SELF)
-        ram_mb = usage.ru_maxrss / 1024
+        ram_mb = MemoryOptimizer.get_process_memory_mb()
         assert ram_mb < 200, f"RAM usage {ram_mb:.1f}MB, target < 200MB"
 
     def test_cpu_idle_low(self, v13_db):
         """CPU idle usage is minimal for lightweight operations."""
         import gc
-        import resource
         gc.collect()
-        start_cpu = resource.getrusage(resource.RUSAGE_SELF).ru_utime
+        start_cpu = time.process_time()
         conn = sqlite3.connect(str(v13_db))
         conn.row_factory = sqlite3.Row
         for _ in range(10):
             conn.execute("SELECT COUNT(*) FROM receipts").fetchone()
         conn.close()
-        end_cpu = resource.getrusage(resource.RUSAGE_SELF).ru_utime
+        end_cpu = time.process_time()
         cpu_seconds = end_cpu - start_cpu
         assert cpu_seconds < 1.0, f"CPU time {cpu_seconds:.2f}s for 10 queries, target < 1s"
 
@@ -268,16 +266,16 @@ class TestMemoryProfiling:
 
     def test_no_memory_leak_on_repeated_queries(self, v13_db):
         """No memory leak after 1000 repeated queries."""
-        import resource
+        from lab_system.app.services.performance_service import MemoryOptimizer
         gc.collect()
-        start_mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        start_mem = MemoryOptimizer.get_process_memory_mb() * 1024
         conn = sqlite3.connect(str(v13_db))
         conn.row_factory = sqlite3.Row
         for _ in range(1000):
             conn.execute("SELECT * FROM receipts LIMIT 10").fetchall()
         conn.close()
         gc.collect()
-        end_mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        end_mem = MemoryOptimizer.get_process_memory_mb() * 1024
         growth_mb = (end_mem - start_mem) / 1024
         assert growth_mb < 10, f"Memory grew {growth_mb:.1f}MB after 1000 queries"
 
@@ -295,24 +293,24 @@ class TestMemoryProfiling:
 
     def test_no_object_retention(self, v13_db):
         """No excessive object retention after operations."""
-        import resource
+        from lab_system.app.services.performance_service import MemoryOptimizer
         gc.collect()
-        start_mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        start_mem = MemoryOptimizer.get_process_memory_mb() * 1024
         for _ in range(100):
             conn = sqlite3.connect(str(v13_db))
             conn.row_factory = sqlite3.Row
             conn.execute("SELECT * FROM receipts LIMIT 10").fetchall()
             conn.close()
         gc.collect()
-        end_mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        end_mem = MemoryOptimizer.get_process_memory_mb() * 1024
         growth_mb = (end_mem - start_mem) / 1024
         assert growth_mb < 5, f"Object retention caused {growth_mb:.1f}MB growth"
 
     def test_concurrent_memory_stability(self, v13_db):
         """Memory stable under concurrent load."""
-        import resource
+        from lab_system.app.services.performance_service import MemoryOptimizer
         gc.collect()
-        start_mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        start_mem = MemoryOptimizer.get_process_memory_mb() * 1024
         errors = []
 
         def worker(thread_id):
@@ -331,7 +329,7 @@ class TestMemoryProfiling:
         for t in threads:
             t.join(timeout=30)
         gc.collect()
-        end_mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        end_mem = MemoryOptimizer.get_process_memory_mb() * 1024
         growth_mb = (end_mem - start_mem) / 1024
         assert len(errors) == 0, f"Concurrent errors: {errors}"
         assert growth_mb < 10, f"Concurrent memory growth {growth_mb:.1f}MB"
