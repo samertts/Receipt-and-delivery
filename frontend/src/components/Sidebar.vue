@@ -103,31 +103,34 @@ const navGroups = computed(() => [
   {
     title: L.nav.operations,
     items: [
-      { path: '/dashboard', label: L.nav.dashboard, icon: ICONS.dashboard },
-      { path: '/transactionslist', label: L.nav.transactions, icon: ICONS.transactions },
-      { path: '/newtransaction', label: L.nav.newTransaction, icon: ICONS.newTransaction },
+      { path: '/dashboard', label: L.nav.dashboard, icon: ICONS.dashboard, permission: 'view_dashboard' },
+      { path: '/transactionslist', label: L.nav.transactions, icon: ICONS.transactions, permission: 'view_transactions' },
+      { path: '/newtransaction', label: L.nav.newTransaction, icon: ICONS.newTransaction, permission: 'create_transaction' },
     ],
   },
   {
     title: L.nav.admin,
     items: [
-      { path: '/organizations', label: L.nav.organizations, icon: ICONS.organizations },
-      { path: '/auditlogs', label: L.nav.auditLogs, icon: ICONS.auditLogs },
+      { path: '/organizations', label: L.nav.organizations, icon: ICONS.organizations, permission: 'view_organizations' },
+      { path: '/auditlogs', label: L.nav.auditLogs, icon: ICONS.auditLogs, permission: 'view_audit_logs' },
     ],
   },
   {
     title: L.nav.reports,
     items: [
-      { path: '/reports', label: L.nav.reportsTitle, icon: ICONS.reports },
+      { path: '/reports', label: L.nav.reportsTitle, icon: ICONS.reports, permission: 'view_reports' },
     ],
   },
   {
     title: L.nav.system,
     items: [
-      { path: '/settings', label: L.nav.settings, icon: ICONS.settings },
+      { path: '/settings', label: L.nav.settings, icon: ICONS.settings, permission: 'manage_settings' },
     ],
   },
-])
+].map((group) => ({
+  ...group,
+  items: group.items.filter((item) => !item.permission || auth.hasPermission(item.permission)),
+})).filter((group) => group.items.length))
 
 const initials = computed(() => {
   const name = auth.user?.username || ''

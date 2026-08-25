@@ -24,10 +24,13 @@ class UserService:
         page: int = 1,
         limit: int = 20,
         role: str = "",
+        status: str = "",
     ) -> tuple[list[User], int]:
         filters = {}
         if role:
             filters["role"] = role
+        if status:
+            filters["status"] = status
         return self.repo.list(
             page=page, limit=limit, filters=filters, order_by="created_at", desc=True
         )
@@ -76,6 +79,7 @@ class UserService:
         user_id: str,
         full_name: str | None = None,
         role: str | None = None,
+        status: str | None = None,
         password: str | None = None,
         request: Any = None,
         current_user: User | None = None,
@@ -84,19 +88,30 @@ class UserService:
         if not user:
             raise NotFoundError("المستخدم غير موجود")
 
-        if (
-            current_user
-            and str(user.id) == str(current_user.id)
-            and role is not None
-            and role != current_user.role
-        ):
+        is_self = current_user is not None and str(user.id) == str(current_user.id)
+        if is_self and role is not None and role != current_user.role:
             raise ValidationError("لا يمكن تغيير صلاحية المستخدم الحالي")
+        if is_self and status == "inactive":
+            raise ValidationError("لا يمكن تعطيل المستخدم الحالي")
+
+        target_role = role or user.role
+        target_status = status or user.status
+        if user.role == "admin" and user.status == "active" and (
+            target_role != "admin" or target_status != "active"
+        ):
+            active_admins = self.db.query(User).filter(
+                User.role == "admin", User.status == "active"
+            ).count()
+            if active_admins <= 1:
+                raise ValidationError("لا يمكن إزالة أو تعطيل آخر مدير نظام")
 
         update_kwargs = {}
         if full_name is not None:
             update_kwargs["full_name"] = full_name
         if role is not None:
             update_kwargs["role"] = role
+        if status is not None:
+            update_kwargs["status"] = status
         if password:
             error = validate_password_strength(password)
             if error:

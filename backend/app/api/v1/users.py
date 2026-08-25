@@ -16,11 +16,12 @@ def list_users(
     page: int = Query(1, ge=1),
     limit: int = Query(20, le=100),
     role: str = Query("", description="تصفية حسب الصلاحية"),
+    status: str = Query("", pattern="^(active|inactive)?$", description="تصفية حسب حالة الحساب"),
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("view_users")),
 ):
     svc = get_user_service(db)
-    items, total = svc.list_users(page=page, limit=limit, role=role)
+    items, total = svc.list_users(page=page, limit=limit, role=role, status=status)
     return paginated_response(
         items=[UserResponse.model_validate(u).model_dump(mode="json") for u in items],
         total=total,
@@ -70,6 +71,7 @@ def update_user(
         user_id,
         full_name=payload.full_name,
         role=payload.role,
+        status=payload.status,
         password=payload.password,
         request=request,
         current_user=current_user,

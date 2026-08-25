@@ -8,28 +8,11 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.exceptions import ForbiddenError, UnauthorizedError
 from app.db.session import get_db
+from app.core.rbac import PERMISSION_ROLES
 from app.models.blacklisted_token import BlacklistedToken
 from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
-
-PERMISSION_ROLES = {
-    "view_dashboard": ["admin", "supervisor", "user", "auditor"],
-    "view_transactions": ["admin", "supervisor", "user", "auditor"],
-    "create_transaction": ["admin", "supervisor", "user"],
-    "edit_transaction": ["admin", "supervisor"],
-    "delete_transaction": ["admin"],
-    "manage_users": ["admin"],
-    "view_users": ["admin", "supervisor"],
-    "view_audit_logs": ["admin", "auditor"],
-    "manage_organizations": ["admin", "supervisor"],
-    "view_organizations": ["admin", "supervisor", "user", "auditor"],
-    "view_reports": ["admin", "supervisor"],
-    "manage_settings": ["admin"],
-    "manage_backups": ["admin"],
-    "sync_data": ["admin"],
-}
-
 
 def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
@@ -64,7 +47,7 @@ def get_current_user(
 
 def require_permission(permission: str):
     def permission_checker(current_user: User = Depends(get_current_user)) -> User:
-        allowed_roles = PERMISSION_ROLES.get(permission, [])
+        allowed_roles = PERMISSION_ROLES.get(permission, ())
         if current_user.role not in allowed_roles:
             raise ForbiddenError()
         return current_user

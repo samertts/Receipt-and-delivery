@@ -5,6 +5,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.core.config import settings
+from app.core.rbac import permissions_for_role
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -40,6 +41,7 @@ def create_access_token(
     payload = {
         "sub": sub,
         "role": role,
+        "permissions": permissions_for_role(role),
         "exp": exp,
         "iat": datetime.now(timezone.utc),
         "type": "access",

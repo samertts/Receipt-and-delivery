@@ -8,7 +8,11 @@ Interactive docs: `/api/docs` (Swagger) | `/api/redoc` (ReDoc)
 
 ## Authentication
 
-### POST /api/auth/login
+### GET /api/auth/me
+
+يعيد بيانات المستخدم الحالي، الدور، الصلاحيات الفعلية، وجميع الأدوار المدعومة. يتطلب access token صالحًا.
+
+### POST /api/auth/refresh
 
 Authenticate user and receive JWT token.
 
@@ -125,6 +129,30 @@ ws://localhost:8000/api/ws/notifications?token=<access-token>
 ```
 
 يتم رفض الرموز المنتهية أو المبطلَة والحسابات غير النشطة برمز إغلاق WebSocket `1008`. التشغيل الافتراضي يستخدم عامل Backend واحدًا للحفاظ على مشاركة اتصالات WebSocket داخل العملية؛ عند استخدام عدة عمال أو عدة نسخ يجب إضافة broker مركزي مثل Redis للبث بين العمليات.
+
+---
+
+## RBAC
+
+يطبق Backend الصلاحيات على كل endpoint، كما تمنع الواجهة فتح المسارات غير المسموح بها وتخفي روابط Sidebar التي لا يملك المستخدم صلاحيتها. الأدوار المدعومة هي `admin` و`supervisor` و`user` و`auditor`.
+
+| الصلاحية | الأدوار المسموح لها |
+|---|---|
+| `view_dashboard` | admin, supervisor, user, auditor |
+| `view_transactions` | admin, supervisor, user, auditor |
+| `create_transaction` | admin, supervisor, user |
+| `edit_transaction` | admin, supervisor |
+| `delete_transaction` | admin |
+| `view_reports` | admin, supervisor |
+| `view_users` | admin, supervisor |
+| `manage_users` | admin |
+| `view_audit_logs` | admin, auditor |
+| `manage_organizations` | admin, supervisor |
+| `manage_settings` | admin |
+
+### User management
+
+يدعم `GET /api/users` معاملات `role` و`status=active|inactive` للتصفية. يدعم `PUT /api/users/{id}` تعديل `full_name` و`role` و`password` و`status`. لا يمكن تعطيل المستخدم الحالي أو إزالة آخر مدير نظام نشط.
 
 ---
 

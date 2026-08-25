@@ -40,6 +40,7 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = Field(None, min_length=1, max_length=180)
     role: Optional[str] = Field(None, pattern="^(admin|supervisor|user|auditor)$")
+    status: Optional[str] = Field(None, pattern="^(active|inactive)$")
     password: Optional[str] = Field(None, min_length=8, max_length=128)
 
 
@@ -48,6 +49,7 @@ class UserResponse(BaseModel):
     username: str
     full_name: str
     role: str
+    status: str
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

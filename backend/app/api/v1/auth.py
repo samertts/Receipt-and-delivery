@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.container_deps import get_auth_service
 from app.api.deps import get_current_user
+from app.core.rbac import ROLE_PERMISSIONS, ROLES, permissions_for_role
 from app.core.response_envelope import wrap_response
 from app.db.session import get_db
 from app.models.user import User
@@ -41,6 +42,22 @@ def refresh_token(
     return wrap_response(
         data=TokenResponse(**data).model_dump(),
         message="تم تحديث رمز الدخول بنجاح",
+    )
+
+
+@router.get("/me")
+def current_user_profile(current_user: User = Depends(get_current_user)):
+    return wrap_response(
+        data={
+            "id": str(current_user.id),
+            "username": current_user.username,
+            "full_name": current_user.full_name,
+            "role": current_user.role,
+            "permissions": permissions_for_role(current_user.role),
+            "roles": list(ROLES),
+            "role_permissions": {role: list(perms) for role, perms in ROLE_PERMISSIONS.items()},
+        },
+        message="تم تحميل ملف المستخدم والصلاحيات بنجاح",
     )
 
 
