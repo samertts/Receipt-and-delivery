@@ -30,6 +30,10 @@ Authenticate user and receive JWT token.
 
 ---
 
+## Localization
+
+تدعم الواجهة العربية والإنجليزية. يُحفظ اختيار المستخدم محليًا، وتتحول الصفحة تلقائيًا بين اتجاهي `RTL` و`LTR`. تُرسل صفحة التقارير معامل `lang=ar` أو `lang=en` إلى Backend لتوطين عناوين وحقول ملفات PDF وExcel.
+
 ## Dashboard
 
 ### GET /api/dashboard/summary
@@ -70,6 +74,24 @@ Authenticate user and receive JWT token.
 ```
 
 تُرجع الواجهة الخلفية هذه البيانات داخل غلاف الاستجابة القياسي `{success, message, data, meta}`. يتطلب endpoint صلاحية `view_dashboard`.
+
+---
+
+## Reports
+
+### GET /api/reports/summary
+
+يعيد تقرير المعاملات والإحصائيات وفق الفلاتر. يدعم `start_date` و`end_date` و`status` و`transaction_type`، إضافة إلى معامل `lang` الاختياري بقيمة `ar` أو `en`.
+
+### GET /api/reports/transactions.xlsx
+
+ينزّل تقرير المعاملات والإحصائيات بصيغة Excel باللغة المختارة.
+
+### GET /api/reports/transactions.pdf
+
+ينزّل تقرير المعاملات والإحصائيات بصيغة PDF باللغة المختارة.
+
+يتطلب الملخص والتصدير صلاحية `view_reports`.
 
 ---
 

@@ -1,9 +1,9 @@
 <template>
-  <div class="fixed top-4 left-4 z-50" dir="rtl">
+  <div class="fixed top-4 left-4 z-50" :dir="locale === 'ar' ? 'rtl' : 'ltr'">
     <button
       type="button"
       class="relative w-11 h-11 rounded-full bg-white border border-slate-200 shadow-md text-slate-600 hover:text-primary-900 hover:border-blue-300 transition-colors flex items-center justify-center"
-      aria-label="فتح التنبيهات"
+      :aria-label="L.notifications.open"
       :aria-expanded="open"
       @click="open = !open"
     >
@@ -13,24 +13,24 @@
       <span
         v-if="notifications.unreadCount"
         class="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center"
-        aria-label="عدد التنبيهات غير المقروءة"
+        :aria-label="L.notifications.unreadCount"
       >{{ notifications.unreadCount > 99 ? '99+' : notifications.unreadCount }}</span>
     </button>
 
     <section
       v-if="open"
       class="absolute left-0 mt-3 w-[min(22rem,calc(100vw-2rem))] bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden"
-      aria-label="مركز التنبيهات"
+      :aria-label="L.notifications.title"
     >
       <header class="flex items-center justify-between gap-3 p-4 border-b border-slate-100">
         <div>
-          <h2 class="font-semibold text-slate-800">التنبيهات</h2>
+          <h2 class="font-semibold text-slate-800">{{ L.notifications.title }}</h2>
           <p class="text-[11px] mt-1" :class="notifications.connected ? 'text-emerald-600' : 'text-slate-400'">
-            {{ notifications.connected ? 'متصل مباشرة' : notifications.connecting ? 'جاري الاتصال...' : 'غير متصل' }}
+            {{ notifications.connected ? L.notifications.connected : notifications.connecting ? L.notifications.connecting : L.notifications.disconnected }}
           </p>
         </div>
         <button v-if="notifications.unreadCount" type="button" class="text-xs text-blue-600 hover:text-blue-800" @click="notifications.markAllRead">
-          تحديد الكل كمقروء
+          {{ L.notifications.markAllRead }}
         </button>
       </header>
 
@@ -39,7 +39,7 @@
       </div>
 
       <div v-if="!notifications.notifications.length" class="p-8 text-center text-sm text-slate-400">
-        لا توجد تنبيهات جديدة
+        {{ L.notifications.empty }}
       </div>
       <div v-else class="max-h-96 overflow-y-auto divide-y divide-slate-100">
         <button
@@ -68,16 +68,18 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotificationStore } from '../stores/notifications'
+import { L, useLocale } from '../composables/useLocale'
 
 const router = useRouter()
 const notifications = useNotificationStore()
+const { locale } = useLocale()
 const open = ref(false)
 
 function formatNotificationDate(value) {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
-  return new Intl.DateTimeFormat('ar-IQ', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+  return new Intl.DateTimeFormat(locale.value === 'ar' ? 'ar-IQ' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
 function openNotification(item) {

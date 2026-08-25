@@ -3,9 +3,9 @@
     <div class="flex items-center gap-3 mb-6">
       <router-link to="/transactionslist" class="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm font-medium">
         <span v-html="icons.arrowRight"></span>
-        العودة
+        {{ L.actions.back }}
       </router-link>
-      <h1 class="text-2xl font-bold text-slate-800">تفاصيل المعاملة</h1>
+      <h1 class="text-2xl font-bold text-slate-800">{{ L.tx.details }}</h1>
     </div>
 
     <div v-if="loading" class="space-y-6">
@@ -27,7 +27,7 @@
     </div>
 
     <div v-else-if="!tx" class="text-center py-12 text-slate-400 bg-white rounded-xl border border-slate-200">
-      المعاملة غير موجودة
+      {{ L.tx.notFound }}
     </div>
 
     <div v-else class="space-y-6">
@@ -41,37 +41,37 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div class="flex items-center gap-2">
             <span class="text-slate-400" v-html="icons.tag"></span>
-            <span class="text-slate-500">النوع:</span>
+            <span class="text-slate-500">{{ L.form.transactionType }}:</span>
             <span class="font-medium text-slate-700">{{ tx.transaction_type }}</span>
           </div>
           <div class="flex items-center gap-2">
             <span class="text-slate-400" v-html="icons.calendar"></span>
-            <span class="text-slate-500">التاريخ:</span>
+            <span class="text-slate-500">{{ L.form.transactionDate }}:</span>
             <span class="font-medium text-slate-700">{{ tx.transaction_date }}</span>
           </div>
           <div class="flex items-center gap-2">
             <span class="text-slate-400" v-html="icons.user"></span>
-            <span class="text-slate-500">المرسل:</span>
+            <span class="text-slate-500">{{ L.form.sender }}:</span>
             <span class="font-medium text-slate-700">{{ tx.sender_name }}</span>
           </div>
           <div class="flex items-center gap-2">
             <span class="text-slate-400" v-html="icons.user"></span>
-            <span class="text-slate-500">المستلم:</span>
+            <span class="text-slate-500">{{ L.form.receiver }}:</span>
             <span class="font-medium text-slate-700">{{ tx.receiver_name }}</span>
           </div>
           <div v-if="tx.sender_job_title" class="flex items-center gap-2">
-            <span class="text-slate-500">مسمى المرسل:</span>
+            <span class="text-slate-500">{{ L.form.senderJobTitle }}:</span>
             <span class="font-medium text-slate-700">{{ tx.sender_job_title }}</span>
           </div>
           <div v-if="tx.receiver_job_title" class="flex items-center gap-2">
-            <span class="text-slate-500">مسمى المستلم:</span>
+            <span class="text-slate-500">{{ L.form.receiverJobTitle }}:</span>
             <span class="font-medium text-slate-700">{{ tx.receiver_job_title }}</span>
           </div>
-          <div v-if="tx.transport_info"><span class="text-slate-500">معلومات النقل:</span> {{ tx.transport_info }}</div>
-          <div><span class="text-slate-500">رقم التفويض:</span> {{ tx.authorization_no || '-' }}</div>
-          <div><span class="text-slate-500">تاريخ التفويض:</span> {{ tx.authorization_date || '-' }}</div>
+          <div v-if="tx.transport_info"><span class="text-slate-500">{{ L.form.transportInfo }}:</span> {{ tx.transport_info }}</div>
+          <div><span class="text-slate-500">{{ L.form.authorizationNo }}:</span> {{ tx.authorization_no || '-' }}</div>
+          <div><span class="text-slate-500">{{ L.form.authorizationDate }}:</span> {{ tx.authorization_date || '-' }}</div>
           <div v-if="tx.notes" class="md:col-span-2">
-            <span class="text-slate-500">ملاحظات:</span>
+            <span class="text-slate-500">{{ L.form.notes }}:</span>
             <p class="mt-1 text-slate-700 bg-slate-50 p-3 rounded-lg">{{ tx.notes }}</p>
           </div>
         </div>
@@ -79,20 +79,20 @@
 
       <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-slate-800">البنود</h3>
-          <span class="text-xs text-slate-400">{{ tx.items?.length || 0 }} بند</span>
+          <h3 class="text-lg font-semibold text-slate-800">{{ L.tx.items }}</h3>
+          <span class="text-xs text-slate-400">{{ tx.items?.length || 0 }} {{ L.tx.itemsCount }}</span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-slate-200 bg-slate-50">
-                <th class="text-right py-3 px-4 font-medium text-slate-600">نوع العينة</th>
-                <th class="text-center py-3 px-4 font-medium text-slate-600">المجموع</th>
-                <th class="text-center py-3 px-4 font-medium text-emerald-600">صالح</th>
-                <th class="text-center py-3 px-4 font-medium text-red-600">تالف</th>
-                <th class="text-center py-3 px-4 font-medium text-red-600">مرفوض</th>
-                <th class="text-center py-3 px-4 font-medium text-amber-600">غير مطابق</th>
-                <th class="text-center py-3 px-4 font-medium text-slate-600">حالة النقل</th>
+                <th class="text-right py-3 px-4 font-medium text-slate-600">{{ L.form.sampleType }}</th>
+                <th class="text-center py-3 px-4 font-medium text-slate-600">{{ L.form.total }}</th>
+                <th class="text-center py-3 px-4 font-medium text-emerald-600">{{ L.form.valid }}</th>
+                <th class="text-center py-3 px-4 font-medium text-red-600">{{ L.form.damaged }}</th>
+                <th class="text-center py-3 px-4 font-medium text-red-600">{{ L.form.rejected }}</th>
+                <th class="text-center py-3 px-4 font-medium text-amber-600">{{ L.form.nonconforming }}</th>
+                <th class="text-center py-3 px-4 font-medium text-slate-600">{{ L.form.transportCondition }}</th>
               </tr>
             </thead>
             <tbody>
@@ -114,15 +114,15 @@
         <div v-if="auth.isAdmin || auth.userRole === 'supervisor'" class="flex flex-wrap gap-3">
           <button @click="updateStatus('approved')" class="gov-btn-success flex items-center gap-2">
             <span v-html="icons.check"></span>
-            اعتماد
+            {{ L.tx.approve }}
           </button>
           <button @click="updateStatus('rejected')" class="gov-btn-danger flex items-center gap-2">
             <span v-html="icons.close"></span>
-            رفض
+            {{ L.tx.reject }}
           </button>
           <button @click="updateStatus('archived')" class="gov-btn-secondary flex items-center gap-2">
             <span v-html="icons.archive"></span>
-            أرشفة
+            {{ L.tx.archive }}
           </button>
         </div>
         <button
@@ -131,17 +131,17 @@
           class="gov-btn flex items-center gap-2 bg-red-800 text-white hover:bg-red-900"
         >
           <span v-html="icons.delete"></span>
-          حذف
+          {{ L.tx.delete }}
         </button>
       </div>
     </div>
 
     <ConfirmDialog
       :visible="showDeleteConfirm"
-      title="حذف المعاملة"
-      message="هل أنت متأكد من حذف هذه المعاملة؟ لا يمكن التراجع عن هذا الإجراء."
-      confirmText="حذف"
-      cancelText="إلغاء"
+      :title="L.tx.delete"
+      :message="L.tx.deleteConfirm"
+      :confirmText="L.actions.delete"
+      :cancelText="L.actions.cancel"
       variant="danger"
       @confirm="deleteTxn"
       @cancel="showDeleteConfirm = false"
@@ -158,6 +158,7 @@ import { transactionsApi } from '../api'
 import { statusLabel, statusClass } from '../composables/useStatus'
 import { ICONS } from '../composables/useIcons'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import { L } from '../composables/useLocale'
 
 const route = useRoute()
 const router = useRouter()
@@ -183,9 +184,9 @@ async function updateStatus(newStatus) {
   try {
     const res = await transactionsApi.update(route.query.id, { status: newStatus })
     tx.value = res.data
-    ui.success(`تم ${statusLabel(newStatus)} المعاملة بنجاح`)
+    ui.success(`${statusLabel(newStatus)}: ${tx.value.transaction_no}`)
   } catch (e) {
-    error.value = e.response?.data?.detail || 'فشل في تحديث الحالة'
+    error.value = e.apiMessage || e.response?.data?.detail || L.errors.updateFailed
     ui.error(error.value)
   }
 }
@@ -194,17 +195,17 @@ async function deleteTxn() {
   showDeleteConfirm.value = false
   try {
     await transactionsApi.delete(route.query.id)
-    ui.success('تم حذف المعاملة بنجاح')
+    ui.success(`${L.actions.delete}: ${tx.value.transaction_no}`)
     router.push('/transactionslist')
   } catch (e) {
-    error.value = e.response?.data?.detail || 'فشل في حذف المعاملة'
+    error.value = e.apiMessage || e.response?.data?.detail || L.errors.deleteFailed
     ui.error(error.value)
   }
 }
 
 onMounted(async () => {
   if (!route.query.id) {
-    error.value = 'لم يتم تحديد معاملة'
+    error.value = L.errors.notSpecified
     loading.value = false
     return
   }
@@ -212,7 +213,7 @@ onMounted(async () => {
     const res = await transactionsApi.get(route.query.id)
     tx.value = res.data
   } catch (e) {
-    error.value = 'فشل في تحميل المعاملة'
+    error.value = L.errors.loadFailedTxDetail
   } finally {
     loading.value = false
   }

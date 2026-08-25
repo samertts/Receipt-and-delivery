@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-slate-800 mb-6">معاملة جديدة</h1>
+    <h1 class="text-2xl font-bold text-slate-800 mb-6">{{ L.tx.new }}</h1>
 
     <div v-if="loading" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
       <div class="space-y-4">
@@ -16,45 +16,45 @@
       </div>
       <div v-if="success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm p-4 rounded-lg flex items-center gap-2">
         <span v-html="icons.check"></span>
-        <span>تم إنشاء المعاملة بنجاح: {{ success }}</span>
+        <span>{{ L.form.createdSuccess }}: {{ success }}</span>
         <router-link to="/transactionslist" class="mr-auto text-emerald-700 hover:text-emerald-900 font-medium underline">
-          العودة إلى القائمة
+          {{ L.form.backToList }}
         </router-link>
       </div>
 
       <div v-if="!success" class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="md:col-span-2">
-          <label class="gov-label">نوع المعاملة</label>
+          <label class="gov-label">{{ L.form.transactionType }}</label>
           <select v-model="form.transaction_type" required class="gov-select">
-            <option value="">اختر نوع المعاملة...</option>
-            <option value="استلام عينات">استلام عينات</option>
-            <option value="تسليم عينات">تسليم عينات</option>
-            <option value="تحويل مختبري">تحويل مختبري</option>
-            <option value="إعادة عينات">إعادة عينات</option>
-            <option value="تسليم نتائج">تسليم نتائج</option>
-            <option value="أخرى">أخرى</option>
+            <option value="">{{ L.form.chooseType }}</option>
+            <option value="استلام عينات">{{ L.form.types.receipt }}</option>
+            <option value="تسليم عينات">{{ L.form.types.delivery }}</option>
+            <option value="تحويل مختبري">{{ L.form.types.transfer }}</option>
+            <option value="إعادة عينات">{{ L.form.types.return }}</option>
+            <option value="تسليم نتائج">{{ L.form.types.results }}</option>
+            <option value="أخرى">{{ L.form.types.other }}</option>
           </select>
         </div>
         <div>
-          <label class="gov-label">تاريخ المعاملة</label>
+          <label class="gov-label">{{ L.form.transactionDate }}</label>
           <input v-model="form.transaction_date" type="date" required class="gov-input" />
         </div>
         <div>
-          <label class="gov-label">المرسل</label>
-          <input v-model="form.sender_name" required placeholder="اسم المرسل" class="gov-input" />
+          <label class="gov-label">{{ L.form.sender }}</label>
+          <input v-model="form.sender_name" required :placeholder="L.form.senderPlaceholder" class="gov-input" />
         </div>
         <div>
-          <label class="gov-label">المستلم</label>
-          <input v-model="form.receiver_name" required placeholder="اسم المستلم" class="gov-input" />
+          <label class="gov-label">{{ L.form.receiver }}</label>
+          <input v-model="form.receiver_name" required :placeholder="L.form.receiverPlaceholder" class="gov-input" />
         </div>
         <div>
-          <label class="gov-label">المنشأة المرسلة</label>
+          <label class="gov-label">{{ L.form.senderOrg }}</label>
           <div class="relative">
             <input
               v-model="senderOrgSearch"
               @focus="senderDropdownOpen = true"
               @input="senderDropdownOpen = true"
-              placeholder="ابحث عن منشأة..."
+              :placeholder="L.form.searchOrg"
               class="gov-input"
             />
             <ul v-if="senderDropdownOpen && filteredSenderOrgs.length"
@@ -70,13 +70,13 @@
           </div>
         </div>
         <div>
-          <label class="gov-label">المنشأة المستلمة</label>
+          <label class="gov-label">{{ L.form.receiverOrg }}</label>
           <div class="relative">
             <input
               v-model="receiverOrgSearch"
               @focus="receiverDropdownOpen = true"
               @input="receiverDropdownOpen = true"
-              placeholder="ابحث عن منشأة..."
+              :placeholder="L.form.searchOrg"
               class="gov-input"
             />
             <ul v-if="receiverDropdownOpen && filteredReceiverOrgs.length"
@@ -92,24 +92,24 @@
           </div>
         </div>
         <div>
-          <label class="gov-label">رقم التفويض</label>
+          <label class="gov-label">{{ L.form.authorizationNo }}</label>
           <input v-model="form.authorization_no" class="gov-input" />
         </div>
         <div>
-          <label class="gov-label">تاريخ التفويض</label>
+          <label class="gov-label">{{ L.form.authorizationDate }}</label>
           <input v-model="form.authorization_date" type="date" class="gov-input" />
         </div>
         <div class="md:col-span-2">
-          <label class="gov-label">ملاحظات</label>
-          <textarea v-model="form.notes" rows="3" class="gov-input" placeholder="ملاحظات إضافية..."></textarea>
+          <label class="gov-label">{{ L.form.notes }}</label>
+          <textarea v-model="form.notes" rows="3" class="gov-input" :placeholder="L.form.extraNotes"></textarea>
         </div>
       </div>
 
       <div v-if="!success">
         <div class="flex items-center justify-between mb-3">
-          <h2 class="text-lg font-semibold text-slate-800">بنود المعاملة</h2>
+          <h2 class="text-lg font-semibold text-slate-800">{{ L.tx.items }}</h2>
           <button type="button" @click="addItem" class="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
-            <span v-html="icons.plus"></span> إضافة بند
+            <span v-html="icons.plus"></span> {{ L.form.addItem }}
           </button>
         </div>
         <div v-for="(item, idx) in form.items" :key="idx"
@@ -117,13 +117,13 @@
         >
           <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div class="relative">
-              <label class="block text-xs text-slate-500 mb-1">نوع العينة</label>
+              <label class="block text-xs text-slate-500 mb-1">{{ L.form.sampleType }}</label>
               <div class="relative">
                 <input
                   v-model="item.sample_type"
                   @focus="sampleDropdownIdx = idx"
                   @input="sampleDropdownIdx = idx"
-                  required placeholder="اختر أو اكتب..."
+                  :placeholder="L.form.chooseOrType" required
                   class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm"
                 />
                 <ul v-if="sampleDropdownIdx === idx && filteredSampleTypes.length"
@@ -137,37 +137,37 @@
               </div>
             </div>
             <div>
-              <label class="block text-xs text-slate-500 mb-1">المجموع</label>
+              <label class="block text-xs text-slate-500 mb-1">{{ L.form.total }}</label>
               <input v-model.number="item.total_count" type="number" min="1" required class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm" />
             </div>
             <div>
-              <label class="block text-xs text-slate-500 mb-1">صالح</label>
+              <label class="block text-xs text-slate-500 mb-1">{{ L.form.valid }}</label>
               <input v-model.number="item.valid_count" type="number" min="0" required class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm" />
             </div>
             <div>
-              <label class="block text-xs text-slate-500 mb-1">تالف</label>
+              <label class="block text-xs text-slate-500 mb-1">{{ L.form.damaged }}</label>
               <input v-model.number="item.damaged_count" type="number" min="0" required class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm" />
             </div>
             <div>
-              <label class="block text-xs text-slate-500 mb-1">مرفوض</label>
+              <label class="block text-xs text-slate-500 mb-1">{{ L.form.rejected }}</label>
               <input v-model.number="item.rejected_count" type="number" min="0" required class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm" />
             </div>
             <div>
-              <label class="block text-xs text-slate-500 mb-1">غير مطابق</label>
+              <label class="block text-xs text-slate-500 mb-1">{{ L.form.nonconforming }}</label>
               <input v-model.number="item.nonconforming_count" type="number" min="0" required class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm" />
             </div>
             <div>
-              <label class="block text-xs text-slate-500 mb-1">حالة النقل</label>
+              <label class="block text-xs text-slate-500 mb-1">{{ L.form.transportCondition }}</label>
               <select v-model="item.transport_condition" class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm bg-white">
-                <option value="">اختر...</option>
-                <option value="جيدة">جيدة</option>
-                <option value="متوسطة">متوسطة</option>
-                <option value="سيئة">سيئة</option>
+                <option value="">{{ L.form.choose }}</option>
+                <option value="جيدة">{{ L.form.good }}</option>
+                <option value="متوسطة">{{ L.form.medium }}</option>
+                <option value="سيئة">{{ L.form.poor }}</option>
               </select>
             </div>
             <div class="flex items-end">
               <button type="button" @click="removeItem(idx)" class="text-red-500 text-sm hover:text-red-700 flex items-center gap-1">
-                <span v-html="icons.close"></span> حذف
+                <span v-html="icons.close"></span> {{ L.form.removeItem }}
               </button>
             </div>
           </div>
@@ -178,7 +178,7 @@
         class="w-full bg-primary-900 text-white py-2.5 rounded-lg font-medium hover:bg-primary-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
       >
         <span v-if="submitting" class="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-        <span>{{ submitting ? 'جاري الحفظ...' : 'حفظ المعاملة' }}</span>
+        <span>{{ submitting ? L.form.saving : L.form.saveTransaction }}</span>
       </button>
     </form>
   </div>
@@ -189,6 +189,7 @@ import { ref, computed, onMounted } from 'vue'
 import { transactionsApi, organizationsApi } from '../api'
 import { useUiStore } from '../stores/ui'
 import { ICONS } from '../composables/useIcons'
+import { L } from '../composables/useLocale'
 
 const ui = useUiStore()
 const icons = ICONS
@@ -313,10 +314,10 @@ async function submitForm() {
   try {
     const result = await transactionsApi.create(form.value)
     success.value = result.data.transaction_no
-    ui.success(`تم إنشاء المعاملة ${result.data.transaction_no} بنجاح`)
+    ui.success(`${L.form.createdSuccess}: ${result.data.transaction_no}`)
     resetForm()
   } catch (e) {
-    error.value = e.response?.data?.detail || 'فشل في إنشاء المعاملة'
+    error.value = e.apiMessage || e.response?.data?.detail || L.errors.saveFailed
   } finally {
     submitting.value = false
   }

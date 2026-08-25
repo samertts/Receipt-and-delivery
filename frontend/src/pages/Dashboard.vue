@@ -1,11 +1,11 @@
 <template>
   <div>
     <div class="mb-6">
-      <h1 class="text-2xl font-bold text-slate-800">{{ L.dashboard.welcome }}، {{ auth.user?.username || 'مستخدم' }}</h1>
+      <h1 class="text-2xl font-bold text-slate-800">{{ L.dashboard.welcome }}, {{ auth.user?.username || L.roles.user }}</h1>
       <p class="text-sm text-slate-500 mt-1">{{ L.dashboard.subtitle }}</p>
     </div>
 
-    <div v-if="loading" role="status" aria-live="polite" aria-label="تحميل بيانات لوحة التحكم">
+    <div v-if="loading" role="status" aria-live="polite" :aria-label="L.actions.loading">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div v-for="i in 4" :key="i" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div class="skeleton h-4 w-24 mb-3"></div>
@@ -42,7 +42,7 @@
           <div class="flex items-center gap-1 mt-1">
             <span v-html="trends.total >= 0 ? ICONS.trendUp : ICONS.trendDown" class="w-4 h-4" :class="trends.total >= 0 ? 'text-emerald-500' : 'text-red-500'"></span>
             <span class="text-xs font-medium" :class="trends.total >= 0 ? 'text-emerald-600' : 'text-red-600'">{{ Math.abs(trends.total) }}%</span>
-            <span class="text-xs text-slate-400">شهري</span>
+            <span class="text-xs text-slate-400">{{ L.dashboard.monthly }}</span>
           </div>
         </div>
 
@@ -62,7 +62,7 @@
           <div class="flex items-center gap-1 mt-1">
             <span v-html="trends.approved >= 0 ? ICONS.trendUp : ICONS.trendDown" class="w-4 h-4" :class="trends.approved >= 0 ? 'text-emerald-500' : 'text-red-500'"></span>
             <span class="text-xs font-medium" :class="trends.approved >= 0 ? 'text-emerald-600' : 'text-red-600'">{{ Math.abs(trends.approved) }}%</span>
-            <span class="text-xs text-slate-400">شهري</span>
+            <span class="text-xs text-slate-400">{{ L.dashboard.monthly }}</span>
           </div>
         </div>
 
@@ -82,7 +82,7 @@
           <div class="flex items-center gap-1 mt-1">
             <span v-html="trends.draft >= 0 ? ICONS.trendUp : ICONS.trendDown" class="w-4 h-4" :class="trends.draft >= 0 ? 'text-emerald-500' : 'text-red-500'"></span>
             <span class="text-xs font-medium" :class="trends.draft >= 0 ? 'text-emerald-600' : 'text-red-600'">{{ Math.abs(trends.draft) }}%</span>
-            <span class="text-xs text-slate-400">شهري</span>
+            <span class="text-xs text-slate-400">{{ L.dashboard.monthly }}</span>
           </div>
         </div>
 
@@ -102,7 +102,7 @@
           <div class="flex items-center gap-1 mt-1">
             <span v-html="trends.orgs >= 0 ? ICONS.trendUp : ICONS.trendDown" class="w-4 h-4" :class="trends.orgs >= 0 ? 'text-emerald-500' : 'text-red-500'"></span>
             <span class="text-xs font-medium" :class="trends.orgs >= 0 ? 'text-emerald-600' : 'text-red-600'">{{ Math.abs(trends.orgs) }}%</span>
-            <span class="text-xs text-slate-400">شهري</span>
+            <span class="text-xs text-slate-400">{{ L.dashboard.monthly }}</span>
           </div>
         </div>
       </div>
@@ -111,12 +111,12 @@
         <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6" aria-labelledby="daily-trend-title">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <h2 id="daily-trend-title" class="text-lg font-semibold text-slate-800">الاتجاه اليومي للمعاملات</h2>
-              <p class="text-xs text-slate-500 mt-1">عدد المعاملات المسجلة خلال آخر سبعة أيام</p>
+              <h2 id="daily-trend-title" class="text-lg font-semibold text-slate-800">{{ L.dashboard.dailyTrend }}</h2>
+              <p class="text-xs text-slate-500 mt-1">{{ L.dashboard.lastSevenDays }}</p>
             </div>
-            <span class="text-xs text-slate-400">{{ trend.reduce((sum, item) => sum + item.count, 0) }} معاملة</span>
+            <span class="text-xs text-slate-400">{{ trend.reduce((sum, item) => sum + item.count, 0) }} {{ L.dashboard.transactionsCount }}</span>
           </div>
-          <div v-if="trend.length" class="overflow-x-auto" role="img" aria-label="رسم بياني يوضح عدد المعاملات لكل يوم">
+          <div v-if="trend.length" class="overflow-x-auto" role="img" :aria-label="L.dashboard.chartLabel">
             <svg class="w-full min-w-[520px] h-64" viewBox="0 0 660 260" preserveAspectRatio="none">
               <line v-for="level in [0, 1, 2, 3, 4]" :key="level" x1="36" :y1="trendGridY(level)" x2="648" :y2="trendGridY(level)" stroke="#e2e8f0" stroke-width="1" />
               <text v-for="level in [0, 1, 2, 3, 4]" :key="`label-${level}`" x="30" :y="trendGridY(level) + 4" text-anchor="end" class="fill-slate-400 text-[10px]">{{ Math.round((trendMax * (4 - level)) / 4) }}</text>
@@ -128,16 +128,16 @@
               </g>
             </svg>
           </div>
-          <div v-else class="text-center py-16 text-slate-400 text-sm">لا توجد بيانات كافية لعرض الاتجاه</div>
+          <div v-else class="text-center py-16 text-slate-400 text-sm">{{ L.dashboard.noTrendData }}</div>
         </section>
 
         <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6" aria-labelledby="type-breakdown-title">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <h2 id="type-breakdown-title" class="text-lg font-semibold text-slate-800">توزيع أنواع المعاملات</h2>
-              <p class="text-xs text-slate-500 mt-1">أكثر أنواع المعاملات استخدامًا</p>
+              <h2 id="type-breakdown-title" class="text-lg font-semibold text-slate-800">{{ L.dashboard.transactionTypes }}</h2>
+              <p class="text-xs text-slate-500 mt-1">{{ L.dashboard.mostUsedTypes }}</p>
             </div>
-            <span class="text-xs text-slate-400">{{ byType.length }} أنواع</span>
+            <span class="text-xs text-slate-400">{{ byType.length }} {{ L.dashboard.types }}</span>
           </div>
           <div v-if="typeBars.length" class="space-y-4">
             <div v-for="item in typeBars" :key="item.key">
@@ -150,7 +150,7 @@
               </div>
             </div>
           </div>
-          <div v-else class="text-center py-16 text-slate-400 text-sm">لا توجد بيانات لأنواع المعاملات</div>
+          <div v-else class="text-center py-16 text-slate-400 text-sm">{{ L.dashboard.noTypeData }}</div>
         </section>
       </div>
 
@@ -192,7 +192,7 @@
 
         <div class="space-y-6">
           <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h2 class="text-lg font-semibold text-slate-800 mb-4">توزيع الحالات</h2>
+            <h2 class="text-lg font-semibold text-slate-800 mb-4">{{ L.dashboard.statusDistribution }}</h2>
             <div class="space-y-3">
               <div v-for="item in statusDistribution" :key="item.key">
                 <div class="flex items-center justify-between text-sm mb-1">
@@ -253,10 +253,11 @@ import { useAuthStore } from '../stores/auth'
 import { dashboardApi } from '../api'
 import { statusLabel, statusClass, formatDate } from '../composables/useStatus'
 import { ICONS } from '../composables/useIcons'
-import { L } from '../composables/useLocale'
+import { L, useLocale } from '../composables/useLocale'
 
 const router = useRouter()
 const auth = useAuthStore()
+const { locale } = useLocale()
 
 const loading = ref(true)
 const error = ref(null)
@@ -290,14 +291,14 @@ function trendGridY(level) {
 
 function trendLabel(value) {
   const date = new Date(`${value}T00:00:00`)
-  return new Intl.DateTimeFormat('ar-IQ', { day: 'numeric', month: 'short' }).format(date)
+  return new Intl.DateTimeFormat(locale.value === 'ar' ? 'ar-IQ' : 'en-US', { day: 'numeric', month: 'short' }).format(date)
 }
 
 async function loadData() {
   loading.value = true
   error.value = null
   try {
-    const response = await dashboardApi.summary({ days: 7 })
+    const response = await dashboardApi.summary({ days: 7, lang: locale.value })
     const payload = response.data || {}
     const summary = payload.summary || {}
     const byStatus = summary.by_status || {}

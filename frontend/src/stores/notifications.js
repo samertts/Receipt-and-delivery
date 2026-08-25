@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getAccessToken } from '../api/tokenStore'
+import { t } from '../composables/useLocale'
 
 const MAX_NOTIFICATIONS = 50
 const INITIAL_RECONNECT_DELAY = 1000
@@ -63,11 +64,11 @@ export const useNotificationStore = defineStore('notifications', () => {
       try {
         addNotification(JSON.parse(event.data))
       } catch {
-        lastError.value = 'تعذر قراءة تنبيه وارد'
+        lastError.value = t('notifications.parseError')
       }
     }
     socket.onerror = () => {
-      lastError.value = 'تعذر الاتصال بالتنبيهات الفورية'
+      lastError.value = t('notifications.connectionError')
     }
     socket.onclose = () => {
       connected.value = false

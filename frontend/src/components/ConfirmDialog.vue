@@ -5,7 +5,7 @@
         <div class="fixed inset-0 bg-black/40 backdrop-blur-sm"></div>
         <div
           class="relative bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border border-slate-200"
-          dir="rtl"
+          :dir="direction"
           role="dialog"
           aria-modal="true"
           :aria-label="title"
@@ -40,13 +40,16 @@
 <script setup>
 import { nextTick, ref, watch } from 'vue'
 import { ICONS } from '../composables/useIcons'
+import { L, useLocale } from '../composables/useLocale'
+
+const { direction } = useLocale()
 
 const props = defineProps({
   visible: Boolean,
-  title: { type: String, default: 'تأكيد' },
-  message: { type: String, default: 'هل أنت متأكد؟' },
-  confirmText: { type: String, default: 'تأكيد' },
-  cancelText: { type: String, default: 'إلغاء' },
+  title: { type: String, default: () => L.actions.confirm },
+  message: { type: String, default: () => L.actions.confirmMessage },
+  confirmText: { type: String, default: () => L.actions.confirm },
+  cancelText: { type: String, default: () => L.actions.cancel },
   variant: { type: String, default: 'danger' },
 })
 

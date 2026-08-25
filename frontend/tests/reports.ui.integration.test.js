@@ -44,7 +44,7 @@ describe('reports UI/API integration', () => {
     const wrapper = mount(Reports)
     await flushPromises()
 
-    expect(reportsApi.summary).toHaveBeenCalledWith({})
+    expect(reportsApi.summary).toHaveBeenCalledWith({ lang: 'ar' })
     expect(wrapper.text()).toContain('2')
     expect(wrapper.text()).toContain('TXN-001')
     expect(wrapper.text()).toContain('مختبر بغداد')
@@ -54,7 +54,7 @@ describe('reports UI/API integration', () => {
     await wrapper.get('form').trigger('submit.prevent')
     await flushPromises()
 
-    expect(reportsApi.summary).toHaveBeenLastCalledWith({ status: 'approved' })
+    expect(reportsApi.summary).toHaveBeenLastCalledWith({ status: 'approved', lang: 'ar' })
   })
 
   it('downloads an Excel report with the active filters', async () => {
@@ -71,7 +71,7 @@ describe('reports UI/API integration', () => {
     await excelButton.trigger('click')
     await flushPromises()
 
-    expect(reportsApi.exportExcel).toHaveBeenCalledWith({ transaction_type: 'استلام' })
+    expect(reportsApi.exportExcel).toHaveBeenCalledWith({ transaction_type: 'استلام', lang: 'ar' })
     expect(createObjectURL).toHaveBeenCalled()
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:report')
   })

@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
@@ -37,6 +37,17 @@ _STATUS_LABELS = {
     "archived": "مؤرشفة",
     "cancelled": "ملغاة",
 }
+_STATUS_LABELS_EN = {
+    "approved": "Approved",
+    "draft": "Draft",
+    "rejected": "Rejected",
+    "archived": "Archived",
+    "cancelled": "Cancelled",
+}
+
+
+def _status_labels(lang: str) -> dict[str, str]:
+    return _STATUS_LABELS_EN if lang == "en" else _STATUS_LABELS
 _PDF_FONT = "Helvetica"
 
 
@@ -100,14 +111,17 @@ def _report_data(
     }
 
 
-def _transaction_rows(transactions: list[Transaction]) -> list[list[str]]:
+def _transaction_rows(
+    transactions: list[Transaction], labels: dict[str, str] | None = None
+) -> list[list[str]]:
+    labels = labels or _STATUS_LABELS
     return [
         [
             str(transaction.transaction_no or ""),
             str(transaction.transaction_type or ""),
             str(transaction.sender_name or ""),
             str(transaction.receiver_name or ""),
-            _STATUS_LABELS.get(transaction.status, transaction.status or ""),
+            labels.get(transaction.status, transaction.status or ""),
             transaction.transaction_date or "",
             transaction.created_at.isoformat() if transaction.created_at else "",
         ]
@@ -125,13 +139,14 @@ def get_report_summary(
     end_date: date | None = Query(None, description="تاريخ النهاية"),
     status: str = Query("", description="الحالة"),
     transaction_type: str = Query("", description="نوع المعاملة"),
+    lang: str = Query("ar", pattern="^(ar|en)$"),
     current_user: User = Depends(require_permission("view_reports")),
     db: Session = Depends(get_db),
 ):
     if start_date and end_date and start_date > end_date:
         from app.core.exceptions import ValidationError
 
-        raise ValidationError("تاريخ البداية يجب أن يسبق تاريخ النهاية")
+        raise ValidationError("Start date must be before end date" if lang == "en" else "تاريخ البداية يجب أن يسبق تاريخ النهاية")
 
     report = _report_data(db, start_date, end_date, status, transaction_type)
     report["summary"]["by_status"] = {
@@ -146,7 +161,7 @@ def get_report_summary(
         TransactionResponse.model_validate(transaction).model_dump(mode="json")
         for transaction in transactions
     ]
-    return wrap_response(data=report, message="تم تحميل التقرير بنجاح")
+    return wrap_response(data=report, message="Report loaded successfully" if lang == "en" else "تم تحميل التقرير بنجاح")
 
 
 @router.get("/transactions.xlsx")
@@ -155,42 +170,40 @@ def export_transactions_excel(
     end_date: date | None = Query(None),
     status: str = Query(""),
     transaction_type: str = Query(""),
+    lang: str = Query("ar", pattern="^(ar|en)$"),
     _: User = Depends(require_permission("view_reports")),
     db: Session = Depends(get_db),
 ):
     report = _report_data(db, start_date, end_date, status, transaction_type)
+    labels = _status_labels(lang)
     workbook = Workbook()
     transactions_sheet = workbook.active
-    transactions_sheet.title = "المعاملات"
-    transactions_sheet.sheet_view.rightToLeft = True
+    transactions_sheet.title = "Transactions" if lang == "en" else "المعاملات"
+    transactions_sheet.sheet_view.rightToLeft = lang != "en"
     headers = [
-        "رقم المعاملة",
-        "نوع المعاملة",
-        "المرسل",
-        "المستلم",
-        "الحالة",
-        "تاريخ المعاملة",
-        "تاريخ الإنشاء",
+        "Transaction number", "Transaction type", "Sender", "Receiver", "Status", "Transaction date", "Created at"
+    ] if lang == "en" else [
+        "رقم المعاملة", "نوع المعاملة", "المرسل", "المستلم", "الحالة", "تاريخ المعاملة", "تاريخ الإنشاء"
     ]
-    transactions_sheet.append(["تقرير المعاملات"])
-    transactions_sheet.append([f"الفلاتر: {report['filters']}"])
+    transactions_sheet.append(["Transaction Report" if lang == "en" else "تقرير المعاملات"])
+    transactions_sheet.append([f"Filters: {report['filters']}" if lang == "en" else f"الفلاتر: {report['filters']}"])
     transactions_sheet.append(headers)
-    for row in _transaction_rows(report["transactions"]):
+    for row in _transaction_rows(report["transactions"], labels):
         transactions_sheet.append(row)
     transactions_sheet.freeze_panes = "A4"
     transactions_sheet.auto_filter.ref = f"A3:G{max(3, transactions_sheet.max_row)}"
 
-    stats_sheet = workbook.create_sheet("الإحصائيات")
-    stats_sheet.sheet_view.rightToLeft = True
-    stats_sheet.append(["ملخص الإحصائيات"])
-    stats_sheet.append(["المؤشر", "القيمة"])
-    stats_sheet.append(["إجمالي المعاملات", report["summary"]["total"]])
+    stats_sheet = workbook.create_sheet("Statistics" if lang == "en" else "الإحصائيات")
+    stats_sheet.sheet_view.rightToLeft = lang != "en"
+    stats_sheet.append(["Statistics Summary" if lang == "en" else "ملخص الإحصائيات"])
+    stats_sheet.append(["Metric", "Value"] if lang == "en" else ["المؤشر", "القيمة"])
+    stats_sheet.append(["Total transactions", report["summary"]["total"]] if lang == "en" else ["إجمالي المعاملات", report["summary"]["total"]])
     stats_sheet.append([])
-    stats_sheet.append(["الحالة", "العدد"])
+    stats_sheet.append(["Status", "Count"] if lang == "en" else ["الحالة", "العدد"])
     for key in _STATUS_LABELS:
-        stats_sheet.append([_STATUS_LABELS[key], report["summary"]["by_status"].get(key, 0)])
+        stats_sheet.append([labels[key], report["summary"]["by_status"].get(key, 0)])
     stats_sheet.append([])
-    stats_sheet.append(["نوع المعاملة", "العدد"])
+    stats_sheet.append(["Transaction type", "Count"] if lang == "en" else ["نوع المعاملة", "العدد"])
     for key, count in sorted(
         report["summary"]["by_type"].items(), key=lambda item: item[1], reverse=True
     ):
@@ -199,7 +212,7 @@ def export_transactions_excel(
     for sheet in (transactions_sheet, stats_sheet):
         for row in sheet.iter_rows():
             for cell in row:
-                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.alignment = Alignment(horizontal="left" if lang == "en" else "right", vertical="center")
         for cell in sheet[1]:
             cell.font = Font(bold=True, size=14, color="FFFFFF")
             cell.fill = PatternFill("solid", fgColor="1F3A5F")
@@ -249,10 +262,12 @@ def export_transactions_pdf(
     end_date: date | None = Query(None),
     status: str = Query(""),
     transaction_type: str = Query(""),
+    lang: str = Query("ar", pattern="^(ar|en)$"),
     _: User = Depends(require_permission("view_reports")),
     db: Session = Depends(get_db),
 ):
     report = _report_data(db, start_date, end_date, status, transaction_type)
+    labels = _status_labels(lang)
     font_name = _register_pdf_font()
     output = BytesIO()
     document = SimpleDocTemplate(
@@ -276,31 +291,37 @@ def export_transactions_pdf(
         "ReportBody",
         parent=styles["BodyText"],
         fontName=font_name,
-        alignment=TA_RIGHT,
+        alignment=TA_LEFT if lang == "en" else TA_RIGHT,
         fontSize=8,
         leading=11,
     )
     story = [
-        Paragraph(_pdf_value("تقرير المعاملات والإحصائيات"), title_style),
+        Paragraph(_pdf_value("Transaction and Statistics Report" if lang == "en" else "تقرير المعاملات والإحصائيات"), title_style),
         Spacer(1, 5 * mm),
         Paragraph(
             _pdf_value(
-                f"إجمالي المعاملات: {report['summary']['total']} | "
-                f"الفترة: {report['filters']['start_date'] or 'الكل'} - "
-                f"{report['filters']['end_date'] or 'الكل'}"
+                (
+                    f"Total transactions: {report['summary']['total']} | "
+                    f"Period: {report['filters']['start_date'] or 'All'} - "
+                    f"{report['filters']['end_date'] or 'All'}"
+                ) if lang == "en" else (
+                    f"إجمالي المعاملات: {report['summary']['total']} | "
+                    f"الفترة: {report['filters']['start_date'] or 'الكل'} - "
+                    f"{report['filters']['end_date'] or 'الكل'}"
+                )
             ),
             body_style,
         ),
         Spacer(1, 4 * mm),
     ]
-    headers = ["رقم المعاملة", "النوع", "المرسل", "المستلم", "الحالة", "التاريخ"]
+    headers = ["Transaction number", "Type", "Sender", "Receiver", "Status", "Date"] if lang == "en" else ["رقم المعاملة", "النوع", "المرسل", "المستلم", "الحالة", "التاريخ"]
     table_data = [[Paragraph(_pdf_value(header), body_style) for header in headers]]
-    for row in _transaction_rows(report["transactions"]):
+    for row in _transaction_rows(report["transactions"], labels):
         table_data.append(
             [Paragraph(_pdf_value(value), body_style) for value in [row[0], row[1], row[2], row[3], row[4], row[5]]]
         )
     if len(table_data) == 1:
-        table_data.append([Paragraph(_pdf_value("لا توجد بيانات"), body_style)] + [""] * 5)
+        table_data.append([Paragraph(_pdf_value("No data available" if lang == "en" else "لا توجد بيانات"), body_style)] + [""] * 5)
     table = Table(table_data, repeatRows=1, colWidths=[34 * mm, 34 * mm, 48 * mm, 48 * mm, 28 * mm, 32 * mm])
     table.setStyle(
         TableStyle(
@@ -309,7 +330,7 @@ def export_transactions_pdf(
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#CBD5E1")),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT" if lang == "en" else "RIGHT"),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 5),
                 ("LEFTPADDING", (0, 0), (-1, -1), 5),

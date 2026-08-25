@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-slate-50" dir="rtl">
+  <div class="min-h-screen bg-slate-50" :dir="direction">
     <div v-if="auth.isAuthenticated" class="flex h-screen overflow-hidden">
       <NotificationCenter />
       <Sidebar
@@ -23,7 +23,9 @@ import { useUiStore } from '../stores/ui'
 import Sidebar from './Sidebar.vue'
 import Toast from './Toast.vue'
 import NotificationCenter from './NotificationCenter.vue'
+import { useLocale } from '../composables/useLocale'
 
 const auth = useAuthStore()
 const ui = useUiStore()
+const { direction } = useLocale()
 </script>

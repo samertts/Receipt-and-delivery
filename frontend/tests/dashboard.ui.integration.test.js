@@ -53,7 +53,7 @@ describe('dashboard UI/API integration', () => {
     const wrapper = mountDashboard()
     await flushPromises()
 
-    expect(dashboardApi.summary).toHaveBeenCalledWith({ days: 7 })
+    expect(dashboardApi.summary).toHaveBeenCalledWith({ days: 7, lang: 'ar' })
     expect(wrapper.text()).toContain('12')
     expect(wrapper.text()).toContain('4')
     expect(wrapper.text()).toContain('الاتجاه اليومي للمعاملات')

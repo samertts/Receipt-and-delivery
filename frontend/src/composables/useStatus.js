@@ -1,10 +1,4 @@
-export const STATUS_LABELS = {
-  draft: 'مسودة',
-  approved: 'معتمد',
-  rejected: 'مرفوض',
-  archived: 'مؤرشف',
-  cancelled: 'ملغي',
-}
+import { currentLocale, t } from './useLocale'
 
 export const STATUS_CLASSES = {
   draft: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
@@ -14,15 +8,8 @@ export const STATUS_CLASSES = {
   cancelled: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200',
 }
 
-export const ROLE_LABELS = {
-  admin: 'مدير',
-  supervisor: 'مشرف',
-  user: 'مستخدم',
-  auditor: 'مدقق',
-}
-
 export function statusLabel(status) {
-  return STATUS_LABELS[status] || status
+  return t(`status.${status}`) || status
 }
 
 export function statusClass(status) {
@@ -30,14 +17,14 @@ export function statusClass(status) {
 }
 
 export function roleLabel(role) {
-  return ROLE_LABELS[role] || role
+  return t(`roles.${role}`) || role
 }
 
 export function formatDate(dateStr) {
   if (!dateStr) return '-'
   try {
     const d = new Date(dateStr)
-    return d.toLocaleDateString('ar-IQ', { year: 'numeric', month: 'short', day: 'numeric' })
+    return d.toLocaleDateString(currentLocale.value === 'ar' ? 'ar-IQ' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   } catch {
     return dateStr
   }

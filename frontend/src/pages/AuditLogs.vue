@@ -4,21 +4,21 @@
       <h1 class="text-2xl font-bold text-slate-800">{{ L.audit.title }}</h1>
       <select v-model="actionFilter" @change="fetchData" class="gov-select sm:w-56">
         <option value="">{{ L.audit.allActions }}</option>
-        <option value="login_success">تسجيل دخول</option>
-        <option value="login_failed">فشل تسجيل دخول</option>
-        <option value="login_blocked">حظر تسجيل دخول</option>
-        <option value="logout">تسجيل خروج</option>
-        <option value="token_refreshed">تحديث رمز</option>
-        <option value="password_changed">تغيير كلمة مرور</option>
-        <option value="transaction_created">إنشاء معاملة</option>
-        <option value="transaction_updated">تحديث معاملة</option>
-        <option value="transaction_deleted">حذف معاملة</option>
-        <option value="user_created">إنشاء مستخدم</option>
-        <option value="user_updated">تحديث مستخدم</option>
-        <option value="user_deleted">حذف مستخدم</option>
-        <option value="org_created">إنشاء مؤسسة</option>
-        <option value="org_updated">تحديث مؤسسة</option>
-        <option value="org_deleted">حذف مؤسسة</option>
+        <option value="login_success">{{ L.audit.actions.login_success }}</option>
+        <option value="login_failed">{{ L.audit.actions.login_failed }}</option>
+        <option value="login_blocked">{{ L.audit.actions.login_blocked }}</option>
+        <option value="logout">{{ L.audit.actions.logout }}</option>
+        <option value="token_refreshed">{{ L.audit.actions.token_refreshed }}</option>
+        <option value="password_changed">{{ L.audit.actions.password_changed }}</option>
+        <option value="transaction_created">{{ L.audit.actions.transaction_created }}</option>
+        <option value="transaction_updated">{{ L.audit.actions.transaction_updated }}</option>
+        <option value="transaction_deleted">{{ L.audit.actions.transaction_deleted }}</option>
+        <option value="user_created">{{ L.audit.actions.user_created }}</option>
+        <option value="user_updated">{{ L.audit.actions.user_updated }}</option>
+        <option value="user_deleted">{{ L.audit.actions.user_deleted }}</option>
+        <option value="org_created">{{ L.audit.actions.org_created }}</option>
+        <option value="org_updated">{{ L.audit.actions.org_updated }}</option>
+        <option value="org_deleted">{{ L.audit.actions.org_deleted }}</option>
       </select>
     </div>
 
@@ -69,7 +69,7 @@
         <template #cell-details="{ row }">
           <div class="flex items-center gap-2">
             <span class="text-xs text-slate-500 max-w-xs truncate">{{ row.details }}</span>
-            <span v-if="row.changes_json" @click.stop="viewChangesJson(row)" class="cursor-pointer text-blue-600 underline hover:text-blue-800 text-xs shrink-0">JSON</span>
+            <span v-if="row.changes_json" @click.stop="viewChangesJson(row)" class="cursor-pointer text-blue-600 underline hover:text-blue-800 text-xs shrink-0">{{ L.audit.json }}</span>
           </div>
         </template>
       </DataTable>
@@ -83,7 +83,7 @@ import { useAuthStore } from '../stores/auth'
 import { useUiStore } from '../stores/ui'
 import { auditLogsApi } from '../api'
 import { ICONS } from '../composables/useIcons'
-import { L } from '../composables/useLocale'
+import { L, useLocale } from '../composables/useLocale'
 import DataTable from '../components/DataTable.vue'
 
 const auth = useAuthStore()
@@ -93,6 +93,7 @@ const logs = ref([])
 const loading = ref(true)
 const error = ref(null)
 const actionFilter = ref('')
+const { locale } = useLocale()
 
 const columns = [
   { key: 'created_at', label: L.audit.date, sortable: true },
@@ -102,26 +103,8 @@ const columns = [
   { key: 'details', label: L.audit.details, sortable: false },
 ]
 
-const actionLabels = {
-  login_success: 'تسجيل دخول',
-  login_failed: 'فشل تسجيل دخول',
-  login_blocked: 'حظر تسجيل دخول',
-  logout: 'تسجيل خروج',
-  token_refreshed: 'تحديث رمز',
-  password_changed: 'تغيير كلمة مرور',
-  transaction_created: 'إنشاء معاملة',
-  transaction_updated: 'تحديث معاملة',
-  transaction_deleted: 'حذف معاملة',
-  user_created: 'إنشاء مستخدم',
-  user_updated: 'تحديث مستخدم',
-  user_deleted: 'حذف مستخدم',
-  org_created: 'إنشاء مؤسسة',
-  org_updated: 'تحديث مؤسسة',
-  org_deleted: 'حذف مؤسسة',
-}
-
 function actionLabel(action) {
-  return actionLabels[action] || action
+  return L.audit.actions[action] || action
 }
 
 function actionBadgeClass(action) {
@@ -133,7 +116,7 @@ function actionBadgeClass(action) {
 
 function formatDate(dateStr) {
   if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('ar-IQ')
+  return new Date(dateStr).toLocaleString(locale.value === 'ar' ? 'ar-IQ' : 'en-US')
 }
 
 function viewChangesJson(log) {

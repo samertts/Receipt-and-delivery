@@ -39,7 +39,7 @@
               <slot name="empty">
                 <div class="flex flex-col items-center gap-2">
                   <span class="text-slate-300 text-4xl" v-html="icons.empty"></span>
-                  <p class="text-sm">لا توجد بيانات</p>
+                  <p class="text-sm">{{ L.actions.noData }}</p>
                 </div>
               </slot>
             </td>
@@ -81,6 +81,7 @@
 <script setup>
 import { computed, shallowRef } from 'vue'
 import { ICONS } from '../composables/useIcons'
+import { L } from '../composables/useLocale'
 
 const props = defineProps({
   columns: { type: Array, required: true },

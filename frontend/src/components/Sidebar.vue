@@ -2,14 +2,15 @@
   <aside
     class="bg-slate-900 text-white flex flex-col transition-all duration-300 shrink-0"
     :class="collapsed ? 'w-16' : 'w-64'"
-    dir="rtl"
+    :dir="locale === 'ar' ? 'rtl' : 'ltr'"
   >
     <div class="h-16 flex items-center px-4 border-b border-slate-800">
       <div v-if="!collapsed" class="flex flex-col">
         <span class="text-base font-bold text-white">{{ appName }}</span>
-        <span class="text-[10px] text-slate-400 leading-tight">نظام الاستلام والتسليم المختبري</span>
+        <span class="text-[10px] text-slate-400 leading-tight">{{ L.appSubtitle }}</span>
       </div>
-      <div v-else class="mx-auto text-lg font-bold text-white">م</div>
+
+      <div v-else class="mx-auto text-lg font-bold text-white">{{ locale === 'ar' ? 'م' : 'L' }}</div>
     </div>
 
     <nav class="flex-1 overflow-y-auto py-4 px-2 space-y-1 scrollbar-thin">
@@ -46,21 +47,30 @@
         </div>
       </div>
       <button
+        @click="toggleLocale"
+        class="mt-2 w-full flex items-center justify-center gap-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800 py-1.5 rounded-lg transition-colors"
+        :title="locale === 'ar' ? L.switchToEnglish : L.switchToArabic"
+        :aria-label="locale === 'ar' ? L.switchToEnglish : L.switchToArabic"
+      >
+        <span class="font-bold">{{ locale === 'ar' ? 'EN' : 'ع' }}</span>
+        <span v-if="!collapsed">{{ locale === 'ar' ? L.switchToEnglish : L.switchToArabic }}</span>
+      </button>
+      <button
         @click="logout"
         class="mt-2 w-full flex items-center justify-center gap-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-900/20 py-1.5 rounded-lg transition-colors"
         :class="{ 'text-center': collapsed }"
-        :title="collapsed ? 'تسجيل خروج' : ''"
+        :title="collapsed ? L.actions.logout : ''"
       >
         <span v-html="icons.logout"></span>
-        <span v-if="!collapsed">تسجيل خروج</span>
+        <span v-if="!collapsed">{{ L.actions.logout }}</span>
       </button>
     </div>
 
     <button
       @click="$emit('toggle')"
       class="h-9 text-slate-400 hover:text-white hover:bg-slate-800 text-sm transition-colors shrink-0 flex items-center justify-center"
-      :title="collapsed ? 'توسيع القائمة' : 'طي القائمة'"
-      :aria-label="collapsed ? 'توسيع القائمة' : 'طي القائمة'"
+      :title="collapsed ? L.actions.expand : L.actions.collapse"
+      :aria-label="collapsed ? L.actions.expand : L.actions.collapse"
     >
       <span v-html="collapsed ? icons.collapseLeft : icons.collapseRight"></span>
     </button>
@@ -71,6 +81,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { L, useLocale } from '../composables/useLocale'
 import { ICONS } from '../composables/useIcons'
 import { roleLabel } from '../composables/useStatus'
 
@@ -85,37 +96,38 @@ const router = useRouter()
 const auth = useAuthStore()
 const icons = ICONS
 
-const appName = 'الاستلام المختبري'
+const { locale, toggleLocale } = useLocale()
+const appName = computed(() => L.appName)
 
-const navGroups = [
+const navGroups = computed(() => [
   {
-    title: 'العمليات',
+    title: L.nav.operations,
     items: [
-      { path: '/dashboard', label: 'لوحة التحكم', icon: ICONS.dashboard },
-      { path: '/transactionslist', label: 'المعاملات', icon: ICONS.transactions },
-      { path: '/newtransaction', label: 'معاملة جديدة', icon: ICONS.newTransaction },
+      { path: '/dashboard', label: L.nav.dashboard, icon: ICONS.dashboard },
+      { path: '/transactionslist', label: L.nav.transactions, icon: ICONS.transactions },
+      { path: '/newtransaction', label: L.nav.newTransaction, icon: ICONS.newTransaction },
     ],
   },
   {
-    title: 'الإدارة',
+    title: L.nav.admin,
     items: [
-      { path: '/organizations', label: 'المؤسسات', icon: ICONS.organizations },
-      { path: '/auditlogs', label: 'سجل التدقيق', icon: ICONS.auditLogs },
+      { path: '/organizations', label: L.nav.organizations, icon: ICONS.organizations },
+      { path: '/auditlogs', label: L.nav.auditLogs, icon: ICONS.auditLogs },
     ],
   },
   {
-    title: 'التقارير',
+    title: L.nav.reports,
     items: [
-      { path: '/reports', label: 'التقارير', icon: ICONS.reports },
+      { path: '/reports', label: L.nav.reportsTitle, icon: ICONS.reports },
     ],
   },
   {
-    title: 'النظام',
+    title: L.nav.system,
     items: [
-      { path: '/settings', label: 'الإعدادات', icon: ICONS.settings },
+      { path: '/settings', label: L.nav.settings, icon: ICONS.settings },
     ],
   },
-]
+])
 
 const initials = computed(() => {
   const name = auth.user?.username || ''
