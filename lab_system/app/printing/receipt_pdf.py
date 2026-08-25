@@ -12,6 +12,7 @@ Supports:
 """
 
 from datetime import datetime
+import re
 from pathlib import Path
 
 import qrcode
@@ -40,6 +41,20 @@ from lab_system.app.settings.config import CONFIG, STORAGE_DIR
 # ---------------------------------------------------------------------------
 # Font helpers — try to register Arabic TTF fonts; fall back to Helvetica
 # ---------------------------------------------------------------------------
+def _display_text(value):
+    """Shape Arabic and apply bidirectional display order for ReportLab."""
+    text = str(value or "")
+    if not re.search(r"[\u0600-\u06FF]", text):
+        return text
+    try:
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+
+        return get_display(arabic_reshaper.reshape(text))
+    except Exception:
+        return text
+
+
 _ARABIC_FONTS = {
     "Arabic": None,
     "ArabicBold": None,
@@ -158,6 +173,10 @@ def generate_receipt_pdf(
     items=None,
     notes="",
     transport_info="",
+    authorization_no="",
+    authorization_date="",
+    additional_comments="",
+    status_text="",
     logo_path=None,
 ):
     """
@@ -178,6 +197,10 @@ def generate_receipt_pdf(
         notes: Additional notes
         transport_info: Transport condition info
         logo_path: Optional path to organization logo image
+        authorization_no: Optional authorization/reference number
+        authorization_date: Optional authorization date
+        additional_comments: Optional extra comments
+        status_text: Optional localized receipt status
 
     Returns:
         Path to the generated PDF file
@@ -199,8 +222,8 @@ def generate_receipt_pdf(
     elements = []
 
     # ---- Header ----
-    elements.append(Paragraph("نظام إدارة الاستلام المختبري", s["title"]))
-    elements.append(Paragraph("إيصال رسمي", s["subtitle"]))
+    elements.append(Paragraph(_display_text("نظام إدارة الاستلام المختبري"), s["title"]))
+    elements.append(Paragraph(_display_text("إيصال رسمي"), s["subtitle"]))
     elements.append(Spacer(1, 6 * mm))
 
     # ---- Logo (if provided) ----
@@ -213,34 +236,55 @@ def generate_receipt_pdf(
 
     # ---- Meta information table ----
     meta_data = [
-        [Paragraph("رقم الإيصال", s["meta_key"]), Paragraph(receipt_no, s["meta_val"])],
-        [Paragraph("نوع المعاملة", s["meta_key"]), Paragraph(tx_type, s["meta_val"])],
-        [Paragraph("الجهة", s["meta_key"]), Paragraph(institution, s["meta_val"])],
-        [Paragraph("التاريخ", s["meta_key"]), Paragraph(date_text, s["meta_val"])],
+        [Paragraph(_display_text("رقم الإيصال"), s["meta_key"]), Paragraph(_display_text(receipt_no), s["meta_val"])],
+        [Paragraph(_display_text("نوع المعاملة"), s["meta_key"]), Paragraph(_display_text(tx_type), s["meta_val"])],
+        [Paragraph(_display_text("الجهة"), s["meta_key"]), Paragraph(_display_text(institution), s["meta_val"])],
+        [Paragraph(_display_text("التاريخ"), s["meta_key"]), Paragraph(_display_text(date_text), s["meta_val"])],
     ]
     if sender_org:
         meta_data.append(
             [
-                Paragraph("الجهة المرسلة", s["meta_key"]),
-                Paragraph(sender_org, s["meta_val"]),
+                Paragraph(_display_text("الجهة المرسلة"), s["meta_key"]),
+                Paragraph(_display_text(sender_org), s["meta_val"]),
             ]
         )
     if receiver_org:
         meta_data.append(
             [
-                Paragraph("الجهة المستقبلة", s["meta_key"]),
-                Paragraph(receiver_org, s["meta_val"]),
+                Paragraph(_display_text("الجهة المستقبلة"), s["meta_key"]),
+                Paragraph(_display_text(receiver_org), s["meta_val"]),
             ]
         )
     if sender_name:
         meta_data.append(
-            [Paragraph("المرسل", s["meta_key"]), Paragraph(sender_name, s["meta_val"])]
+            [Paragraph(_display_text("المرسل"), s["meta_key"]), Paragraph(_display_text(sender_name), s["meta_val"])]
         )
     if receiver_name:
         meta_data.append(
             [
-                Paragraph("المستلم", s["meta_key"]),
-                Paragraph(receiver_name, s["meta_val"]),
+                Paragraph(_display_text("المستلم"), s["meta_key"]),
+                Paragraph(_display_text(receiver_name), s["meta_val"]),
+            ]
+        )
+    if authorization_no:
+        meta_data.append(
+            [
+                Paragraph(_display_text("رقم التفويض"), s["meta_key"]),
+                Paragraph(_display_text(authorization_no), s["meta_val"]),
+            ]
+        )
+    if authorization_date:
+        meta_data.append(
+            [
+                Paragraph(_display_text("تاريخ التفويض"), s["meta_key"]),
+                Paragraph(_display_text(authorization_date), s["meta_val"]),
+            ]
+        )
+    if status_text:
+        meta_data.append(
+            [
+                Paragraph(_display_text("الحالة"), s["meta_key"]),
+                Paragraph(_display_text(status_text), s["meta_val"]),
             ]
         )
 
@@ -275,17 +319,17 @@ def generate_receipt_pdf(
             "غير مطابق",
             "حالة النقل",
         ]
-        table_data = [[Paragraph(h, s["table_header"]) for h in header]]
+        table_data = [[Paragraph(_display_text(h), s["table_header"]) for h in header]]
 
         for item in items:
             row = [
-                Paragraph(str(item.get("sample_name", "")), s["table_cell"]),
+                Paragraph(_display_text(item.get("sample_name", "")), s["table_cell"]),
                 Paragraph(str(item.get("total_count", 0)), s["table_cell"]),
                 Paragraph(str(item.get("valid_count", 0)), s["table_cell"]),
                 Paragraph(str(item.get("damaged_count", 0)), s["table_cell"]),
                 Paragraph(str(item.get("rejected_count", 0)), s["table_cell"]),
                 Paragraph(str(item.get("non_conforming_count", 0)), s["table_cell"]),
-                Paragraph(str(item.get("transport_condition", "")), s["table_cell"]),
+                Paragraph(_display_text(item.get("transport_condition", "")), s["table_cell"]),
             ]
             table_data.append(row)
 
@@ -339,10 +383,14 @@ def generate_receipt_pdf(
 
     # ---- Notes & transport ----
     if notes:
-        elements.append(Paragraph(f"<b>ملاحظات:</b> {notes}", s["meta_val"]))
+        elements.append(Paragraph(f"<b>{_display_text('ملاحظات:')}</b> {_display_text(notes)}", s["meta_val"]))
     if transport_info:
         elements.append(
-            Paragraph(f"<b>معلومات النقل:</b> {transport_info}", s["meta_val"])
+            Paragraph(f"<b>{_display_text('معلومات النقل:')}</b> {_display_text(transport_info)}", s["meta_val"])
+        )
+    if additional_comments:
+        elements.append(
+            Paragraph(f"<b>{_display_text('تعليقات إضافية:')}</b> {_display_text(additional_comments)}", s["meta_val"])
         )
 
     elements.append(Spacer(1, 10 * mm))
@@ -386,8 +434,8 @@ def generate_receipt_pdf(
     sig_table = Table(
         [
             [
-                Paragraph("توقيع المرسل: _____________", s["signature"]),
-                Paragraph("توقيع المستلم: _____________", s["signature"]),
+                Paragraph(_display_text("توقيع المرسل: _____________"), s["signature"]),
+                Paragraph(_display_text("توقيع المستلم: _____________"), s["signature"]),
             ]
         ],
         colWidths=[doc.width * 0.5, doc.width * 0.5],
@@ -406,7 +454,7 @@ def generate_receipt_pdf(
     elements.append(Spacer(1, 8 * mm))
     elements.append(
         Paragraph(
-            f"نظام إدارة الاستلام المختبري — الإصدار {CONFIG.app_version} — {datetime.now().year}",
+            _display_text(f"نظام إدارة الاستلام المختبري — الإصدار {CONFIG.app_version} — {datetime.now().year}"),
             s["footer"],
         ),
     )

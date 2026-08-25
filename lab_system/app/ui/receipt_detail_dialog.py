@@ -323,16 +323,27 @@ class ReceiptDetailDialog(QDialog):
             self.attachments_table.setCellWidget(i, 2, open_btn)
 
     def _print_pdf(self):
-        receipt, _, _ = get_receipt(self.receipt_id)
+        receipt, items, _ = get_receipt(self.receipt_id)
         if not receipt:
             return
         try:
             rd = dict(receipt)
             path = generate_receipt_pdf(
                 receipt_no=rd["receipt_no"],
-                institution=rd.get("sender_org", ""),
+                institution=rd.get("sender_org", "") or rd.get("receiver_org", ""),
                 tx_type=rd.get("tx_type", ""),
-                date_text=rd.get("created_at", ""),
+                date_text=rd.get("transaction_date", "") or rd.get("created_at", ""),
+                sender_name=rd.get("sender_name", ""),
+                receiver_name=rd.get("receiver_name", ""),
+                sender_org=rd.get("sender_org", ""),
+                receiver_org=rd.get("receiver_org", ""),
+                items=[dict(item) for item in items],
+                notes=rd.get("notes", ""),
+                transport_info=rd.get("transport_info", ""),
+                authorization_no=rd.get("auth_doc_no", ""),
+                authorization_date=rd.get("auth_date", ""),
+                additional_comments=rd.get("additional_comments", ""),
+                status_text=STATUS_TRANSLATION.get(rd.get("status", ""), rd.get("status", "")),
             )
             log_action(
                 self.current_user["id"],

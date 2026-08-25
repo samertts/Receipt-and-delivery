@@ -110,7 +110,11 @@
         </div>
       </div>
 
-      <div class="flex flex-wrap gap-3">
+      <div class="flex flex-wrap gap-3 items-center">
+        <button @click="printReceipt" class="gov-btn-primary flex items-center gap-2">
+          <span v-html="icons.print"></span>
+          {{ L.tx.printReceipt }}
+        </button>
         <div v-if="auth.isAdmin || auth.userRole === 'supervisor'" class="flex flex-wrap gap-3">
           <button @click="updateStatus('approved')" class="gov-btn-success flex items-center gap-2">
             <span v-html="icons.check"></span>
@@ -158,6 +162,7 @@ import { transactionsApi } from '../api'
 import { statusLabel, statusClass } from '../composables/useStatus'
 import { ICONS } from '../composables/useIcons'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import { printHtml } from '../services/deviceService'
 import { L } from '../composables/useLocale'
 
 const route = useRoute()
@@ -179,6 +184,45 @@ icons.tag = TAG_ICON
 icons.user = USER_ICON
 icons.archive = ARCHIVE_ICON
 icons.delete = DELETE_ICON
+icons.print = `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character])
+}
+
+function printReceipt() {
+  if (!tx.value) return
+  const itemRows = (tx.value.items || []).map((item) => `
+    <tr>
+      <td>${escapeHtml(item.sample_type)}</td>
+      <td>${escapeHtml(item.total_count)}</td>
+      <td>${escapeHtml(item.valid_count)}</td>
+      <td>${escapeHtml(item.damaged_count)}</td>
+      <td>${escapeHtml(item.rejected_count)}</td>
+      <td>${escapeHtml(item.nonconforming_count)}</td>
+      <td>${escapeHtml(item.transport_condition || '-')}</td>
+    </tr>`).join('')
+  const field = (label, value) => `<div class="field"><span class="label">${escapeHtml(label)}:</span><span>${escapeHtml(value || '-')}</span></div>`
+  const body = `
+    <div class="receipt">
+      <div class="receipt-header"><h1>${escapeHtml(L.tx.receiptTitle)}</h1><div class="receipt-no">${escapeHtml(L.tx.receiptNumber)}: <strong>${escapeHtml(tx.value.transaction_no)}</strong></div></div>
+      <div class="meta-grid">
+        ${field(L.form.transactionType, tx.value.transaction_type)}
+        ${field(L.form.transactionDate, tx.value.transaction_date)}
+        ${field(L.form.sender, tx.value.sender_name)}
+        ${field(L.form.receiver, tx.value.receiver_name)}
+        ${field(L.form.senderOrg, tx.value.sender_organization_name)}
+        ${field(L.form.receiverOrg, tx.value.receiver_organization_name)}
+        ${field(L.form.authorizationNo, tx.value.authorization_no)}
+        ${field(L.form.authorizationDate, tx.value.authorization_date)}
+      </div>
+      ${tx.value.notes ? `<div class="notes"><strong>${escapeHtml(L.form.notes)}:</strong> ${escapeHtml(tx.value.notes)}</div>` : ''}
+      <h2>${escapeHtml(L.tx.items)}</h2>
+      <table><thead><tr><th>${escapeHtml(L.form.sampleType)}</th><th>${escapeHtml(L.form.total)}</th><th>${escapeHtml(L.form.valid)}</th><th>${escapeHtml(L.form.damaged)}</th><th>${escapeHtml(L.form.rejected)}</th><th>${escapeHtml(L.form.nonconforming)}</th><th>${escapeHtml(L.form.transportCondition)}</th></tr></thead><tbody>${itemRows || `<tr><td colspan="7">${escapeHtml(L.actions.noData)}</td></tr>`}</tbody></table>
+      <div class="signatures"><div>${escapeHtml(L.form.sender)}: __________________</div><div>${escapeHtml(L.form.receiver)}: __________________</div></div>
+    </div>`
+  printHtml({ title: L.tx.receiptTitle, body })
+}
 
 async function updateStatus(newStatus) {
   try {
