@@ -24,6 +24,9 @@ def _resolve_storage_root(app_name: str) -> Path:
     return (Path.home() / "Documents" / app_name).resolve()
 
 
+# In source mode this resolves to repo/lab_system and repo. In a PyInstaller
+# build, __file__ is unpacked under _MEIPASS/lab_system, so the same relative
+# layout resolves bundled assets while user data remains under LOCALAPPDATA.
 BASE_DIR = Path(__file__).resolve().parents[2]
 ROOT_DIR = BASE_DIR.parent
 STORAGE_ROOT = _resolve_storage_root("LabReceiptSystem")

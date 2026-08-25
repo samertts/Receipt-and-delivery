@@ -70,6 +70,17 @@ pip install -r requirements.txt
 python main.py
 ```
 
+### بناء نسخة Windows EXE
+
+على Windows شغّل PowerShell من جذر المشروع لتنفيذ الاختبارات وبناء النسخة المحمولة والمثبت اختياريًا:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\build_windows.ps1
+```
+
+التفاصيل ومسار GitHub Actions موضحان في [دليل بناء Windows](docs/WINDOWS_BUILD.md). لا يمكن إنتاج Windows EXE موثوق من Linux مباشرة عبر PyInstaller.
+
 ### واجهة الويب (API)
 
 ```bash
@@ -106,6 +117,8 @@ docker compose up -d
 | [API.md](API.md) | توثيق API |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | دليل المساهمة |
 | [CHANGELOG.md](CHANGELOG.md) | سجل التغييرات |
+| [DEVICE_INTEGRATION.md](DEVICE_INTEGRATION.md) | تكامل الكاميرا والباركود وOCR وNFC والطباعة والجسر المحلي |
+| [docs/WINDOWS_BUILD.md](docs/WINDOWS_BUILD.md) | بناء نسخة Windows EXE والمثبت |
 
 ---
 

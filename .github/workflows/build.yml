@@ -119,15 +119,6 @@ jobs:
             exit /b 1
           )
 
-      - name: Certify Installer Inputs
-        shell: cmd
-        run: |
-          python scripts/certify_installer_inputs.py
-          if errorlevel 1 (
-            echo ERROR: Installer input certification failed
-            exit /b 1
-          )
-
       # ===================================================================
       # PHASE 5 — BUILD WITH EMBEDDED METADATA
       # ===================================================================
@@ -168,6 +159,15 @@ jobs:
           )
           for %%i in (dist\LabReceiptSystem.exe) do echo EXE verified. Size: %%~zi bytes
 
+      - name: Certify Installer Inputs
+        shell: cmd
+        run: |
+          python scripts/certify_installer_inputs.py
+          if errorlevel 1 (
+            echo ERROR: Installer input certification failed
+            exit /b 1
+          )
+
       # ===================================================================
       # PHASE 3 — BUILD INSTALLER
       # ===================================================================
@@ -179,7 +179,7 @@ jobs:
       - name: Build Installer
         shell: cmd
         run: |
-          ISCC lab_system/installer/LabReceipt.iss
+          ISCC /DMyAppVersion=${{ steps.meta.outputs.VERSION }} lab_system/installer/LabReceipt.iss
           if errorlevel 1 (
             echo ERROR: Installer build failed
             exit /b 1

@@ -5,15 +5,25 @@ Values are injected via environment variables or left as defaults for local buil
 """
 
 import os
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
-# Version is always read from VERSION file (single source of truth)
-_VERSION_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "..", "VERSION")
+
+def _resource_root() -> Path:
+    """Return the bundled resource root in source and frozen execution modes."""
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    return Path(__file__).resolve().parents[2]
+
+
+# Version is always read from VERSION file (single source of truth).
+_VERSION_FILE = _resource_root() / "VERSION"
 
 
 def _read_version() -> str:
     try:
-        with open(_VERSION_FILE, encoding="utf-8") as f:
+        with _VERSION_FILE.open(encoding="utf-8") as f:
             return f.read().strip()
     except FileNotFoundError:
         return "0.0.0-dev"

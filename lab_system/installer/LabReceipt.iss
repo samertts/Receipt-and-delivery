@@ -1,6 +1,9 @@
 [Setup]
 AppName=Lab Receipt System
-AppVersion=1.2.0
+#ifndef MyAppVersion
+#define MyAppVersion "1.2.0"
+#endif
+AppVersion={#MyAppVersion}
 AppPublisher=Iraqi Health Laboratory Directorate
 DefaultDirName={autopf}\LabReceiptSystem
 DefaultGroupName=Lab Receipt System
