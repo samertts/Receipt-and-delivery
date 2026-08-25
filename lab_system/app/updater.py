@@ -35,6 +35,16 @@ MAX_INSTALLER_BYTES = 300 * 1024 * 1024
 _VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]+)?$")
 
 
+def is_startup_check_enabled(
+    platform: str | None = None,
+    public_key: str | None = None,
+) -> bool:
+    """Enable the automatic startup check only for configured Windows builds."""
+    effective_platform = os.name if platform is None else platform
+    effective_key = public_key if public_key is not None else UPDATE_PUBLIC_KEY_B64
+    return effective_platform == "nt" and bool(effective_key)
+
+
 class UpdateError(RuntimeError):
     """Base class for expected update failures."""
 

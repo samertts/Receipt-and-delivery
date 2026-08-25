@@ -31,12 +31,13 @@ from lab_system.app.diagnostics.startup import (
 from lab_system.app.services.auth_service import AuthService
 from lab_system.app.services.catalog_service import seed_defaults
 from lab_system.app.services.seed_service import seed_organizations
-from lab_system.app.services.seed_service import seed_default_users
+from lab_system.app.services.user_service import seed_default_users
 from lab_system.app.updater import (
     UpdateError,
     check_for_update,
     download_installer,
     launch_installer,
+    is_startup_check_enabled,
 )
 from lab_system.app.ui.audit_page import AuditPage
 from lab_system.app.ui.backup_page import BackupPage
@@ -52,6 +53,7 @@ from lab_system.app.utils.constants import APP_NAME, DEFAULT_WINDOW_SIZE, THEME
 from lab_system.app.utils.errors import AuthenticationError, SessionExpiredError
 
 SESSION_CHECK_INTERVAL = 30000
+STARTUP_UPDATE_DELAY_MS = 3000
 
 
 class UpdateWorker(QObject):
@@ -340,6 +342,7 @@ class MainWindow(QMainWindow):
 
         self._update_thread = None
         self._update_worker = None
+        self._automatic_update_check = False
         self._setup_shortcuts()
         self._setup_update_action()
 
@@ -393,7 +396,7 @@ class MainWindow(QMainWindow):
         help_menu.addAction(self._update_action)
 
     def _run_update_worker(self, mode: str, manifest: dict | None = None):
-        thread = QThread(self)
+        thread = QThread()
         worker = UpdateWorker(mode, manifest)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
@@ -406,9 +409,20 @@ class MainWindow(QMainWindow):
         self._update_worker = worker
         thread.start()
 
+    def check_for_updates_on_startup(self):
+        """Silently check once after startup; notify only for a valid update."""
+        if not is_startup_check_enabled():
+            return
+        if self._update_thread and self._update_thread.isRunning():
+            return
+        self._automatic_update_check = True
+        self.statusBar().showMessage("جارٍ التحقق من وجود تحديث...")
+        self._run_update_worker("check")
+
     def _check_for_updates(self):
         if self._update_thread and self._update_thread.isRunning():
             return
+        self._automatic_update_check = False
         self._update_action.setEnabled(False)
         self.statusBar().showMessage("جارٍ التحقق من التحديثات...")
         self._run_update_worker("check")
@@ -416,14 +430,18 @@ class MainWindow(QMainWindow):
     def _handle_update_result(self, result):
         mode = result.get("mode")
         if mode == "check":
+            automatic = self._automatic_update_check
+            self._automatic_update_check = False
             if result.get("error"):
                 self._finish_update_action()
-                QMessageBox.warning(self, "التحديثات", result["error"])
+                if not automatic:
+                    QMessageBox.warning(self, "التحديثات", result["error"])
                 return
             update = result.get("update")
             if not update:
                 self._finish_update_action()
-                QMessageBox.information(self, "التحديثات", "أنت تستخدم أحدث إصدار متاح.")
+                if not automatic:
+                    QMessageBox.information(self, "التحديثات", "أنت تستخدم أحدث إصدار متاح.")
                 return
             version = update.get("version", "غير معروف")
             notes = update.get("release_notes", "")
@@ -592,4 +610,5 @@ def run() -> None:
 
     win = MainWindow(login.user, auth_service=auth_service)
     win.show()
+    QTimer.singleShot(STARTUP_UPDATE_DELAY_MS, win.check_for_updates_on_startup)
     app.exec()
