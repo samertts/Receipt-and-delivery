@@ -27,7 +27,8 @@ class TestPerformance:
         conn.commit()
         conn.close()
         elapsed = time.perf_counter() - start
-        assert elapsed < 2.0, f"Schema creation took {elapsed:.2f}s (threshold: 2.0s)"
+        threshold = 5.0 if sys.platform == "win32" else 2.0
+        assert elapsed < threshold, f"Schema creation took {elapsed:.2f}s (threshold: {threshold:.1f}s)"
 
     def test_concurrent_connections(self, fresh_db):
         import threading

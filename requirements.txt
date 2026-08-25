@@ -16,4 +16,5 @@ pip-audit==2.9.0
 pypdf==6.16.1
 xhtml2pdf==0.2.17
 setuptools==84.0.0
+psutil==7.0.0
 wheel==0.48.0
