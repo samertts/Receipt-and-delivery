@@ -219,11 +219,11 @@ if warnings:
 if errors:
     print("Errors:")
     for e in errors:
-        print(f"  ❌ {e}")
+        print(f"  ERROR: {e}")
     print()
     sys.exit(1)
 else:
-    print("✅ ALL INSTALLER INPUT CHECKS PASSED")
+    print("ALL INSTALLER INPUT CHECKS PASSED")
     print("   All installer prerequisites are present and valid.")
     print()
     sys.exit(0)
