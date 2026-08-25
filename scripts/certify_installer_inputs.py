@@ -179,9 +179,9 @@ if iss_path.exists():
             parent_dir = resolved
             ok(
                 parent_dir.exists(),
-                f"Source path does not resolve: '{src_val}' → {resolved}",
+                f"Source path does not resolve: '{src_val}' -> {resolved}",
             )
-            print(f"  Source: {src_val} → {resolved}")
+            print(f"  Source: {src_val} -> {resolved}")
 else:
     print("  MISSING")
 
@@ -213,7 +213,7 @@ print()
 if warnings:
     print("Warnings:")
     for w in warnings:
-        print(f"  ⚠ {w}")
+        print(f"  WARNING: {w}")
     print()
 
 if errors:
