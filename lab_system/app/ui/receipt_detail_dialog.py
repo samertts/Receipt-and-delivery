@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QComboBox,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -19,8 +20,10 @@ from PySide6.QtWidgets import (
 from lab_system.app.attachments.manager import save_attachment
 from lab_system.app.audit.logger import log_action
 from lab_system.app.printing.receipt_pdf import generate_receipt_pdf
+from lab_system.app.services.receipt_branding_service import ReceiptBrandingService
 from lab_system.app.services.receipt_service import get_receipt
 from lab_system.app.ui.notifications import toast
+from lab_system.app.utils.errors import to_arabic_error
 from lab_system.app.utils.constants import THEME, TABLE_STYLE
 
 
@@ -69,6 +72,7 @@ class ReceiptDetailDialog(QDialog):
         super().__init__()
         self.current_user = current_user
         self.receipt_id = receipt_id
+        self._branding_svc = ReceiptBrandingService()
         self.setWindowTitle("تفاصيل الإيصال")
         self.setMinimumSize(480, 400)
         self.resize(900, 680)
@@ -217,6 +221,16 @@ class ReceiptDetailDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
         btn_row.addStretch()
+        self.print_format_combo = QComboBox()
+        self.print_format_combo.addItem("A4 — نسخة واحدة", "a4")
+        self.print_format_combo.addItem("A5 — نسخة واحدة", "a5")
+        self.print_format_combo.addItem("A4 — نسختان: مستلم ومرسل", "a4-two-up")
+        default_layout = self._branding_svc.load().get("layout", "a4")
+        default_index = self.print_format_combo.findData(default_layout)
+        if default_index >= 0:
+            self.print_format_combo.setCurrentIndex(default_index)
+        self.print_format_combo.setToolTip("اختر حجم الوصل وعدد النسخ قبل الطباعة")
+        btn_row.addWidget(self.print_format_combo)
         print_btn = QPushButton("طباعة")
         print_btn.clicked.connect(self._print_pdf)
         btn_row.addWidget(print_btn)
@@ -328,6 +342,7 @@ class ReceiptDetailDialog(QDialog):
             return
         try:
             rd = dict(receipt)
+            branding = self._branding_svc.load()
             path = generate_receipt_pdf(
                 receipt_no=rd["receipt_no"],
                 institution=rd.get("sender_org", "") or rd.get("receiver_org", ""),
@@ -344,6 +359,15 @@ class ReceiptDetailDialog(QDialog):
                 authorization_date=rd.get("auth_date", ""),
                 additional_comments=rd.get("additional_comments", ""),
                 status_text=STATUS_TRANSLATION.get(rd.get("status", ""), rd.get("status", "")),
+                transaction_time=rd.get("transaction_time", "") or rd.get("transaction_date_time", ""),
+                created_at_text=rd.get("created_at", ""),
+                updated_at_text=rd.get("updated_at", ""),
+                print_format=self.print_format_combo.currentData(),
+                logo_path=branding.get("logo_path") or None,
+                company_name=branding.get("company_name"),
+                subtitle=branding.get("subtitle"),
+                footer_text=branding.get("footer"),
+                primary_color=branding.get("primary_color", "#1D4E89"),
             )
             log_action(
                 self.current_user["id"],
@@ -351,8 +375,8 @@ class ReceiptDetailDialog(QDialog):
                 f"طباعة الإيصال: {receipt['receipt_no']}",
             )
             _open_file_safe(path)
-        except Exception as e:
-            QMessageBox.warning(self, "خطأ", f"فشل الطباعة: {e}")
+        except Exception as exc:
+            QMessageBox.warning(self, "خطأ", to_arabic_error(exc, "فشل الطباعة"))
 
     def _attach_file(self):
         from PySide6.QtWidgets import QFileDialog

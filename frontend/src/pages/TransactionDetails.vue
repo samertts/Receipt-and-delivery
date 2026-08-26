@@ -111,6 +111,14 @@
       </div>
 
       <div class="flex flex-wrap gap-3 items-center">
+        <label class="flex items-center gap-2 text-sm text-slate-600">
+          <span>{{ L.tx.printLayout }}</span>
+          <select v-model="printLayout" class="border border-slate-300 rounded-lg px-3 py-2 bg-white">
+            <option value="a4">{{ L.tx.printA4 }}</option>
+            <option value="a5">{{ L.tx.printA5 }}</option>
+            <option value="a4-two-up">{{ L.tx.printA4TwoUp }}</option>
+          </select>
+        </label>
         <button @click="printReceipt" class="gov-btn-primary flex items-center gap-2">
           <span v-html="icons.print"></span>
           {{ L.tx.printReceipt }}
@@ -175,6 +183,7 @@ const tx = ref(null)
 const loading = ref(true)
 const error = ref(null)
 const showDeleteConfirm = ref(false)
+const printLayout = ref('a4')
 
 const TAG_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`
 const USER_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
@@ -190,6 +199,13 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character])
 }
 
+function formatReceiptDateTime(value) {
+  const text = String(value ?? '').trim()
+  if (!text) return ''
+  const match = text.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})/)
+  return match ? `${match[1]} ${match[2]}` : text
+}
+
 function printReceipt() {
   if (!tx.value) return
   const itemRows = (tx.value.items || []).map((item) => `
@@ -203,8 +219,9 @@ function printReceipt() {
       <td>${escapeHtml(item.transport_condition || '-')}</td>
     </tr>`).join('')
   const field = (label, value) => `<div class="field"><span class="label">${escapeHtml(label)}:</span><span>${escapeHtml(value || '-')}</span></div>`
-  const body = `
+  const buildCopy = (copyLabel = '') => `
     <div class="receipt">
+      ${copyLabel ? `<div class="copy-label">${escapeHtml(copyLabel)}</div>` : ''}
       <div class="receipt-header"><h1>${escapeHtml(L.tx.receiptTitle)}</h1><div class="receipt-no">${escapeHtml(L.tx.receiptNumber)}: <strong>${escapeHtml(tx.value.transaction_no)}</strong></div></div>
       <div class="meta-grid">
         ${field(L.form.transactionType, tx.value.transaction_type)}
@@ -215,13 +232,18 @@ function printReceipt() {
         ${field(L.form.receiverOrg, tx.value.receiver_organization_name)}
         ${field(L.form.authorizationNo, tx.value.authorization_no)}
         ${field(L.form.authorizationDate, tx.value.authorization_date)}
+        ${field(L.tx.createdAt, formatReceiptDateTime(tx.value.created_at))}
+        ${field(L.tx.updatedAt, formatReceiptDateTime(tx.value.updated_at))}
       </div>
       ${tx.value.notes ? `<div class="notes"><strong>${escapeHtml(L.form.notes)}:</strong> ${escapeHtml(tx.value.notes)}</div>` : ''}
       <h2>${escapeHtml(L.tx.items)}</h2>
       <table><thead><tr><th>${escapeHtml(L.form.sampleType)}</th><th>${escapeHtml(L.form.total)}</th><th>${escapeHtml(L.form.valid)}</th><th>${escapeHtml(L.form.damaged)}</th><th>${escapeHtml(L.form.rejected)}</th><th>${escapeHtml(L.form.nonconforming)}</th><th>${escapeHtml(L.form.transportCondition)}</th></tr></thead><tbody>${itemRows || `<tr><td colspan="7">${escapeHtml(L.actions.noData)}</td></tr>`}</tbody></table>
       <div class="signatures"><div>${escapeHtml(L.form.sender)}: __________________</div><div>${escapeHtml(L.form.receiver)}: __________________</div></div>
     </div>`
-  printHtml({ title: L.tx.receiptTitle, body })
+  const body = printLayout.value === 'a4-two-up'
+    ? `<div class="receipt-dual">${buildCopy(L.tx.recipientCopy)}${buildCopy(L.tx.senderCopy)}</div>`
+    : buildCopy()
+  printHtml({ title: L.tx.receiptTitle, body, layout: printLayout.value })
 }
 
 async function updateStatus(newStatus) {

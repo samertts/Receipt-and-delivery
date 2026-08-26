@@ -12,7 +12,9 @@ Supports:
 """
 
 from datetime import datetime
+import os
 import re
+import tempfile
 from pathlib import Path
 
 import qrcode
@@ -20,7 +22,7 @@ from barcode import Code128
 from barcode.writer import ImageWriter
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, A5, landscape
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm, mm
 from reportlab.pdfbase import pdfmetrics
@@ -35,12 +37,30 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
+from pypdf import PdfReader, PdfWriter
 
 from lab_system.app.settings.config import CONFIG, STORAGE_DIR
 
 # ---------------------------------------------------------------------------
 # Font helpers — try to register Arabic TTF fonts; fall back to Helvetica
 # ---------------------------------------------------------------------------
+def format_receipt_datetime(value):
+    """Format ISO/date-time values without inventing an unavailable timezone."""
+    if value in (None, ""):
+        return ""
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        text = str(value).strip()
+        if not text:
+            return ""
+        try:
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return text
+    return parsed.strftime("%Y-%m-%d %H:%M:%S")
+
+
 def _display_text(value):
     """Shape Arabic and apply bidirectional display order for ReportLab."""
     text = str(value or "")
@@ -120,13 +140,31 @@ def _font_name(*, bold=False):
     return "Helvetica-Bold" if bold else "Helvetica"
 
 
-def _styles():
+def _safe_hex_color(value, fallback="#1D4E89"):
+    value = str(value or "").strip()
+    return value if re.fullmatch(r"#[0-9A-Fa-f]{6}", value) else fallback
+
+
+def _default_logo_path():
+    candidates = [
+        os.environ.get("LAB_RECEIPT_LOGO_PATH", ""),
+        str(CONFIG.storage_dir / "settings" / "company_logo.png"),
+        str(CONFIG.assets_dir / "company_logo.png"),
+        str(CONFIG.assets_dir / "logo.png"),
+    ]
+    return next((path for path in candidates if path and Path(path).is_file()), None)
+
+
+def _styles(primary_color="#1D4E89", compact=False):
     """Return paragraph styles for the PDF."""
+    primary_color = _safe_hex_color(primary_color)
     fn = _font_name()
     fnb = _font_name(bold=True)
-    return {
+    styles = {
         "title": ParagraphStyle(
-            "Title", fontName=fnb, fontSize=16, alignment=TA_CENTER, spaceAfter=6
+            "Title",             fontName=fnb, fontSize=16, alignment=TA_CENTER, spaceAfter=6,
+            textColor=colors.HexColor(primary_color),
+
         ),
         "subtitle": ParagraphStyle(
             "Subtitle",
@@ -159,9 +197,14 @@ def _styles():
             textColor=colors.HexColor("#999999"),
         ),
     }
+    if compact:
+        for style in styles.values():
+            style.fontSize = max(6, style.fontSize - 1)
+            style.leading = max(style.fontSize + 1, style.leading - 1)
+    return styles
 
 
-def generate_receipt_pdf(
+def _generate_receipt_pdf_single(
     receipt_no,
     institution,
     tx_type,
@@ -177,7 +220,17 @@ def generate_receipt_pdf(
     authorization_date="",
     additional_comments="",
     status_text="",
+    transaction_time="",
+    created_at_text="",
+    updated_at_text="",
     logo_path=None,
+    copy_label="",
+    paper_size=A4,
+    output_path=None,
+    company_name=None,
+    subtitle=None,
+    footer_text=None,
+    primary_color="#1D4E89",
 ):
     """
     Generate a production-quality Arabic governmental receipt PDF.
@@ -201,30 +254,48 @@ def generate_receipt_pdf(
         authorization_date: Optional authorization date
         additional_comments: Optional extra comments
         status_text: Optional localized receipt status
+        transaction_time: Optional transaction time
+        created_at_text: Optional detailed creation timestamp
+        updated_at_text: Optional detailed update timestamp
+        copy_label: Optional recipient/sender copy label
+        paper_size: ReportLab page size, such as A4 or A5
 
     Returns:
         Path to the generated PDF file
     """
-    pdf_path = STORAGE_DIR / "receipts" / f"{receipt_no}.pdf"
+    pdf_path = Path(output_path) if output_path else STORAGE_DIR / "receipts" / f"{receipt_no}.pdf"
     pdf_path.parent.mkdir(parents=True, exist_ok=True)
+    transaction_time = format_receipt_datetime(transaction_time)
+    created_at_text = format_receipt_datetime(created_at_text)
+    updated_at_text = format_receipt_datetime(updated_at_text)
+    company_name = company_name or os.environ.get("LAB_RECEIPT_COMPANY_NAME", "نظام إدارة الاستلام المختبري")
+    subtitle = subtitle or os.environ.get("LAB_RECEIPT_SUBTITLE", "إيصال رسمي")
+    footer_text = footer_text or os.environ.get("LAB_RECEIPT_FOOTER", "")
+    logo_path = logo_path or _default_logo_path()
 
+    compact = paper_size == A5
+    margin = 8 if compact else 15
+    top_margin = 10 if compact else 20
+    bottom_margin = 8 if compact else 15
     doc = SimpleDocTemplate(
         str(pdf_path),
-        pagesize=A4,
-        rightMargin=15 * mm,
-        leftMargin=15 * mm,
-        topMargin=20 * mm,
-        bottomMargin=15 * mm,
+        pagesize=paper_size,
+        rightMargin=margin * mm,
+        leftMargin=margin * mm,
+        topMargin=top_margin * mm,
+        bottomMargin=bottom_margin * mm,
         encoding="utf-8",
     )
 
-    s = _styles()
+    s = _styles(primary_color, compact=compact)
     elements = []
 
     # ---- Header ----
-    elements.append(Paragraph(_display_text("نظام إدارة الاستلام المختبري"), s["title"]))
-    elements.append(Paragraph(_display_text("إيصال رسمي"), s["subtitle"]))
-    elements.append(Spacer(1, 6 * mm))
+    elements.append(Paragraph(_display_text(company_name), s["title"]))
+    elements.append(Paragraph(_display_text(subtitle), s["subtitle"]))
+    if copy_label:
+        elements.append(Paragraph(_display_text(copy_label), s["subtitle"]))
+    elements.append(Spacer(1, (3 if compact else 6) * mm))
 
     # ---- Logo (if provided) ----
     if logo_path and Path(logo_path).exists():
@@ -287,6 +358,27 @@ def generate_receipt_pdf(
                 Paragraph(_display_text(status_text), s["meta_val"]),
             ]
         )
+    if transaction_time:
+        meta_data.append(
+            [
+                Paragraph(_display_text("وقت المعاملة"), s["meta_key"]),
+                Paragraph(_display_text(transaction_time), s["meta_val"]),
+            ]
+        )
+    if created_at_text:
+        meta_data.append(
+            [
+                Paragraph(_display_text("تاريخ ووقت التسجيل"), s["meta_key"]),
+                Paragraph(_display_text(created_at_text), s["meta_val"]),
+            ]
+        )
+    if updated_at_text:
+        meta_data.append(
+            [
+                Paragraph(_display_text("آخر تحديث"), s["meta_key"]),
+                Paragraph(_display_text(updated_at_text), s["meta_val"]),
+            ]
+        )
 
     meta_table = Table(meta_data, colWidths=[doc.width * 0.3, doc.width * 0.7])
     meta_table.setStyle(
@@ -303,7 +395,7 @@ def generate_receipt_pdf(
         )
     )
     elements.append(meta_table)
-    elements.append(Spacer(1, 6 * mm))
+    elements.append(Spacer(1, (3 if compact else 6) * mm))
 
     # ---- Items table ----
     if items and len(items) > 0:
@@ -362,7 +454,7 @@ def generate_receipt_pdf(
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1D4E89")),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(_safe_hex_color(primary_color))),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                     ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E8F0FE")),
                     ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
@@ -379,7 +471,7 @@ def generate_receipt_pdf(
             )
         )
         elements.append(item_table)
-        elements.append(Spacer(1, 4 * mm))
+        elements.append(Spacer(1, (2 if compact else 4) * mm))
 
     # ---- Notes & transport ----
     if notes:
@@ -393,28 +485,27 @@ def generate_receipt_pdf(
             Paragraph(f"<b>{_display_text('تعليقات إضافية:')}</b> {_display_text(additional_comments)}", s["meta_val"])
         )
 
-    elements.append(Spacer(1, 10 * mm))
+    elements.append(Spacer(1, (4 if compact else 10) * mm))
 
     # ---- QR Code ----
     temp_files = []
     try:
         qr_data = f"{receipt_no}|{institution}|{date_text}|{tx_type}"
         qr_img = qrcode.make(qr_data)
-        import tempfile
 
         qr_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
         qr_tmp.close()
         qr_path = Path(qr_tmp.name)
         qr_img.save(str(qr_path))
         temp_files.append(qr_path)
-        qr_rl = RLImage(str(qr_path), width=3 * cm, height=3 * cm)
+        qr_size = 2 * cm if compact else 3 * cm
+        qr_rl = RLImage(str(qr_path), width=qr_size, height=qr_size)
         elements.append(qr_rl)
     except Exception:
         pass
 
     # ---- Barcode ----
     try:
-        import tempfile
 
         bar_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
         bar_tmp.close()
@@ -422,13 +513,13 @@ def generate_receipt_pdf(
         with open(str(bar_path), "wb") as f:
             Code128(receipt_no, writer=ImageWriter()).write(f)
         temp_files.append(bar_path)
-        bar_rl = RLImage(str(bar_path), width=8 * cm, height=1.5 * cm)
+        bar_rl = RLImage(str(bar_path), width=(6 if compact else 8) * cm, height=(1 if compact else 1.5) * cm)
         elements.append(Spacer(1, 2 * mm))
         elements.append(bar_rl)
     except Exception:
         pass
 
-    elements.append(Spacer(1, 10 * mm))
+    elements.append(Spacer(1, (4 if compact else 10) * mm))
 
     # ---- Signature section ----
     sig_table = Table(
@@ -451,10 +542,10 @@ def generate_receipt_pdf(
     elements.append(sig_table)
 
     # ---- Footer ----
-    elements.append(Spacer(1, 8 * mm))
+    elements.append(Spacer(1, (3 if compact else 8) * mm))
     elements.append(
         Paragraph(
-            _display_text(f"نظام إدارة الاستلام المختبري — الإصدار {CONFIG.app_version} — {datetime.now().year}"),
+            _display_text(footer_text or f"نظام إدارة الاستلام المختبري — الإصدار {CONFIG.app_version} — {datetime.now().year}"),
             s["footer"],
         ),
     )
@@ -467,3 +558,63 @@ def generate_receipt_pdf(
         except Exception:
             pass
     return pdf_path
+
+
+def _merge_a5_copies_on_a4(first_path, second_path, output_path):
+    """Place two one-page A5 PDFs side by side on one landscape A4 page."""
+    from pypdf import Transformation
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    writer = PdfWriter()
+    first = PdfReader(str(first_path)).pages
+    second = PdfReader(str(second_path)).pages
+    page_count = max(len(first), len(second))
+    a4_width, a4_height = landscape(A4)
+    for page_index in range(page_count):
+        base = writer.add_blank_page(width=a4_width, height=a4_height)
+        for copy_index, source_pages in enumerate((first, second)):
+            if page_index >= len(source_pages):
+                continue
+            page = source_pages[page_index]
+            source_width = float(page.mediabox.width)
+            source_height = float(page.mediabox.height)
+            scale_x = A5[0] / source_width if source_width else 1
+            scale_y = A5[1] / source_height if source_height else 1
+            transform = Transformation().scale(sx=scale_x, sy=scale_y).translate(
+                tx=copy_index * A5[0], ty=0
+            )
+            base.merge_transformed_page(page, transform, over=True)
+    with output_path.open("wb") as stream:
+        writer.write(stream)
+    return output_path
+
+
+def generate_receipt_pdf(*args, print_format="a4", **kwargs):
+    """Generate a receipt in A4, A5, or two A5 copies on one A4 sheet."""
+    normalized = str(print_format or "a4").lower().replace("_", "-")
+    if normalized not in {"a4", "a5", "a4-two-up", "two-up", "a4-2up"}:
+        raise ValueError("تنسيق الطباعة غير مدعوم. استخدم a4 أو a5 أو a4-two-up")
+    receipt_no = str(kwargs.get("receipt_no") or (args[0] if args else "receipt"))
+    if normalized == "a5":
+        kwargs["paper_size"] = A5
+        return _generate_receipt_pdf_single(*args, **kwargs)
+    if normalized == "a4":
+        kwargs["paper_size"] = A4
+        return _generate_receipt_pdf_single(*args, **kwargs)
+
+    base_dir = Path(kwargs.pop("output_path", STORAGE_DIR / "receipts"))
+    if base_dir.suffix.lower() == ".pdf":
+        output_path = base_dir
+    else:
+        output_path = base_dir / f"{receipt_no}_two_up.pdf"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="receipt-two-up-", dir=str(output_path.parent)) as temp_dir:
+        first_path = Path(temp_dir) / f"{receipt_no}_recipient_a5.pdf"
+        second_path = Path(temp_dir) / f"{receipt_no}_sender_a5.pdf"
+        first_kwargs = dict(kwargs, output_path=first_path, paper_size=A5, copy_label="نسخة المستلم")
+        second_kwargs = dict(kwargs, output_path=second_path, paper_size=A5, copy_label="نسخة المرسل")
+        _generate_receipt_pdf_single(*args, **first_kwargs)
+        _generate_receipt_pdf_single(*args, **second_kwargs)
+        _merge_a5_copies_on_a4(first_path, second_path, output_path)
+    return output_path
