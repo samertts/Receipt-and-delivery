@@ -1,20 +1,23 @@
 <template>
-  <div>
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+  <div class="reports-page space-y-6 pb-8">
+    <header class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-slate-800">{{ L.reports.title }}</h1>
-        <p class="text-sm text-slate-500 mt-1">{{ L.reports.description }}</p>
+        <h1 class="page-title">{{ L.reports.title }}</h1>
+        <p class="page-subtitle">{{ L.reports.description }}</p>
       </div>
-      <div class="flex items-center gap-2 text-xs" :class="loading ? 'text-blue-600' : 'text-slate-400'" aria-live="polite">
-        <span v-if="loading" class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-        {{ loading ? L.reports.updating : lastUpdated ? `${L.reports.lastUpdated}: ${formatDateTime(lastUpdated)}` : '' }}
+      <div class="status-strip" :class="loading ? 'text-blue-700' : 'text-slate-600'" aria-live="polite" aria-atomic="true">
+        <span v-if="loading" class="w-2 h-2 rounded-full bg-blue-500 animate-pulse" aria-hidden="true"></span>
+        <span>{{ loading ? L.reports.updating : lastUpdated ? `${L.reports.lastUpdated}: ${formatDateTime(lastUpdated)}` : L.reports.noData }}</span>
       </div>
-    </div>
+    </header>
 
-    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-6" aria-labelledby="filters-title">
-      <div class="flex items-center gap-2 mb-4">
-        <span class="text-indigo-600" v-html="icons.filter"></span>
-        <h2 id="filters-title" class="text-lg font-semibold text-slate-800">{{ L.reports.filters }}</h2>
+    <section class="gov-card report-filter-card p-5" aria-labelledby="filters-title">
+      <div class="report-section-heading">
+        <span class="text-blue-700" v-html="icons.filter" aria-hidden="true"></span>
+        <div>
+          <h2 id="filters-title" class="text-lg font-semibold text-slate-800">{{ L.reports.filters }}</h2>
+          <p class="page-subtitle">{{ L.reports.description }}</p>
+        </div>
       </div>
       <form class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4" @submit.prevent="loadReport">
         <div>
@@ -37,8 +40,8 @@
           <input id="type-filter" v-model.trim="filters.transaction_type" type="text" class="gov-input" :placeholder="L.reports.transactionTypePlaceholder" />
         </div>
         <div class="flex items-end gap-2">
-          <button type="submit" class="gov-btn-primary flex-1" :disabled="loading">
-            <span v-html="icons.search"></span>
+          <button type="submit" class="gov-btn-primary flex-1" :disabled="loading" :aria-busy="loading">
+            <span v-html="icons.search" aria-hidden="true"></span>
             {{ L.reports.apply }}
           </button>
           <button type="button" class="gov-btn-secondary" :disabled="loading" @click="resetFilters">{{ L.reports.reset }}</button>
@@ -47,31 +50,31 @@
       <p v-if="filterError" class="text-red-600 text-xs mt-3" role="alert">{{ filterError }}</p>
     </section>
 
-    <div v-if="loading && !report" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-      <div v-for="i in 4" :key="i" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+    <div v-if="loading && !report" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4" role="status" aria-live="polite" :aria-label="L.actions.loading">
+      <div v-for="i in 4" :key="i" class="gov-card report-kpi-card p-5">
         <div class="skeleton h-4 w-24 mb-3"></div>
         <div class="skeleton h-8 w-16"></div>
       </div>
     </div>
 
-    <div v-else-if="error" class="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-lg flex items-center justify-between gap-3" role="alert">
+    <div v-else-if="error" class="status-strip status-strip--error justify-between gap-3" role="alert">
       <span>{{ error }}</span>
-      <button class="font-medium underline" @click="loadReport">{{ L.actions.retry }}</button>
+      <button class="gov-btn-secondary" @click="loadReport">{{ L.actions.retry }}</button>
     </div>
 
     <template v-else-if="report">
-      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <div v-for="card in statCards" :key="card.key" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4" :aria-label="L.reports.summary">
+        <div v-for="card in statCards" :key="card.key" class="gov-card report-kpi-card p-5">
           <div class="flex items-center justify-between mb-2">
             <span class="text-sm text-slate-500">{{ card.label }}</span>
-            <span :class="card.color" v-html="card.icon"></span>
+            <span :class="card.color" v-html="card.icon" aria-hidden="true"></span>
           </div>
           <div class="text-3xl font-bold" :class="card.valueColor">{{ card.value }}</div>
         </div>
       </div>
 
       <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
-        <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-5" aria-labelledby="status-report-title">
+        <section class="gov-card report-panel p-5" aria-labelledby="status-report-title">
           <h2 id="status-report-title" class="text-lg font-semibold text-slate-800 mb-4">{{ L.reports.statusDistribution }}</h2>
           <div class="space-y-3">
             <div v-for="item in statusRows" :key="item.key" class="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
@@ -82,40 +85,42 @@
           </div>
         </section>
 
-        <section class="xl:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-5" aria-labelledby="type-report-title">
+        <section class="gov-card report-panel xl:col-span-2 p-5" aria-labelledby="type-report-title">
           <h2 id="type-report-title" class="text-lg font-semibold text-slate-800 mb-4">{{ L.reports.byType }}</h2>
           <div v-if="typeRows.length" class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div v-for="item in typeRows" :key="item.type" class="p-3 bg-slate-50 rounded-lg">
-              <div class="flex justify-between gap-3 text-sm mb-2"><span class="truncate text-slate-700" :title="item.type">{{ item.type }}</span><strong>{{ item.count }}</strong></div>
-              <div class="h-2 bg-slate-200 rounded-full overflow-hidden"><div class="h-full bg-indigo-500 rounded-full" :style="{ width: `${item.percent}%` }"></div></div>
+            <div v-for="item in typeRows" :key="item.type" class="report-type-row p-3 rounded-lg">
+                <div class="flex justify-between gap-3 text-sm mb-2"><span class="truncate text-slate-700" :title="item.type">{{ item.type }}</span><strong class="tabular-nums">{{ item.count }}</strong></div>
+                <div class="h-2 bg-slate-200 rounded-full overflow-hidden" role="progressbar" :aria-valuenow="item.percent" aria-valuemin="0" aria-valuemax="100" :aria-label="`${item.type}: ${item.percent}%`"><div class="h-full bg-blue-600 rounded-full" :style="{ width: `${item.percent}%` }"></div></div>
+
             </div>
           </div>
           <div v-else class="text-sm text-slate-400 text-center py-8">لا توجد بيانات</div>
         </section>
       </div>
 
-      <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden" aria-labelledby="transactions-report-title">
+      <section class="gov-card report-table-panel overflow-hidden" aria-labelledby="transactions-report-title">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-5 border-b border-slate-100">
           <div>
             <h2 id="transactions-report-title" class="text-lg font-semibold text-slate-800">{{ L.reports.transactionData }}</h2>
             <p class="text-xs text-slate-500 mt-1">{{ report.summary.total }} {{ L.reports.matchingResults }}</p>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="report-export-actions flex items-center gap-2">
             <button type="button" class="gov-btn-success" :disabled="exporting !== null" @click="exportReport('excel')">
-              <span v-html="icons.download"></span>{{ exporting === 'excel' ? L.reports.exporting : L.reports.exportExcel }}
+              <span v-html="icons.download" aria-hidden="true"></span>{{ exporting === 'excel' ? L.reports.exporting : L.reports.exportExcel }}
             </button>
             <button type="button" class="gov-btn-danger" :disabled="exporting !== null" @click="exportReport('pdf')">
-              <span v-html="icons.download"></span>{{ exporting === 'pdf' ? L.reports.exporting : L.reports.exportPdf }}
+              <span v-html="icons.download" aria-hidden="true"></span>{{ exporting === 'pdf' ? L.reports.exporting : L.reports.exportPdf }}
             </button>
           </div>
         </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm text-right">
+        <div class="overflow-x-auto" tabindex="0" aria-label="{{ L.reports.transactionData }}">
+          <table class="w-full text-sm text-right report-table">
+            <caption class="sr-only">{{ L.reports.transactionData }}</caption>
             <thead class="bg-slate-50 text-slate-500">
               <tr><th class="px-4 py-3 font-medium">{{ L.tx.title }}</th><th class="px-4 py-3 font-medium">{{ L.form.transactionType }}</th><th class="px-4 py-3 font-medium">{{ L.form.sender }}</th><th class="px-4 py-3 font-medium">{{ L.form.receiver }}</th><th class="px-4 py-3 font-medium">{{ L.settings.status }}</th><th class="px-4 py-3 font-medium">{{ L.form.transactionDate }}</th></tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="transaction in report.transactions" :key="transaction.id" class="hover:bg-slate-50">
+              <tr v-for="transaction in report.transactions" :key="transaction.id" class="hover:bg-slate-50 transition-colors duration-200">
                 <td class="px-4 py-3 font-medium text-primary-900">{{ transaction.transaction_no }}</td><td class="px-4 py-3">{{ transaction.transaction_type }}</td><td class="px-4 py-3">{{ transaction.sender_name }}</td><td class="px-4 py-3">{{ transaction.receiver_name }}</td><td class="px-4 py-3"><span class="gov-badge bg-slate-100 text-slate-700">{{ statusLabel(transaction.status) }}</span></td><td class="px-4 py-3 whitespace-nowrap">{{ transaction.transaction_date }}</td>
               </tr>
             </tbody>
