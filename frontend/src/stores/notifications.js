@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { getAccessToken } from '../api/tokenStore'
+import { getSessionUser } from '../api/tokenStore'
 import { t } from '../composables/useLocale'
 
 const MAX_NOTIFICATIONS = 50
@@ -36,7 +36,7 @@ export const useNotificationStore = defineStore('notifications', () => {
   }
 
   function scheduleReconnect() {
-    if (manuallyClosed || reconnectTimer || !getAccessToken()) return
+    if (manuallyClosed || reconnectTimer || !getSessionUser()) return
     const delay = Math.min(INITIAL_RECONNECT_DELAY * 2 ** reconnectAttempt, MAX_RECONNECT_DELAY)
     reconnectAttempt += 1
     reconnectTimer = window.setTimeout(() => {
@@ -46,7 +46,7 @@ export const useNotificationStore = defineStore('notifications', () => {
   }
 
   function connect() {
-    if (typeof WebSocket === 'undefined' || !getAccessToken()) return
+    if (typeof WebSocket === 'undefined' || !getSessionUser()) return
     if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) return
 
     manuallyClosed = false
@@ -55,7 +55,6 @@ export const useNotificationStore = defineStore('notifications', () => {
     socket = new WebSocket(buildSocketUrl())
 
     socket.onopen = () => {
-      socket.send(JSON.stringify({ type: 'auth', token: getAccessToken() }))
       connected.value = true
       connecting.value = false
       reconnectAttempt = 0

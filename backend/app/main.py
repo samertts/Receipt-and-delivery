@@ -80,7 +80,7 @@ app.add_middleware(
     allow_origins=settings.origin_list,
     allow_credentials=settings.cors_allow_credentials,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID", "X-CSRF-Token"],
 )
 
 app.middleware("http")(rate_limit_middleware)
@@ -108,10 +108,12 @@ async def response_envelope_middleware(
 
     try:
         data = json.loads(body)
-        if isinstance(data, dict) and "success" in data and "meta" in data:
-            return JSONResponse(content=data, status_code=response.status_code)
-        wrapped = wrap_response(data=data)
-        return JSONResponse(content=wrapped, status_code=response.status_code)
+        content = data if isinstance(data, dict) and "success" in data and "meta" in data else wrap_response(data=data)
+        wrapped_response = JSONResponse(content=content, status_code=response.status_code)
+        for key, value in response.raw_headers:
+            if key.lower() not in {b"content-length", b"content-type"}:
+                wrapped_response.raw_headers.append((key, value))
+        return wrapped_response
     except (json.JSONDecodeError, UnicodeDecodeError):
         return Response(
             content=body,

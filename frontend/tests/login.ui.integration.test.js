@@ -27,10 +27,9 @@ describe('login page UI/API integration', () => {
   })
 
   it('submits credentials through the API and navigates after success', async () => {
-    const encode = (value) => btoa(JSON.stringify(value)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-    const accessToken = `${encode({ alg: 'none' })}.${encode({ sub: 'admin', role: 'admin' })}.signature`
-    vi.spyOn(authApi, 'login').mockResolvedValue({
-      data: { access_token: accessToken, refresh_token: 'refresh-token' },
+    vi.spyOn(authApi, 'login').mockResolvedValue({ data: { authenticated: true } })
+    vi.spyOn(authApi, 'me').mockResolvedValue({
+      data: { username: 'admin', role: 'admin', permissions: [], roles: [], role_permissions: {} },
     })
 
     const wrapper = mountLogin()

@@ -35,7 +35,7 @@ class TestInactiveUser:
 
         token = create_access_token(sub=user.username, role=user.role)
         response = client.post(
-            "/api/auth/change-password",
+            "/api/v1/auth/change-password",
             json={"current_password": "Old@1234", "new_password": "New@5678"},
             headers={"Authorization": f"Bearer {token}"},
         )

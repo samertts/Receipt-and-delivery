@@ -1,11 +1,13 @@
+import secrets
 from typing import Optional
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.cookie_auth import CSRF_COOKIE, CSRF_HEADER, is_browser_api_request, request_token
 from app.core.exceptions import ForbiddenError, UnauthorizedError
 from app.db.session import get_db
 from app.core.rbac import PERMISSION_ROLES
@@ -14,11 +16,27 @@ from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
+def verify_csrf(request: Request) -> None:
+    if not is_browser_api_request(request) or request.method in {"GET", "HEAD", "OPTIONS"}:
+        return
+    # Explicit Bearer clients are non-browser compatibility clients; CSRF is
+    # required for cookie-authenticated browser requests only.
+    if request.headers.get("Authorization", "").lower().startswith("bearer "):
+        return
+    cookie_token = request.cookies.get(CSRF_COOKIE, "")
+    header_token = request.headers.get(CSRF_HEADER, "")
+    if not cookie_token or not header_token or not secrets.compare_digest(cookie_token, header_token):
+        raise ForbiddenError("رمز حماية الطلب غير صالح")
+
+
 def get_current_user(
+    request: Request,
     token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    if token is None:
+    verify_csrf(request)
+    token = request_token(request, token)
+    if not token:
         raise UnauthorizedError("لم يتم تسجيل الدخول")
     try:
         payload = jwt.decode(

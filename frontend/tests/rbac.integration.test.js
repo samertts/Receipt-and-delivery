@@ -12,9 +12,17 @@ vi.mock('../src/api', () => ({ authApi: authApiMock }))
 
 import { useAuthStore } from '../src/stores/auth'
 
-function tokenFor(payload) {
-  const encode = (value) => btoa(JSON.stringify(value)).replace(/=/g, '')
-  return `${encode({ alg: 'none', typ: 'JWT' })}.${encode(payload)}.signature`
+function profile(overrides = {}) {
+  return {
+    id: 'user-1',
+    username: 'supervisor',
+    full_name: 'Supervisor',
+    role: 'supervisor',
+    permissions: ['view_dashboard', 'view_reports'],
+    roles: ['supervisor'],
+    role_permissions: {},
+    ...overrides,
+  }
 }
 
 describe('RBAC integration', () => {
@@ -23,14 +31,10 @@ describe('RBAC integration', () => {
     vi.clearAllMocks()
   })
 
-  it('stores permissions from the access token and evaluates them by role', async () => {
+  it('stores permissions from the server profile and evaluates them by role', async () => {
     setActivePinia(createPinia())
-    authApiMock.login.mockResolvedValue({
-      data: {
-        access_token: tokenFor({ sub: 'supervisor', role: 'supervisor', permissions: ['view_dashboard', 'view_reports'] }),
-        refresh_token: 'refresh-token',
-      },
-    })
+    authApiMock.login.mockResolvedValue({ data: { authenticated: true } })
+    authApiMock.me.mockResolvedValue({ data: profile() })
 
     const auth = useAuthStore()
     await auth.login('supervisor', 'password')
@@ -41,20 +45,19 @@ describe('RBAC integration', () => {
     expect(auth.hasAnyPermission(['manage_users', 'view_reports'])).toBe(true)
   })
 
-  it('refreshes permissions when the backend rotates the access token', async () => {
+  it('refreshes permissions from the server profile after rotating the cookie session', async () => {
     setActivePinia(createPinia())
-    authApiMock.login.mockResolvedValue({
-      data: { access_token: tokenFor({ sub: 'user', role: 'user', permissions: ['view_dashboard'] }), refresh_token: 'refresh-1' },
-    })
-    authApiMock.refresh.mockResolvedValue({
-      data: { access_token: tokenFor({ sub: 'user', role: 'user', permissions: ['view_dashboard', 'create_transaction'] }), refresh_token: 'refresh-2' },
-    })
+    authApiMock.login.mockResolvedValue({ data: { authenticated: true } })
+    authApiMock.me
+      .mockResolvedValueOnce({ data: profile({ role: 'user', permissions: ['view_dashboard'] }) })
+      .mockResolvedValueOnce({ data: profile({ role: 'user', permissions: ['view_dashboard', 'create_transaction'] }) })
+    authApiMock.refresh.mockResolvedValue({ data: { authenticated: true } })
 
     const auth = useAuthStore()
     await auth.login('user', 'password')
     await auth.refresh()
 
     expect(auth.hasPermission('create_transaction')).toBe(true)
-    expect(auth.refreshToken).toBe('refresh-2')
+    expect(auth.refreshToken).toBe('')
   })
 })

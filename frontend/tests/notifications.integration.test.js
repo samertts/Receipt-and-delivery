@@ -52,7 +52,7 @@ describe('notifications store and WebSocket integration', () => {
     expect(socket.url).toContain('/api/ws/notifications')
     expect(socket.url).not.toContain('access-token')
     socket.open()
-    expect(JSON.parse(socket.sent[0])).toEqual({ type: 'auth', token: 'access-token' })
+    expect(socket.sent).toEqual([])
     socket.emit({ type: 'connected', message: 'جاهز' })
     socket.emit({
       id: 'notification-1',

@@ -114,7 +114,7 @@ def admin_token(client, db: Session) -> str:
     db.commit()
 
     response = client.post(
-        "/api/auth/login",
+        "/api/v1/auth/login",
         json={"username": "admin", "password": "Admin@123"},
     )
     body = response.json()
@@ -137,7 +137,7 @@ def user_token(client, db: Session) -> str:
     db.commit()
 
     response = client.post(
-        "/api/auth/login",
+        "/api/v1/auth/login",
         json={"username": "user1", "password": "User@1234"},
     )
     body = response.json()

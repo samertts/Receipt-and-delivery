@@ -1,19 +1,28 @@
 import axios from 'axios'
-import { clearSession, getAccessToken, getRefreshToken, updateAccessToken, updateRefreshToken } from './tokenStore'
+import { clearSession } from './tokenStore'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const UNSAFE_METHODS = new Set(['post', 'put', 'patch', 'delete'])
 
 const client = axios.create({
   baseURL: API_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
+function getCookie(name) {
+  if (typeof document === 'undefined') return ''
+  const prefix = `${encodeURIComponent(name)}=`
+  const entry = document.cookie.split('; ').find((item) => item.startsWith(prefix))
+  return entry ? decodeURIComponent(entry.slice(prefix.length)) : ''
+}
+
 client.interceptors.request.use((config) => {
-  const token = getAccessToken()
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  if (UNSAFE_METHODS.has((config.method || 'get').toLowerCase())) {
+    const csrfToken = getCookie('lab_csrf_token')
+    if (csrfToken) config.headers['X-CSRF-Token'] = csrfToken
   }
   return config
 })
@@ -21,10 +30,10 @@ client.interceptors.request.use((config) => {
 let isRefreshing = false
 let failedQueue = []
 
-function processQueue(error, token = null) {
+function processQueue(error) {
   failedQueue.forEach((prom) => {
     if (error) prom.reject(error)
-    else prom.resolve(token)
+    else prom.resolve()
   })
   failedQueue = []
 }
@@ -55,33 +64,20 @@ client.interceptors.response.use(
     }
     if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.endsWith('/auth/refresh')) {
       originalRequest._retry = true
-      const refreshToken = getRefreshToken()
-      if (!refreshToken) {
-        clearSession()
-        window.location.href = '/'
-        return Promise.reject(error)
-      }
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject })
-        }).then((token) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`
-          return client(originalRequest)
-        })
+        }).then(() => client(originalRequest))
       }
       isRefreshing = true
       try {
-        const response = await client.post('/auth/refresh', { refresh_token: refreshToken })
-        const newToken = response.data.access_token
-        updateAccessToken(newToken)
-        if (response.data.refresh_token) updateRefreshToken(response.data.refresh_token)
-        processQueue(null, newToken)
-        originalRequest.headers.Authorization = `Bearer ${newToken}`
+        await client.post('/auth/refresh')
+        processQueue(null)
         return client(originalRequest)
       } catch (refreshError) {
-        processQueue(refreshError, null)
+        processQueue(refreshError)
         clearSession()
-        window.location.href = '/'
+        if (typeof window !== 'undefined') window.location.href = '/'
         return Promise.reject(refreshError)
       } finally {
         isRefreshing = false

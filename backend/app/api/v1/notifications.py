@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import asyncio
-import json
-
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.cookie_auth import ACCESS_COOKIE
 from app.db.session import get_db
 from app.models.blacklisted_token import BlacklistedToken
 from app.models.user import User
@@ -13,8 +12,21 @@ from app.services.notification_service import notification_manager
 from app.services.security import decode_access_token
 
 router = APIRouter(prefix="/ws", tags=["التنبيهات الفورية"])
-AUTH_TIMEOUT_SECONDS = 5
-MAX_AUTH_MESSAGE_BYTES = 2048
+
+
+def _origin_is_allowed(websocket: WebSocket) -> bool:
+    origin = websocket.headers.get("origin", "")
+    return not origin or origin in settings.origin_list
+
+
+def _find_user(token: str, db: Session) -> User | None:
+    payload = decode_access_token(token)
+    if not payload:
+        return None
+    if db.query(BlacklistedToken).filter(BlacklistedToken.token == token).first():
+        return None
+    user = db.query(User).filter(User.username == payload.get("sub", "")).first()
+    return user if user and user.status == "active" else None
 
 
 @router.websocket("/notifications")
@@ -24,32 +36,15 @@ async def notifications_socket(
 ) -> None:
     user_id = ""
     await websocket.accept()
-
     try:
-        raw_auth = await asyncio.wait_for(
-            websocket.receive_text(), timeout=AUTH_TIMEOUT_SECONDS
-        )
-        if len(raw_auth.encode("utf-8")) > MAX_AUTH_MESSAGE_BYTES:
-            await websocket.close(code=1008, reason="رسالة مصادقة كبيرة جدًا")
+        if not _origin_is_allowed(websocket):
+            await websocket.close(code=1008, reason="مصدر الاتصال غير مسموح")
             return
-        try:
-            auth_message = json.loads(raw_auth)
-        except json.JSONDecodeError:
-            await websocket.close(code=1008, reason="رسالة مصادقة غير صالحة")
-            return
-        token = auth_message.get("token", "") if isinstance(auth_message, dict) else ""
-        payload = decode_access_token(token)
-        if not payload:
+
+        token = websocket.cookies.get(ACCESS_COOKIE, "")
+        user = _find_user(token, db)
+        if not user:
             await websocket.close(code=1008, reason="رمز مصادقة غير صالح")
-            return
-
-        if db.query(BlacklistedToken).filter(BlacklistedToken.token == token).first():
-            await websocket.close(code=1008, reason="تم إبطال الرمز")
-            return
-
-        user = db.query(User).filter(User.username == payload["sub"]).first()
-        if not user or user.status != "active":
-            await websocket.close(code=1008, reason="الحساب غير نشط")
             return
 
         user_id = str(user.id)
@@ -68,7 +63,7 @@ async def notifications_socket(
             message = await websocket.receive_text()
             if message == "ping":
                 await websocket.send_json({"type": "pong"})
-    except (WebSocketDisconnect, asyncio.TimeoutError):
+    except WebSocketDisconnect:
         pass
     finally:
         if user_id:

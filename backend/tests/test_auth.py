@@ -1,6 +1,17 @@
 from app.services.security import create_access_token, hash_password, verify_password
 
 
+def _cookie_from_response(response, name):
+    from http.cookies import SimpleCookie
+
+    for header in response.headers.get_list("set-cookie"):
+        cookies = SimpleCookie()
+        cookies.load(header)
+        if name in cookies:
+            return cookies[name].value
+    return ""
+
+
 def _unwrap(body: dict) -> dict:
     """Extract data from response envelope."""
     return body.get("data", body)
@@ -52,8 +63,12 @@ class TestLoginAPI:
         )
         assert response.status_code == 200
         data = _unwrap(response.json())
-        assert "access_token" in data
-        assert data["token_type"] == "bearer"
+        assert data == {"authenticated": True}
+        assert _cookie_from_response(response, "lab_access_token")
+        assert _cookie_from_response(response, "lab_refresh_token")
+        assert _cookie_from_response(response, "lab_csrf_token")
+        set_cookie_headers = ", ".join(response.headers.get_list("set-cookie"))
+        assert "HttpOnly" in set_cookie_headers
 
     def test_login_invalid_credentials(self, client):
         response = client.post(
@@ -87,36 +102,47 @@ class TestRefreshToken:
             json={"username": "refreshuser", "password": "Test@1234"},
         )
         assert login_resp.status_code == 200
-        refresh_token = _unwrap(login_resp.json())["refresh_token"]
+        refresh_token = _cookie_from_response(login_resp, "lab_refresh_token")
+        csrf_token = _cookie_from_response(login_resp, "lab_csrf_token")
         assert refresh_token
-
+        assert csrf_token
         refresh_resp = client.post(
             "/api/auth/refresh",
-            json={"refresh_token": refresh_token},
+            headers={"X-CSRF-Token": csrf_token},
+            cookies={"lab_refresh_token": refresh_token, "lab_csrf_token": csrf_token},
         )
         assert refresh_resp.status_code == 200
         data = _unwrap(refresh_resp.json())
-        assert "access_token" in data
-        assert "refresh_token" in data
+        assert data == {"authenticated": True}
+        assert _cookie_from_response(refresh_resp, "lab_access_token")
 
     def test_refresh_invalid_token(self, client):
+        client.cookies.set("lab_csrf_token", "test-csrf")
         response = client.post(
             "/api/auth/refresh",
             json={"refresh_token": "invalid-token"},
+            headers={"X-CSRF-Token": "test-csrf"},
         )
         assert response.status_code == 401
 
 
 class TestLogout:
-    def test_logout_success(self, client, admin_token):
+    def test_browser_logout_requires_csrf_header(self, client, admin_token):
         response = client.post(
             "/api/auth/logout",
+            cookies={"lab_access_token": admin_token},
+        )
+        assert response.status_code == 403
+
+    def test_logout_success(self, client, admin_token):
+        response = client.post(
+            "/api/v1/auth/logout",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 200
 
     def test_logout_without_auth(self, client):
-        response = client.post("/api/auth/logout")
+        response = client.post("/api/v1/auth/logout")
         assert response.status_code == 401
 
 
@@ -136,27 +162,27 @@ class TestChangePassword:
         db.commit()
 
         login_resp = client.post(
-            "/api/auth/login",
+            "/api/v1/auth/login",
             json={"username": "changepw", "password": "Old@1234"},
         )
         token = _unwrap(login_resp.json())["access_token"]
 
         response = client.post(
-            "/api/auth/change-password",
+            "/api/v1/auth/change-password",
             json={"current_password": "Old@1234", "new_password": "New@5678"},
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == 200
 
         login_resp2 = client.post(
-            "/api/auth/login",
+            "/api/v1/auth/login",
             json={"username": "changepw", "password": "New@5678"},
         )
         assert login_resp2.status_code == 200
 
     def test_change_password_wrong_current(self, client, admin_token):
         response = client.post(
-            "/api/auth/change-password",
+            "/api/v1/auth/change-password",
             json={"current_password": "Wrong@123", "new_password": "New@5678"},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
@@ -164,7 +190,7 @@ class TestChangePassword:
 
     def test_change_password_weak_new(self, client, admin_token):
         response = client.post(
-            "/api/auth/change-password",
+            "/api/v1/auth/change-password",
             json={"current_password": "Admin@123", "new_password": "weak"},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
@@ -182,7 +208,7 @@ class TestProtectedEndpoints:
 
     def test_transactions_with_auth(self, client, admin_token):
         response = client.get(
-            "/api/transactions",
+            "/api/v1/transactions",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert response.status_code == 200

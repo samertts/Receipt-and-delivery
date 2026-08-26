@@ -1,27 +1,21 @@
-let accessToken = ''
-let refreshToken = ''
+// Browser authentication uses HttpOnly cookies. This module keeps only a
+// minimal in-memory profile for UI state and intentionally never stores tokens.
 let user = null
 
-export function setSession({ accessToken: newAccessToken = '', refreshToken: newRefreshToken = '', user: newUser = null } = {}) {
-  accessToken = newAccessToken
-  refreshToken = newRefreshToken
+export function setSession({ user: newUser = null } = {}) {
   user = newUser
 }
 
-export function updateAccessToken(newAccessToken = '') {
-  accessToken = newAccessToken
-}
+export function updateAccessToken(_newAccessToken = '') {}
 
-export function updateRefreshToken(newRefreshToken = '') {
-  refreshToken = newRefreshToken
-}
+export function updateRefreshToken(_newRefreshToken = '') {}
 
 export function getAccessToken() {
-  return accessToken
+  return ''
 }
 
 export function getRefreshToken() {
-  return refreshToken
+  return ''
 }
 
 export function getSessionUser() {
@@ -29,7 +23,5 @@ export function getSessionUser() {
 }
 
 export function clearSession() {
-  accessToken = ''
-  refreshToken = ''
   user = null
 }

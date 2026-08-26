@@ -22,6 +22,13 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore()
+  if (!auth.sessionLoaded) {
+    try {
+      await auth.loadProfile()
+    } catch {
+      // No active cookie session; protected routes will be denied below.
+    }
+  }
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     next('/')
     return
@@ -29,13 +36,6 @@ router.beforeEach(async (to, from, next) => {
   if (to.meta.guest && auth.isAuthenticated) {
     next('/dashboard')
     return
-  }
-  if (auth.isAuthenticated && !auth.permissions.length) {
-    try {
-      await auth.loadProfile()
-    } catch {
-      // The API interceptor handles expired sessions; the guard denies unknown permissions.
-    }
   }
   if (to.meta.permission && !auth.hasPermission(to.meta.permission)) {
     next({ name: 'Forbidden' })
