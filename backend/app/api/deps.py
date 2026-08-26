@@ -3,7 +3,7 @@ from typing import Optional
 
 from fastapi import Depends, Request
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+from app.core.jwt_compat import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app.core.config import settings

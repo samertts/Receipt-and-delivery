@@ -23,8 +23,10 @@ def get_db():
         db.close()
 
 
-# TODO: Initialize Alembic for database migrations
-# Run: alembic init alembic
-# Then create initial migration: alembic revision --autogenerate -m "initial"
-def init_db():
+def init_db() -> None:
+    """Development/test bootstrap only; production must run Alembic explicitly."""
+    if settings.environment.lower() in {"prod", "production", "staging"}:
+        raise RuntimeError(
+            "Base.metadata.create_all is disabled in production; run alembic upgrade head"
+        )
     Base.metadata.create_all(bind=engine)

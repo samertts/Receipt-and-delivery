@@ -35,9 +35,15 @@ class SyncResponse:
 class APIClient:
     """API client with HTTP transport via urllib."""
 
-    def __init__(self, base_url: str = "", timeout: int = 30):
+    def __init__(
+        self,
+        base_url: str = "",
+        timeout: int = 30,
+        total_timeout: int | None = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.total_timeout = total_timeout or max(timeout * 4, timeout)
         self._enabled = False
         self._token: str = ""
 
@@ -45,13 +51,20 @@ class APIClient:
     def is_enabled(self) -> bool:
         return self._enabled
 
-    def enable(self, base_url: str, token: str = "", timeout: int = 30) -> None:
+    def enable(
+        self,
+        base_url: str,
+        token: str = "",
+        timeout: int = 30,
+        total_timeout: int | None = None,
+    ) -> None:
         parsed = urllib.parse.urlparse(base_url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("base_url must be an absolute http(s) URL")
         self.base_url = base_url.rstrip("/")
         self._token = token
         self.timeout = timeout
+        self.total_timeout = total_timeout or max(timeout * 4, timeout)
         self._enabled = True
 
     def disable(self) -> None:
@@ -91,11 +104,16 @@ class APIClient:
             body = json.dumps(data).encode("utf-8")
 
         max_retries = 3
+        deadline = time.monotonic() + self.total_timeout
         for attempt in range(max_retries):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return SyncResponse(success=False, status_code=0, message="Total request timeout")
             req = urllib.request.Request(url, data=body, headers=headers, method=method)
             try:
                 # The URL scheme is validated in enable(); urllib remains the transport.
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # nosec B310
+                request_timeout = min(self.timeout, max(0.1, remaining))
+                with urllib.request.urlopen(req, timeout=request_timeout) as resp:  # nosec B310
                     resp_body = resp.read().decode("utf-8")
                     resp_data: dict[str, Any] = {}
                     if resp_body:
@@ -107,9 +125,14 @@ class APIClient:
                         data=resp_data,
                     )
             except urllib.error.HTTPError as e:
-                if e.code >= 500 and attempt < max_retries - 1:
-                    wait_time = (2**attempt) + random.uniform(0, 1)
-                    time.sleep(wait_time)
+                retryable = e.code in {408, 429} or e.code >= 500
+                if retryable and attempt < max_retries - 1:
+                    wait_time = min(
+                        (2**attempt) + random.uniform(0, 1),
+                        max(0, deadline - time.monotonic()),
+                    )
+                    if wait_time > 0:
+                        time.sleep(wait_time)
                     continue
                 resp_body = e.read().decode("utf-8", errors="replace")
                 resp_data = {}
@@ -126,8 +149,12 @@ class APIClient:
                 )
             except urllib.error.URLError as e:
                 if attempt < max_retries - 1:
-                    wait_time = (2**attempt) + random.uniform(0, 1)
-                    time.sleep(wait_time)
+                    wait_time = min(
+                        (2**attempt) + random.uniform(0, 1),
+                        max(0, deadline - time.monotonic()),
+                    )
+                    if wait_time > 0:
+                        time.sleep(wait_time)
                     continue
                 return SyncResponse(
                     success=False,

@@ -14,6 +14,7 @@ class AuthService(BaseService):
         self._session_user = None
         self._login_time = None
         self._last_activity = None
+        self._last_sensitive_auth = None
 
     def login(self, username: str, password: str):
         max_attempts = int(self._get_setting("security.max_login_attempts", "5"))
@@ -24,6 +25,7 @@ class AuthService(BaseService):
         self._session_user = dict(user)
         self._login_time = datetime.now()
         self._last_activity = datetime.now()
+        self._last_sensitive_auth = None
         return self._session_user
 
     @property
@@ -67,10 +69,44 @@ class AuthService(BaseService):
                 )
         self.touch_activity()
 
+    def reauthenticate(self, password: str) -> bool:
+        """Require the current password before a high-risk local operation."""
+        if not self._session_user:
+            raise AuthenticationError("الرجاء تسجيل الدخول أولاً")
+        self.check_session()
+        max_attempts = int(self._get_setting("security.max_login_attempts", "5"))
+        lockout_minutes = int(self._get_setting("security.login_lockout_minutes", "5"))
+        verified = authenticate(
+            self._session_user["username"],
+            password,
+            max_attempts,
+            lockout_minutes,
+        )
+        if not verified:
+            raise AuthenticationError("إعادة التحقق مطلوبة قبل تنفيذ العملية الحساسة")
+        self._last_sensitive_auth = datetime.now()
+        self.touch_activity()
+        return True
+
+    def require_recent_reauthentication(self, max_age_minutes: int = 5) -> None:
+        """Reject a sensitive operation unless password was recently re-entered."""
+        if max_age_minutes <= 0:
+            raise ValueError("max_age_minutes must be positive")
+        if not self._session_user:
+            raise AuthenticationError("الرجاء تسجيل الدخول أولاً")
+        self.check_session()
+        if not self._last_sensitive_auth:
+            raise AuthenticationError("إعادة التحقق مطلوبة: أعد إدخال كلمة المرور قبل تنفيذ العملية الحساسة")
+        elapsed = (datetime.now() - self._last_sensitive_auth).total_seconds() / 60
+        if elapsed > max_age_minutes:
+            self._last_sensitive_auth = None
+            raise AuthenticationError("انتهت صلاحية إعادة التحقق للعملية الحساسة")
+
     def logout(self) -> None:
         self._session_user = None
         self._login_time = None
         self._last_activity = None
+        self._last_sensitive_auth = None
 
     def needs_password_change(self) -> bool:
         if not self._session_user:

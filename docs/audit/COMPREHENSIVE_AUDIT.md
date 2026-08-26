@@ -109,3 +109,19 @@
 [ADR-001]: ../adr/ADR-001-tenant-isolation.md "Tenant isolation before multi-facility"
 [ADR-002]: ../adr/ADR-002-backend-migrations.md "Backend production migrations"
 [ADR-003]: ../adr/ADR-003-local-data-encryption.md "Local database and attachment encryption"
+
+
+## ملحق تنفيذ متطلبات الملف المرفق
+
+بعد دورة التدقيق الأصلية أضيفت طبقات تشغيلية قابلة للاختبار: `backend/alembic` لإدارة schema PostgreSQL، `OperationalModeService` لـSafe/Emergency/Restricted Mode، `JobManager` للمهام المحدودة مع progress/retry/watchdog، `workflow_risk` للمطابقة وتقدير المخاطر، وfeature flags/telemetry opt-in. كما أصبح إنشاء receipt وoutbox event محصورًا في transaction واحدة، وأصبح root hash المحلي يكشف العبث بآخر audit row، وأضيف disable-on-failure للـplugins وre-authentication للعمليات الحساسة.
+
+تظل العناصر التي تحتاج بنية مجال جديدة أو أجهزة فعلية غير مكتملة عمدًا: specimen/manifest domain الكامل، device registry وrevoke الخادمي، manifest signing، split/merge shipment، تشفير SQLite وإدارة مفاتيحه، scanning antivirus فعلي، two-person approval UI، وload/soak/chaos tests على Windows و40 مركزًا. لا يجوز وصف هذه العناصر بأنها production-ready قبل وجود schema وسياسة تشغيل واختبارات قبول.
+
+
+## نتائج دورة تنفيذ الملف المرفق
+
+أُضيفت بيئة Alembic مستقلة لـBackend PostgreSQL مع baseline وrevisions expand/backfill/enforce لمفتاح `sync_logs.idempotency_key`، و`alembic check` وoffline SQL gate ودورة downgrade/upgrade. وأصبح `backend/start.sh` يطبق `upgrade head`، بينما يمنع `init_db()` استخدام `create_all()` في production/staging.
+
+كما أُضيفت طبقات `JobManager` بــstatus/progress/retry/cancel/watchdog، و`OperationalModeService` للـSafe/Emergency/Restricted Mode، وfeature flags default-off وtelemetry opt-in redacted، وIdentity Matching/Risk Engine، وre-authentication للعمليات الحساسة. وأصبح outbox الخاص بعمليات receipt داخل transaction نفسها، وسُجل root hash لكشف العبث بآخر audit row، ويُعطّل plugin الفاشل بدل إسقاط التطبيق.
+
+بعد هذه التغييرات نجحت **1,593** اختبارات desktop، و**79** اختبار Backend، و**24** اختبار frontend عبر 10 ملفات، مع نجاح Vite/PWA build. لا توجد Docker أو `psql` في بيئة التنفيذ المحلية؛ لذلك اختبار PostgreSQL online الحقيقي موجود في CI عبر service container، بينما تم التحقق محليًا عبر SQLite chain وPostgreSQL offline SQL dialect.

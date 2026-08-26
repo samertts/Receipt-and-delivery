@@ -76,6 +76,7 @@ class SyncService:
         action: str,
         payload: str = "",
         idempotency_key: str = "",
+        conn: Any | None = None,
     ) -> int:
         if action not in SYNC_ACTIONS:
             raise ValueError(
@@ -88,28 +89,45 @@ class SyncService:
         idempotency_key = idempotency_key.strip() or str(uuid.uuid4())
         if len(idempotency_key) > 160:
             raise ValueError("Idempotency key exceeds the safety limit")
-        with _db.get_conn() as conn:
-            existing = conn.execute(
-                "SELECT id FROM sync_queue WHERE idempotency_key=? LIMIT 1",
-                (idempotency_key,),
-            ).fetchone()
-            if existing:
-                return existing[0]
-            conn.execute(
-                """INSERT INTO sync_queue
-                    (entity_type, entity_id, action, payload, idempotency_key, status, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    entity_type,
-                    entity_id,
-                    action,
-                    payload,
-                    idempotency_key,
-                    SYNC_STATUS_PENDING,
-                    _utcnow(),
-                ),
+        if conn is not None:
+            return self._enqueue_in_connection(
+                conn, entity_type, entity_id, action, payload, idempotency_key
             )
-            return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        with _db.get_conn() as owned_conn:
+            return self._enqueue_in_connection(
+                owned_conn, entity_type, entity_id, action, payload, idempotency_key
+            )
+
+    @staticmethod
+    def _enqueue_in_connection(
+        conn: Any,
+        entity_type: str,
+        entity_id: int,
+        action: str,
+        payload: str,
+        idempotency_key: str,
+    ) -> int:
+        existing = conn.execute(
+            "SELECT id FROM sync_queue WHERE idempotency_key=? LIMIT 1",
+            (idempotency_key,),
+        ).fetchone()
+        if existing:
+            return existing[0]
+        conn.execute(
+            """INSERT INTO sync_queue
+                (entity_type, entity_id, action, payload, idempotency_key, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                entity_type,
+                entity_id,
+                action,
+                payload,
+                idempotency_key,
+                SYNC_STATUS_PENDING,
+                _utcnow(),
+            ),
+        )
+        return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def get_pending(self, limit: int = 100) -> list[SyncQueueEntry]:
         """Return pending entries whose exponential retry delay has elapsed."""

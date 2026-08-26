@@ -1,9 +1,10 @@
 #!/bin/sh
-set -e
+set -eu
 
-echo "Initializing database..."
-python -c "from app.db.session import init_db; init_db()"
-echo "Database initialized"
+ALEMBIC_CONFIG_PATH="${ALEMBIC_CONFIG:-/app/alembic.ini}"
+echo "Applying database migrations with Alembic..."
+alembic -c "$ALEMBIC_CONFIG_PATH" upgrade head
+echo "Database migrations applied"
 
 echo "Starting uvicorn..."
 exec uvicorn app.main:app \

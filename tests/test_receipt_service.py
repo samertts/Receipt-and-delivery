@@ -293,3 +293,56 @@ class TestListReceipts:
         from lab_system.app.services.receipt_service import search_receipts
         rows = search_receipts(q="Ahmed")
         assert len(rows) == 1
+
+
+def test_receipt_and_outbox_commit_atomically(fresh_db, seed_data, monkeypatch):
+    import lab_system.app.database.db as _db
+    import lab_system.app.services.receipt_service as receipt_module
+
+    with _db.get_conn() as conn:
+        _seed_base(conn)
+        tx_id, org_a, org_b, st_id = _get_ids(conn)
+
+    def fail_enqueue(*args, **kwargs):
+        raise RuntimeError("outbox unavailable")
+
+    monkeypatch.setattr(receipt_module.sync_service, "enqueue", fail_enqueue)
+    with pytest.raises(RuntimeError, match="outbox unavailable"):
+        receipt_module.create_receipt(
+            data={
+                "tx_type_id": tx_id,
+                "sender_org_id": org_a,
+                "receiver_org_id": org_b,
+                "sender_name": "Atomic",
+                "receiver_name": "Test",
+                "sender_job_title": "Tech",
+                "receiver_job_title": "Manager",
+                "auth_doc_no": "AUTH-ATOMIC",
+                "auth_date": "2026-01-01",
+                "notes": "",
+                "transport_info": "",
+                "additional_comments": "",
+                "status": "Draft",
+            },
+            items=[{
+                "sample_type_id": st_id,
+                "total_count": 1,
+                "valid_count": 1,
+                "damaged_count": 0,
+                "rejected_count": 0,
+                "non_conforming_count": 0,
+                "transport_condition": "",
+                "notes": "",
+            }],
+            user_id=1,
+            user=ADMIN_USER,
+        )
+
+    with _db.get_conn() as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM receipts WHERE auth_doc_no=?",
+            ("AUTH-ATOMIC",),
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM sync_queue WHERE payload LIKE '%AUTH-ATOMIC%'"
+        ).fetchone()[0] == 0

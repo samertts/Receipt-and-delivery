@@ -102,3 +102,22 @@ class TestAuthService:
         svc = AuthService()
         val = svc._get_setting("security.max_login_attempts", "5")
         assert val == "5"
+
+    def test_reauthenticate_and_require_recent_auth(self, fresh_db, seed_data):
+        from lab_system.app.services.auth_service import AuthService
+
+        svc = AuthService()
+        svc.login("admin", "Admin@123")
+        with pytest.raises(Exception, match="إعادة التحقق"):
+            svc.require_recent_reauthentication()
+        assert svc.reauthenticate("Admin@123") is True
+        svc.require_recent_reauthentication()
+
+    def test_reauthenticate_rejects_wrong_password(self, fresh_db, seed_data):
+        from lab_system.app.services.auth_service import AuthService
+        from lab_system.app.utils.errors import AuthenticationError
+
+        svc = AuthService()
+        svc.login("admin", "Admin@123")
+        with pytest.raises(AuthenticationError, match="إعادة التحقق"):
+            svc.reauthenticate("wrongpassword")

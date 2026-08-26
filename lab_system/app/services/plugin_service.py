@@ -25,6 +25,8 @@ class PluginRegistry:
             "status": config.get("status", "inactive"),
             "contracts": config.get("contracts", []),
             "config": config,
+            "failure_count": 0,
+            "last_error": "",
         }
         return True
 
@@ -58,12 +60,24 @@ class PluginRegistry:
         """Get all active plugins."""
         return [p for p in self._plugins.values() if p.get("status") == "active"]
 
+    def record_failure(self, name: str, error: str, disable: bool = True) -> bool:
+        """Record a plugin failure and optionally disable it immediately."""
+        plugin = self._plugins.get(name)
+        if plugin is None:
+            return False
+        plugin["failure_count"] = int(plugin.get("failure_count", 0)) + 1
+        plugin["last_error"] = str(error)[:500]
+        if disable:
+            plugin["status"] = "disabled"
+        return True
+
 
 class PluginLoader:
     """Safely loads and validates plugin modules."""
 
-    def __init__(self):
+    def __init__(self, registry: PluginRegistry | None = None):
         self._loaded_modules: dict[str, Any] = {}
+        self._registry = registry
 
     def validate_plugin_path(self, path: str) -> dict:
         """Validate that a plugin path exists and is loadable."""
@@ -99,6 +113,8 @@ class PluginLoader:
             result["module"] = module
         except Exception as e:
             result["error"] = str(e)
+            if self._registry:
+                self._registry.record_failure(name, str(e), disable=True)
         return result
 
     def unload_plugin(self, name: str) -> bool:

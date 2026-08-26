@@ -75,3 +75,16 @@ class TestAuditChain:
         ok, count, msg = verify_audit_chain()
         assert ok is True
         assert count == 2
+
+    def test_verify_detects_tampered_tail_row(self, fresh_db, seed_data):
+        from lab_system.app.audit.logger import log_action, verify_audit_chain
+
+        log_action(user_id=1, action="immutable", details="original")
+        with sqlite3.connect(str(fresh_db)) as conn:
+            conn.execute("UPDATE audit_logs SET details=?", ("tampered",))
+            conn.commit()
+
+        ok, count, message = verify_audit_chain()
+        assert ok is False
+        assert count == 0
+        assert "Root hash mismatch" in message

@@ -126,7 +126,9 @@ def create_receipt(data, items, user_id, user=None):
                     i["notes"],
                 ),
             )
-    sync_service.enqueue("receipts", rid, "create", json.dumps({"receipt_no": no}))
+        sync_service.enqueue(
+            "receipts", rid, "create", json.dumps({"receipt_no": no}), conn=conn
+        )
     return rid, no
 
 
@@ -232,7 +234,7 @@ def update_receipt(receipt_id, data, items, user=None):
                     i["notes"],
                 ),
             )
-    sync_service.enqueue("receipts", receipt_id, "update", "")
+        sync_service.enqueue("receipts", receipt_id, "update", "", conn=conn)
 
 
 @with_permission("receipts.delete")
@@ -240,8 +242,10 @@ def soft_delete_receipt(receipt_id, user_id=None, user=None):
     now = datetime.now().isoformat(timespec="seconds")
     with _db.get_conn() as conn:
         conn.execute("UPDATE receipts SET deleted_at=? WHERE id=?", (now, receipt_id))
+        sync_service.enqueue(
+            "receipts", receipt_id, "update", '{"deleted": true}', conn=conn
+        )
     log_action(user_id, "soft_delete", f"Receipt {receipt_id}")
-    sync_service.enqueue("receipts", receipt_id, "update", '{"deleted": true}')
 
 
 @with_permission("receipts.delete")
@@ -256,6 +260,13 @@ def hard_delete_receipt(receipt_id, user_id=None, user=None):
         conn.execute("DELETE FROM receipt_history WHERE receipt_id=?", (receipt_id,))
         conn.execute("DELETE FROM receipts WHERE id=?", (receipt_id,))
         conn.execute("DELETE FROM receipts_fts WHERE rowid=?", (receipt_id,))
+        sync_service.enqueue(
+            "receipts",
+            receipt_id,
+            "delete",
+            json.dumps({"receipt_id": receipt_id}),
+            conn=conn,
+        )
     for att in atts:
         for p in (
             att["file_path"],
@@ -266,9 +277,6 @@ def hard_delete_receipt(receipt_id, user_id=None, user=None):
                     Path(p).unlink(missing_ok=True)
                 except Exception:
                     pass
-    sync_service.enqueue(
-        "receipts", receipt_id, "delete", json.dumps({"receipt_id": receipt_id})
-    )
     log_action(user_id, "hard_delete", f"Receipt {receipt_id}")
 
 

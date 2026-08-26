@@ -111,6 +111,23 @@ jobs:
 
   backend:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql+psycopg://lab_user:lab_pass@localhost:5432/lab_txn
+      ENVIRONMENT: test
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: lab_txn
+          POSTGRES_USER: lab_user
+          POSTGRES_PASSWORD: lab_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lab_user -d lab_txn"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -122,6 +139,24 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
+
+      - name: Alembic Upgrade from Empty Database
+        run: alembic -c backend/alembic.ini upgrade head
+
+      - name: Alembic Current and Drift Check
+        run: |
+          alembic -c backend/alembic.ini current
+          alembic -c backend/alembic.ini check
+
+      - name: Alembic Downgrade and Upgrade Cycle
+        run: |
+          alembic -c backend/alembic.ini downgrade -1
+          alembic -c backend/alembic.ini upgrade head
+
+      - name: Alembic Offline SQL Review Artifact
+        run: |
+          alembic -c backend/alembic.ini upgrade head --sql > alembic-upgrade.sql
+          test -s alembic-upgrade.sql
 
       - name: Backend Tests
         run: PYTHONPATH=backend python -m pytest backend/tests -p no:xonsh -q

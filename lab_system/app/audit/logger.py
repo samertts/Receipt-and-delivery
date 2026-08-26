@@ -27,6 +27,14 @@ def log_action(user_id, action, details=""):
                 prev_hash,
             ),
         )
+        latest = conn.execute(
+            "SELECT * FROM audit_logs ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if latest:
+            conn.execute(
+                "INSERT OR REPLACE INTO meta(key, value) VALUES(?, ?)",
+                ("audit_chain_root", _row_hash(latest)),
+            )
 
 
 def verify_audit_chain(conn=None):
@@ -45,4 +53,13 @@ def _verify(conn):
         actual_prev = row["prev_hash"] or ""
         if actual_prev != expected_prev:
             return False, i, f"Hash mismatch at row {row['id']}"
+    if rows:
+        try:
+            stored_root = conn.execute(
+                "SELECT value FROM meta WHERE key=?", ("audit_chain_root",)
+            ).fetchone()
+        except Exception:
+            stored_root = None
+        if stored_root and stored_root[0] != _row_hash(rows[-1]):
+            return False, len(rows) - 1, f"Root hash mismatch at row {rows[-1]['id']}"
     return True, len(rows), f"Chain intact: {len(rows)} entries"
