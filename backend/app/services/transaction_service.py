@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import desc
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.audit import log_audit
@@ -151,20 +152,63 @@ class TransactionService:
             raise NotFoundError("المعاملة غير موجودة")
 
         items_data = update_data.pop("items", None)
+        merged_items = None
+        if items_data is not None:
+            existing_by_id = {
+                str(item.id): {
+                    "id": str(item.id),
+                    "sample_type": item.sample_type,
+                    "total_count": item.total_count,
+                    "valid_count": item.valid_count,
+                    "damaged_count": item.damaged_count,
+                    "rejected_count": item.rejected_count,
+                    "nonconforming_count": item.nonconforming_count,
+                    "transport_condition": item.transport_condition,
+                    "notes": item.notes,
+                }
+                for item in txn.items
+            }
+            merged_by_id = dict(existing_by_id)
+            new_items = []
+            for item_data in items_data:
+                item_id = str(item_data.get("id")) if item_data.get("id") else ""
+                if item_id:
+                    if item_id not in merged_by_id:
+                        raise ValidationError("بند المعاملة غير موجود")
+                    if item_data.get("delete"):
+                        merged_by_id.pop(item_id)
+                    else:
+                        for key, value in item_data.items():
+                            if key not in ("id", "delete") and value is not None:
+                                merged_by_id[item_id][key] = value
+                elif not item_data.get("delete"):
+                    new_items.append(
+                        {
+                            "sample_type": item_data.get("sample_type", ""),
+                            "total_count": item_data.get("total_count", 1),
+                            "valid_count": item_data.get("valid_count", 0),
+                            "damaged_count": item_data.get("damaged_count", 0),
+                            "rejected_count": item_data.get("rejected_count", 0),
+                            "nonconforming_count": item_data.get("nonconforming_count", 0),
+                            "transport_condition": item_data.get("transport_condition", ""),
+                            "notes": item_data.get("notes", ""),
+                        }
+                    )
+            merged_items = list(merged_by_id.values()) + new_items
+            self._validate_item_counts(merged_items)
+
         changes = self._build_changes_dict(txn, update_data)
 
         for key, value in update_data.items():
             setattr(txn, key, value)
 
         if items_data is not None:
-            self._validate_item_counts(
-                [item for item in items_data if not item.get("delete")]
-            )
             existing_ids = {str(item.id) for item in txn.items}
 
             for item_data in items_data:
                 item_id = item_data.get("id")
-                if item_id and item_id in existing_ids:
+                item_id_key = str(item_id) if item_id else ""
+                if item_id_key and item_id_key in existing_ids:
                     item = (
                         self.db.query(TransactionItem)
                         .filter(TransactionItem.id == item_id)
@@ -266,7 +310,18 @@ class TransactionService:
             reason=event_data.reason,
         )
         self.db.add(event)
-        self.db.commit()
+        try:
+            self.db.commit()
+        except IntegrityError as exc:
+            self.db.rollback()
+            winner = (
+                self.db.query(CustodyEvent)
+                .filter(CustodyEvent.idempotency_key == idempotency_key)
+                .first()
+            )
+            if winner and str(winner.transaction_id) == str(txn.id):
+                return winner
+            raise ValidationError("مفتاح idempotency مستخدم لمعاملة أخرى") from exc
         self.db.refresh(event)
         if self.gula_client and self.tenant_id:
             delivery = self.gula_client.publish_custody_transition(

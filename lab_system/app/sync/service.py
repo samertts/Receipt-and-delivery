@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from lab_system.app.database import db as _db
@@ -35,6 +35,8 @@ SYNC_ACTIONS = ("create", "update", "delete")
 # Retry policy
 SYNC_MAX_RETRIES = 10
 SYNC_BACKOFF_BASE_SECONDS = 30
+SYNC_MAX_BACKOFF_SECONDS = 3600
+SYNC_MAX_PAYLOAD_BYTES = 5 * 1024 * 1024
 
 
 @dataclass
@@ -49,6 +51,7 @@ class SyncQueueEntry:
     created_at: str = ""
     synced_at: str = ""
     idempotency_key: str = ""
+    last_error: str = ""
 
 
 @dataclass
@@ -72,14 +75,26 @@ class SyncService:
         entity_id: int,
         action: str,
         payload: str = "",
+        idempotency_key: str = "",
     ) -> int:
         if action not in SYNC_ACTIONS:
             raise ValueError(
                 f"Invalid sync action '{action}'. Must be one of {SYNC_ACTIONS}"
             )
-        now = _utcnow()
-        idempotency_key = str(uuid.uuid4())
+        if not entity_type or len(entity_type) > 50:
+            raise ValueError("Invalid sync entity type")
+        if not isinstance(payload, str) or len(payload.encode("utf-8")) > SYNC_MAX_PAYLOAD_BYTES:
+            raise ValueError("Sync payload exceeds the safety limit")
+        idempotency_key = idempotency_key.strip() or str(uuid.uuid4())
+        if len(idempotency_key) > 160:
+            raise ValueError("Idempotency key exceeds the safety limit")
         with _db.get_conn() as conn:
+            existing = conn.execute(
+                "SELECT id FROM sync_queue WHERE idempotency_key=? LIMIT 1",
+                (idempotency_key,),
+            ).fetchone()
+            if existing:
+                return existing[0]
             conn.execute(
                 """INSERT INTO sync_queue
                     (entity_type, entity_id, action, payload, idempotency_key, status, created_at)
@@ -91,30 +106,46 @@ class SyncService:
                     payload,
                     idempotency_key,
                     SYNC_STATUS_PENDING,
-                    now,
+                    _utcnow(),
                 ),
             )
             return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def get_pending(self, limit: int = 100) -> list[SyncQueueEntry]:
-        """Return pending entries that have not exceeded max retries and are eligible for retry."""
+        """Return pending entries whose exponential retry delay has elapsed."""
+        if limit < 1:
+            return []
         with _db.get_conn() as conn:
             rows = conn.execute(
                 """SELECT * FROM sync_queue
-                    WHERE status = ?
-                      AND retry_count < ?
-                      AND (synced_at = '' OR
-                           CAST(julianday('now') - julianday(synced_at) AS REAL) * 86400 > ?)
+                    WHERE status = ? AND retry_count < ?
                     ORDER BY created_at ASC
                     LIMIT ?""",
-                (
-                    SYNC_STATUS_PENDING,
-                    SYNC_MAX_RETRIES,
-                    SYNC_BACKOFF_BASE_SECONDS,
-                    limit,
-                ),
+                (SYNC_STATUS_PENDING, SYNC_MAX_RETRIES, max(limit * 4, limit)),
             ).fetchall()
-        return [SyncQueueEntry(**dict(r)) for r in rows]
+        now = datetime.now(timezone.utc)
+        pending: list[SyncQueueEntry] = []
+        for row in rows:
+            entry = SyncQueueEntry(**dict(row))
+            if not entry.synced_at:
+                pending.append(entry)
+                continue
+            try:
+                last_attempt = datetime.fromisoformat(entry.synced_at)
+                if last_attempt.tzinfo is None:
+                    last_attempt = last_attempt.replace(tzinfo=timezone.utc)
+            except ValueError:
+                pending.append(entry)
+                continue
+            delay = min(
+                SYNC_BACKOFF_BASE_SECONDS * (2 ** max(entry.retry_count - 1, 0)),
+                SYNC_MAX_BACKOFF_SECONDS,
+            )
+            if now - last_attempt >= timedelta(seconds=delay):
+                pending.append(entry)
+            if len(pending) >= limit:
+                break
+        return pending
 
     def mark_synced(self, entry_id: int) -> None:
         with _db.get_conn() as conn:
@@ -142,10 +173,18 @@ class SyncService:
 
     def mark_conflict(self, entry_id: int, details: str = "") -> None:
         with _db.get_conn() as conn:
-            conn.execute(
-                "UPDATE sync_queue SET status=?, payload=? WHERE id=?",
-                (SYNC_STATUS_CONFLICT, details, entry_id),
-            )
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(sync_queue)")}
+            if "last_error" in columns:
+                conn.execute(
+                    "UPDATE sync_queue SET status=?, last_error=?, synced_at=? WHERE id=?",
+                    (SYNC_STATUS_CONFLICT, details[:2000], _utcnow(), entry_id),
+                )
+            else:
+                # Compatibility with an un-migrated local database; retain payload.
+                conn.execute(
+                    "UPDATE sync_queue SET status=?, synced_at=? WHERE id=?",
+                    (SYNC_STATUS_CONFLICT, _utcnow(), entry_id),
+                )
 
     def increment_retry(self, entry_id: int) -> int:
         with _db.get_conn() as conn:
@@ -187,27 +226,19 @@ class SyncService:
         _local_data: dict[str, Any],
     ) -> ConflictResolution:
         """
-        Conflict resolution: last-writer-wins based on timestamp comparison.
+        Quarantine chain-of-custody conflicts for human review.
 
-        If both sides have timestamps, the later one wins.
-        Otherwise, defaults to server-wins.
+        Timestamp-based last-writer-wins is unsafe for custody records because it
+        can silently overwrite a historical event. The caller must preserve both
+        payloads and complete a documented correction workflow.
         """
-        remote_ts = remote_data.get("updated_at") or remote_data.get("created_at", "")
-        local_ts = (
-            _local_data.get("updated_at") or _local_data.get("created_at", "")
-            if isinstance(_local_data, dict)
-            else ""
-        )
-        if remote_ts and local_ts and local_ts > remote_ts:
-            return ConflictResolution(
-                strategy="last-writer-wins",
-                resolved=True,
-                merged=_local_data,
-            )
         return ConflictResolution(
-            strategy="server-wins",
-            resolved=True,
-            merged=remote_data,
+            strategy="quarantine",
+            resolved=False,
+            merged={
+                "local": _local_data if isinstance(_local_data, dict) else {},
+                "remote": remote_data if isinstance(remote_data, dict) else {},
+            },
         )
 
     def sync_all(self) -> dict[str, int]:
@@ -225,6 +256,7 @@ class SyncService:
                     "entity_id": e.entity_id,
                     "action": e.action,
                     "payload": e.payload,
+                    "idempotency_key": e.idempotency_key,
                 }
                 for e in pending
             ],
@@ -232,13 +264,27 @@ class SyncService:
             branch_id=branch_id,
         )
         response = self._client.push(payload)
+        response_data = response.data.get("data", response.data) if response.data else {}
+        conflict_items = response_data.get("conflict_items", [])
+        conflict_keys = {
+            (item.get("entity_type"), item.get("entity_id"))
+            for item in conflict_items
+            if isinstance(item, dict)
+        }
         if response.success:
+            conflicts = 0
             for e in pending:
-                self.mark_synced(e.id)
-            return {"synced": len(pending), "conflicts": 0}
+                key = (e.entity_type, e.entity_id)
+                if key in conflict_keys:
+                    self.mark_conflict(e.id, "Server conflict requires manual review")
+                    conflicts += 1
+                else:
+                    self.mark_synced(e.id)
+            return {"synced": len(pending) - conflicts, "conflicts": conflicts}
         if response.status_code == 409:
+            detail = response_data.get("detail", response.message)
             for e in pending:
-                self.mark_conflict(e.id, response.data.get("detail", ""))
+                self.mark_conflict(e.id, str(detail))
             return {"synced": 0, "conflicts": len(pending)}
         for e in pending:
             retries = self.increment_retry(e.id)
@@ -258,8 +304,9 @@ class SyncService:
         entity_id: int,
         action: str,
         payload: str = "",
+        idempotency_key: str = "",
     ) -> dict[str, Any]:
-        entry_id = self.enqueue(entity_type, entity_id, action, payload)
+        entry_id = self.enqueue(entity_type, entity_id, action, payload, idempotency_key)
         if self.is_online:
             result = self.sync_all()
             if "error" in result:

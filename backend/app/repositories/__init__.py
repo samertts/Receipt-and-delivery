@@ -104,12 +104,20 @@ class SyncRepository(BaseRepository[SyncLog]):
     def __init__(self, db):
         super().__init__(SyncLog, db)
 
-    def find_since(self, since_dt, device_id: str = "", limit: int = 100):
+    def find_since(
+        self,
+        since_dt,
+        device_id: str = "",
+        branch_id: str = "",
+        limit: int = 100,
+    ):
         query = self.db.query(SyncLog)
         if since_dt is not None:
             query = query.filter(SyncLog.synced_at > since_dt)
         if device_id:
             query = query.filter(SyncLog.device_id == device_id)
+        if branch_id:
+            query = query.filter(SyncLog.branch_id == branch_id)
         return query.order_by(SyncLog.synced_at.asc()).limit(limit).all()
 
     def get_latest(self):

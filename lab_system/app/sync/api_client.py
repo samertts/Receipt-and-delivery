@@ -66,10 +66,10 @@ class APIClient:
             return SyncResponse(success=False, message="API client disabled")
         return self._send("POST", "/sync/push", payload.__dict__)
 
-    def pull(self, since: str = "", device_id: str = "") -> SyncResponse:
+    def pull(self, since: str = "", device_id: str = "", branch_id: str = "") -> SyncResponse:
         if not self._enabled:
             return SyncResponse(success=False, message="API client disabled")
-        params = {"since": since, "device_id": device_id}
+        params = {"since": since, "device_id": device_id, "branch_id": branch_id}
         return self._send("GET", f"/sync/pull?{urllib.parse.urlencode(params)}", None)
 
     def status(self) -> SyncResponse:

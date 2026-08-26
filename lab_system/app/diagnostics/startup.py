@@ -4,6 +4,7 @@ Startup diagnostics and self-repair for the desktop application.
 Runs on every startup to detect and repair common issues.
 """
 
+import os
 import sqlite3
 import urllib.error
 import urllib.request
@@ -121,9 +122,13 @@ def check_folders() -> dict:
     return {"created": created, "missing": missing}
 
 
-def check_network(host: str = "https://google.com", timeout: int = 5) -> dict:
-    """Check network connectivity by reaching a known host."""
+def check_network(host: str | None = None, timeout: int = 5) -> dict:
+    """Check an explicitly configured API host; never contact a third party by default."""
+    host = host or os.getenv("LAB_API_HEALTH_URL", "").strip()
     result = {"reachable": False, "latency_ms": 0, "error": ""}
+    if not host:
+        result["error"] = "network check disabled; no API health URL configured"
+        return result
     try:
         import time
 
@@ -138,8 +143,8 @@ def check_network(host: str = "https://google.com", timeout: int = 5) -> dict:
             result["reachable"] = True
     except (urllib.error.URLError, urllib.error.HTTPError, OSError) as e:
         result["error"] = str(e)
-    except Exception as e:
-        result["error"] = f"Unexpected: {e}"
+    except Exception:
+        result["error"] = "network check failed"
     return result
 
 

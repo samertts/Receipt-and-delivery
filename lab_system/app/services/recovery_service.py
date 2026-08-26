@@ -5,7 +5,8 @@ Provides tools to verify backup integrity, detect database corruption,
 attempt recovery from WAL or backup files, and manage backup retention.
 """
 
-import shutil
+import hashlib
+import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -47,6 +48,14 @@ def _get_snapshot_dir() -> Path:
     return configured
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _validate_path_in_dir(path: Path, allowed_dir: Path) -> Path:
     resolved = path.resolve()
     allowed = allowed_dir.resolve()
@@ -55,11 +64,18 @@ def _validate_path_in_dir(path: Path, allowed_dir: Path) -> Path:
     return resolved
 
 
-def verify_backup(path: Path | str) -> dict:
-    """Check whether a backup file has a valid SQLite header and passes integrity check."""
+def verify_backup(path: Path | str, expected_checksum: str = "") -> dict:
+    """Check SQLite integrity and optionally verify a persisted SHA-256 checksum."""
     path = Path(path)
     logger.info(f"verify_backup: checking path={path}")
-    result = {"valid": False, "size": 0, "error": None, "integrity_ok": False}
+    result = {
+        "valid": False,
+        "size": 0,
+        "error": None,
+        "integrity_ok": False,
+        "checksum": None,
+        "checksum_ok": not expected_checksum,
+    }
     if not path.exists():
         result["error"] = "File not found"
         logger.warning(f"verify_backup: file not found at {path}")
@@ -71,6 +87,12 @@ def verify_backup(path: Path | str) -> dict:
         logger.warning(f"verify_backup: file too small ({file_size} bytes) at {path}")
         return result
     try:
+        result["checksum"] = _sha256_file(path)
+        if expected_checksum and result["checksum"] != expected_checksum:
+            result["error"] = "Backup checksum mismatch"
+            logger.warning("verify_backup: checksum mismatch")
+            return result
+        result["checksum_ok"] = True
         conn = sqlite3.connect(str(path))
         conn.execute("PRAGMA busy_timeout = 3000;")
         try:
@@ -115,11 +137,15 @@ def list_backups() -> list[dict]:
 
 
 def _get_backup_record(path: str) -> dict | None:
-    with _db.get_conn() as conn:
-        row = conn.execute(
-            "SELECT * FROM backups WHERE backup_file = ?",
-            (path,),
-        ).fetchone()
+    try:
+        with _db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM backups WHERE backup_file = ?",
+                (path,),
+            ).fetchone()
+    except sqlite3.OperationalError:
+        # A damaged or not-yet-initialized local DB has no metadata record.
+        return None
     return dict(row) if row else None
 
 
@@ -147,7 +173,9 @@ def restore_from_backup(backup_path: Path | str, user=None) -> dict:
         f"backup_dir={backup_dir}"
     )
     result = {"success": False, "error": None, "restored_path": None}
-    verification = verify_backup(backup_path)
+    record = _get_backup_record(str(backup_path))
+    expected_checksum = (record or {}).get("checksum", "") or ""
+    verification = verify_backup(backup_path, expected_checksum=expected_checksum)
     logger.info(f"restore_from_backup: verification={verification}")
     if not verification["valid"]:
         result["error"] = verification.get("error", "Backup verification failed")
@@ -165,34 +193,37 @@ def restore_from_backup(backup_path: Path | str, user=None) -> dict:
         _checkpoint_wal()
 
         dest = db_path
-        backup_dest = dest.with_suffix(".db.corrupted")
-        if dest.exists():
-            logger.info(f"restore_from_backup: moving current DB to {backup_dest}")
-            shutil.move(str(dest), str(backup_dest))
-        logger.info(f"restore_from_backup: copying backup to {dest}")
-        shutil.copy2(str(backup_path), str(dest))
+        temp_dest = dest.with_suffix(".restore.tmp")
+        temp_dest.unlink(missing_ok=True)
+        logger.info("restore_from_backup: copying verified backup into temporary database")
+        source_conn = sqlite3.connect(str(backup_path))
+        target_conn = sqlite3.connect(str(temp_dest))
+        try:
+            source_conn.backup(target_conn, pages=-1, progress=None)
+        finally:
+            target_conn.close()
+            source_conn.close()
+        verify = verify_backup(temp_dest, expected_checksum=expected_checksum)
+        logger.info(
+            "restore_from_backup: post-copy verification valid=%s checksum_ok=%s",
+            verify["valid"],
+            verify["checksum_ok"],
+        )
+        if not verify["valid"]:
+            temp_dest.unlink(missing_ok=True)
+            result["error"] = "Restored database failed integrity check"
+            return result
+        os.replace(temp_dest, dest)
         with _db.get_conn() as conn:
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA foreign_keys = ON;")
         rebuild_fts()
-        verify = verify_backup(dest)
-        logger.info(f"restore_from_backup: post-restore verification={verify}")
-        if not verify["valid"]:
-            if backup_dest.exists():
-                logger.info(
-                    f"restore_from_backup: restoring original DB from {backup_dest}"
-                )
-                shutil.move(str(backup_dest), str(dest))
-            result["error"] = "Restored database failed integrity check"
-            logger.error(
-                "restore_from_backup: post-restore verification FAILED"
-            )
-            return result
         result["success"] = True
         result["restored_path"] = str(dest)
         logger.info(f"restore_from_backup: SUCCESS restored to {dest}")
     except Exception as e:
-        result["error"] = str(e)
+        _get_db_path().with_suffix(".restore.tmp").unlink(missing_ok=True)
+        result["error"] = "Restore failed"
         logger.error(f"restore_from_backup: exception: {e}")
     return result
 
@@ -230,12 +261,21 @@ def create_recovery_snapshot(reason="manual") -> dict:
         f"db_path={db_path}"
     )
     snapshot_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     name = f"snapshot_{reason}_{ts}.db"
     target = snapshot_dir / name
     try:
         _checkpoint_wal()
-        shutil.copy2(str(db_path), str(target))
+        temp_target = target.with_suffix(".snapshot.tmp")
+        temp_target.unlink(missing_ok=True)
+        source_conn = sqlite3.connect(str(db_path))
+        target_conn = sqlite3.connect(str(temp_target))
+        try:
+            source_conn.backup(target_conn, pages=-1, progress=None)
+        finally:
+            target_conn.close()
+            source_conn.close()
+        os.replace(temp_target, target)
         logger.info(f"create_recovery_snapshot: snapshot created at {target}")
         return {"success": True, "path": str(target), "name": name}
     except Exception as e:

@@ -84,6 +84,26 @@ class UpdateWorker(QObject):
             self.finished.emit()
 
 
+class SyncWorker(QObject):
+    """Run local/network synchronization away from the GUI event loop."""
+
+    result = Signal(object)
+    finished = Signal()
+
+    def __init__(self, service):
+        super().__init__()
+        self.service = service
+
+    @Slot()
+    def run(self):
+        try:
+            self.result.emit(self.service.sync_pending())
+        except Exception as exc:
+            self.result.emit({"error": "Sync failed", "detail": str(exc)})
+        finally:
+            self.finished.emit()
+
+
 class ChangePasswordDialog(QDialog):
     def __init__(self, auth_service):
         super().__init__()
@@ -336,8 +356,11 @@ class MainWindow(QMainWindow):
 
         from lab_system.app.sync.service import sync_service
 
+        self._sync_service = sync_service
+        self._sync_thread = None
+        self._sync_worker = None
         self._sync_timer = QTimer()
-        self._sync_timer.timeout.connect(sync_service.sync_pending)
+        self._sync_timer.timeout.connect(self._run_sync_worker)
         self._sync_timer.start(60000)
 
         self._update_thread = None
@@ -345,6 +368,31 @@ class MainWindow(QMainWindow):
         self._automatic_update_check = False
         self._setup_shortcuts()
         self._setup_update_action()
+
+    def _run_sync_worker(self):
+        if self._sync_thread and self._sync_thread.isRunning():
+            return
+        thread = QThread()
+        worker = SyncWorker(self._sync_service)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.result.connect(self._handle_sync_result)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(lambda: setattr(self, "_sync_thread", None))
+        thread.finished.connect(lambda: setattr(self, "_sync_worker", None))
+        self._sync_thread = thread
+        self._sync_worker = worker
+        thread.start()
+
+    def _handle_sync_result(self, result):
+        if result.get("error"):
+            self.statusBar().showMessage("تعذر إكمال المزامنة؛ ستتم إعادة المحاولة لاحقًا", 5000)
+        elif result.get("conflicts", 0):
+            self.statusBar().showMessage(
+                f"توجد {result['conflicts']} تعارضات مزامنة تحتاج إلى مراجعة", 8000
+            )
 
     def _setup_shortcuts(self):
         refresh_action = QAction("تحديث", self)

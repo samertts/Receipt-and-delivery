@@ -47,6 +47,15 @@ class TestSyncServiceEnqueue:
         entry_id = svc.enqueue("receipts", 1, "delete", "")
         assert entry_id > 0
 
+    def test_enqueue_same_idempotency_key_is_idempotent(self, fresh_db, seed_data):
+        from lab_system.app.sync.service import SyncService
+
+        svc = SyncService()
+        first = svc.enqueue("receipts", 1, "create", '{"v": 1}', "operation-1")
+        second = svc.enqueue("receipts", 1, "create", '{"v": 1}', "operation-1")
+        assert second == first
+        assert svc.get_stats().get("pending", 0) == 1
+
     def test_enqueue_invalid_action_raises(self, fresh_db, seed_data):
         from lab_system.app.sync.service import SyncService
         svc = SyncService()
@@ -148,27 +157,27 @@ class TestSyncServiceStats:
 
 
 class TestSyncServiceConflictResolution:
-    def test_server_wins(self, fresh_db, seed_data):
+    def test_conflict_is_quarantined(self, fresh_db, seed_data):
         from lab_system.app.sync.service import SyncService, SyncQueueEntry
         svc = SyncService()
         entry = SyncQueueEntry(entity_type="receipts", entity_id=1, action="create")
         remote = {"updated_at": "2026-06-25 12:00:00"}
         local = {"updated_at": "2026-06-25 10:00:00"}
         resolution = svc.resolve_conflict(entry, remote, local)
-        assert resolution.strategy == "server-wins"
-        assert resolution.resolved is True
-        assert resolution.merged == remote
+        assert resolution.strategy == "quarantine"
+        assert resolution.resolved is False
+        assert resolution.merged == {"local": local, "remote": remote}
 
-    def test_last_writer_wins(self, fresh_db, seed_data):
+    def test_conflict_keeps_both_versions_for_review(self, fresh_db, seed_data):
         from lab_system.app.sync.service import SyncService, SyncQueueEntry
         svc = SyncService()
         entry = SyncQueueEntry(entity_type="receipts", entity_id=1, action="create")
         remote = {"updated_at": "2026-06-25 10:00:00"}
         local = {"updated_at": "2026-06-25 12:00:00"}
         resolution = svc.resolve_conflict(entry, remote, local)
-        assert resolution.strategy == "last-writer-wins"
-        assert resolution.resolved is True
-        assert resolution.merged == local
+        assert resolution.strategy == "quarantine"
+        assert resolution.resolved is False
+        assert resolution.merged == {"local": local, "remote": remote}
 
 
 class TestSyncServiceHealth:

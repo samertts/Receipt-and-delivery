@@ -120,10 +120,11 @@ class TestSyncQueue:
         svc.mark_conflict(eid, "server data differs")
         with _db.get_conn() as conn:
             row = conn.execute(
-                "SELECT status, payload FROM sync_queue WHERE id=?", (eid,)
+                "SELECT status, payload, last_error FROM sync_queue WHERE id=?", (eid,)
             ).fetchone()
         assert row["status"] == "conflict"
-        assert row["payload"] == "server data differs"
+        assert row["payload"] == "{}"
+        assert row["last_error"] == "server data differs"
 
     def test_increment_retry(self):
         from lab_system.app.sync.service import SyncService
@@ -433,7 +434,7 @@ class TestAPIClientAdvanced:
 
 
 class TestConflictResolution:
-    def test_server_wins_default(self):
+    def test_conflict_is_quarantined_without_timestamps(self):
         from lab_system.app.sync.service import SyncQueueEntry, SyncService
 
         svc = SyncService()
@@ -443,10 +444,11 @@ class TestConflictResolution:
         remote = {"name": "server-data"}
         local = {"name": "local-data"}
         resolution = svc.resolve_conflict(entry, remote, local)
-        assert resolution.resolved
-        assert resolution.merged == remote
+        assert not resolution.resolved
+        assert resolution.strategy == "quarantine"
+        assert resolution.merged == {"local": local, "remote": remote}
 
-    def test_last_writer_wins_with_timestamps(self):
+    def test_conflict_is_quarantined_when_local_is_newer(self):
         from lab_system.app.sync.service import SyncQueueEntry, SyncService
 
         svc = SyncService()
@@ -456,11 +458,11 @@ class TestConflictResolution:
         remote = {"name": "server", "updated_at": "2024-01-01 00:00:00"}
         local = {"name": "local", "updated_at": "2024-06-01 00:00:00"}
         resolution = svc.resolve_conflict(entry, remote, local)
-        assert resolution.resolved
-        assert resolution.strategy == "last-writer-wins"
-        assert resolution.merged == local
+        assert not resolution.resolved
+        assert resolution.strategy == "quarantine"
+        assert resolution.merged == {"local": local, "remote": remote}
 
-    def test_server_wins_when_local_older(self):
+    def test_conflict_is_quarantined_when_remote_is_newer(self):
         from lab_system.app.sync.service import SyncQueueEntry, SyncService
 
         svc = SyncService()
@@ -470,9 +472,9 @@ class TestConflictResolution:
         remote = {"name": "server", "updated_at": "2024-06-01 00:00:00"}
         local = {"name": "local", "updated_at": "2024-01-01 00:00:00"}
         resolution = svc.resolve_conflict(entry, remote, local)
-        assert resolution.resolved
-        assert resolution.strategy == "server-wins"
-        assert resolution.merged == remote
+        assert not resolution.resolved
+        assert resolution.strategy == "quarantine"
+        assert resolution.merged == {"local": local, "remote": remote}
 
     def test_get_health_disabled(self):
         from lab_system.app.sync.service import SyncService

@@ -409,8 +409,9 @@ class TestSyncServiceAdvanced:
             remote = {"name": "s", "updated_at": "2024-01-01 00:00:00"}
             local = {"name": "l", "updated_at": "2024-06-01 00:00:00"}
             res = svc.resolve_conflict(entry, remote, local)
-            assert res.strategy == "last-writer-wins"
-            assert res.merged == local
+            assert res.strategy == "quarantine"
+            assert res.resolved is False
+            assert res.merged == {"local": local, "remote": remote}
 
     def test_resolve_conflict_server_wins(self, fresh_db_with_data):
         import lab_system.app.sync.service as sync_mod
@@ -420,8 +421,9 @@ class TestSyncServiceAdvanced:
             remote = {"name": "s", "updated_at": "2024-06-01 00:00:00"}
             local = {"name": "l", "updated_at": "2024-01-01 00:00:00"}
             res = svc.resolve_conflict(entry, remote, local)
-            assert res.strategy == "server-wins"
-            assert res.merged == remote
+            assert res.strategy == "quarantine"
+            assert res.resolved is False
+            assert res.merged == {"local": local, "remote": remote}
 
     def test_resolve_conflict_no_timestamps(self, fresh_db_with_data):
         import lab_system.app.sync.service as sync_mod
@@ -431,7 +433,9 @@ class TestSyncServiceAdvanced:
             remote = {"name": "s"}
             local = {"name": "l"}
             res = svc.resolve_conflict(entry, remote, local)
-            assert res.strategy == "server-wins"
+            assert res.strategy == "quarantine"
+            assert res.resolved is False
+            assert res.merged == {"local": local, "remote": remote}
 
     def test_resolve_conflict_local_not_dict(self, fresh_db_with_data):
         import lab_system.app.sync.service as sync_mod
@@ -440,7 +444,9 @@ class TestSyncServiceAdvanced:
             entry = sync_mod.SyncQueueEntry(id=1, entity_type="r", entity_id=1, action="update")
             remote = {"name": "s"}
             res = svc.resolve_conflict(entry, remote, "not a dict")
-            assert res.strategy == "server-wins"
+            assert res.strategy == "quarantine"
+            assert res.resolved is False
+            assert res.merged == {"local": {}, "remote": remote}
 
     def test_get_health_online_with_synced(self, fresh_db_with_data):
         import lab_system.app.sync.service as sync_mod

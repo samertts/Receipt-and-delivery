@@ -1,0 +1,60 @@
+{
+  "environment": {
+    "python": "runtime",
+    "database": "SQLite",
+    "network": "disabled"
+  },
+  "startup": {
+    "self_repair": {
+      "min_ms": 0.081,
+      "median_ms": 0.086,
+      "p95_ms": 0.419,
+      "max_ms": 0.419
+    },
+    "init_db_warm": {
+      "min_ms": 1.287,
+      "median_ms": 1.452,
+      "p95_ms": 1.697,
+      "max_ms": 1.697
+    },
+    "run_all_checks": {
+      "min_ms": 1.47,
+      "median_ms": 1.53,
+      "p95_ms": 1.789,
+      "max_ms": 1.789
+    },
+    "check_integrity": {
+      "min_ms": 0.947,
+      "median_ms": 0.964,
+      "p95_ms": 1.035,
+      "max_ms": 1.035
+    },
+    "check_indexes": {
+      "min_ms": 0.286,
+      "median_ms": 0.304,
+      "p95_ms": 0.341,
+      "max_ms": 0.341
+    }
+  },
+  "database_queries": {
+    "dataset": {
+      "receipts": 1000
+    },
+    "local_fts_search": {
+      "min_ms": 0.405,
+      "median_ms": 0.493,
+      "p95_ms": 0.68,
+      "max_ms": 0.68
+    },
+    "indexed_status_query": {
+      "min_ms": 0.347,
+      "median_ms": 0.405,
+      "p95_ms": 1.246,
+      "max_ms": 1.246
+    }
+  },
+  "notes": [
+    "Measurements are isolated local-process timings, not a production SLO claim.",
+    "The benchmark uses a controlled 1,000-receipt dataset and excludes Qt painting and login UI."
+  ]
+}

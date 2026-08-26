@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import shutil
 import sqlite3
 from contextlib import contextmanager
@@ -7,7 +8,8 @@ from pathlib import Path
 
 from lab_system.app.settings.config import CONFIG
 
-SCHEMA_VERSION = 11
+logger = logging.getLogger(__name__)
+SCHEMA_VERSION = 13
 
 SCHEMA = """
 PRAGMA foreign_keys = ON;
@@ -122,7 +124,7 @@ CREATE TABLE IF NOT EXISTS migration_lock (
  owner TEXT DEFAULT '',
  updated_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS backups (id INTEGER PRIMARY KEY AUTOINCREMENT, backup_file TEXT NOT NULL, created_at TEXT NOT NULL, created_by INTEGER REFERENCES users(id), notes TEXT DEFAULT '');
+CREATE TABLE IF NOT EXISTS backups (id INTEGER PRIMARY KEY AUTOINCREMENT, backup_file TEXT NOT NULL, created_at TEXT NOT NULL, created_by INTEGER REFERENCES users(id), notes TEXT DEFAULT '', checksum TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER REFERENCES users(id), action TEXT NOT NULL, machine_name TEXT NOT NULL, timestamp TEXT NOT NULL, details TEXT DEFAULT '', prev_hash TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS login_attempts (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -137,6 +139,7 @@ CREATE TABLE IF NOT EXISTS sync_queue (
  action TEXT NOT NULL CHECK(action IN ('create','update','delete')),
  payload TEXT DEFAULT '',
  idempotency_key TEXT DEFAULT '',
+ last_error TEXT DEFAULT '',
  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','synced','conflict','failed')),
  retry_count INTEGER NOT NULL DEFAULT 0,
  created_at TEXT NOT NULL,
@@ -196,7 +199,7 @@ def rebuild_fts():
                 "SELECT id, name, code FROM organizations;"
             )
     except Exception:
-        pass
+        logger.exception("Failed to rebuild local full-text indexes")
 
 
 DEFAULT_SETTINGS = {
@@ -406,6 +409,43 @@ def migrate_db(conn: sqlite3.Connection) -> None:
             conn, "v11_sync_idempotency", "add idempotency_key column to sync_queue"
         )
 
+    if current < 12:
+        if "last_error" not in _table_columns(conn, "sync_queue"):
+            conn.execute(
+                "ALTER TABLE sync_queue ADD COLUMN last_error TEXT DEFAULT ''"
+            )
+        duplicate_keys = conn.execute(
+            """SELECT idempotency_key FROM sync_queue
+               WHERE idempotency_key <> ''
+               GROUP BY idempotency_key HAVING COUNT(*) > 1"""
+        ).fetchall()
+        for (idempotency_key,) in duplicate_keys:
+            duplicate_rows = conn.execute(
+                "SELECT id FROM sync_queue WHERE idempotency_key=? ORDER BY id",
+                (idempotency_key,),
+            ).fetchall()
+            for (row_id,) in duplicate_rows[1:]:
+                replacement = f"{idempotency_key}-legacy-{row_id}"[:160]
+                conn.execute(
+                    "UPDATE sync_queue SET idempotency_key=? WHERE id=?",
+                    (replacement, row_id),
+                )
+        conn.execute(
+            """CREATE UNIQUE INDEX IF NOT EXISTS uq_sync_queue_idempotency_key
+               ON sync_queue(idempotency_key) WHERE idempotency_key <> ''"""
+        )
+        _record_migration(
+            conn,
+            "v12_sync_integrity",
+            "sync_queue last_error and unique non-empty idempotency keys",
+        )
+
+    if current < 13:
+        if "checksum" not in _table_columns(conn, "backups"):
+            statement = "ALTER TABLE backups ADD COLUMN checksum TEXT DEFAULT ''"
+            conn.execute(statement)
+            _record_migration(conn, "v13_backup_checksum", statement)
+
 
 def _recreate_table_with_fk(conn: sqlite3.Connection, table: str) -> None:
     if not table or not table.replace("_", "").isalnum() or table[0].isdigit():
@@ -444,9 +484,19 @@ def _backup_before_migration():
     db_path = Path(CONFIG.db_path)
     if not db_path.exists():
         return
+    try:
+        with sqlite3.connect(str(db_path), timeout=2) as probe:
+            row = probe.execute(
+                "SELECT value FROM meta WHERE key='schema_version'"
+            ).fetchone()
+        if row and int(row[0]) >= SCHEMA_VERSION:
+            return
+    except (sqlite3.Error, ValueError):
+        # A missing/corrupt metadata row must be backed up before recovery.
+        pass
     backup_dir = db_path.parent / "migration_backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     backup_path = backup_dir / f"pre_migration_{timestamp}.db"
     shutil.copy2(str(db_path), str(backup_path))
 
@@ -458,6 +508,7 @@ def init_db():
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA foreign_keys = ON;")
         conn.executescript(SCHEMA)
+        conn.execute("BEGIN IMMEDIATE")
         _acquire_migration_lock(conn)
         try:
             migrate_db(conn)

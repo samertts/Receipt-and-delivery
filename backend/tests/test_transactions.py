@@ -160,6 +160,46 @@ class TestTransactionDeepUpdate:
         assert data["notes"] == "updated notes"
         assert len(data["items"]) == 2
 
+    def test_partial_item_update_validates_merged_counts(self, client, db, admin_token):
+        from app.models.transaction import Transaction
+        from app.models.transaction_item import TransactionItem
+
+        txn = Transaction(
+            transaction_no="TXN-MERGED-VALIDATION",
+            transaction_type="Test",
+            sender_organization_id="00000000-0000-0000-0000-000000000001",
+            receiver_organization_id="00000000-0000-0000-0000-000000000002",
+            sender_name="S",
+            receiver_name="R",
+            transaction_date="2026-06-01",
+            status="draft",
+        )
+        db.add(txn)
+        db.flush()
+        item = TransactionItem(
+            transaction_id=str(txn.id),
+            sample_type="Serum",
+            total_count=5,
+            valid_count=5,
+            damaged_count=0,
+            rejected_count=0,
+            nonconforming_count=0,
+            transport_condition="",
+        )
+        db.add(item)
+        db.commit()
+
+        response = client.put(
+            f"/api/transactions/{txn.id}",
+            json={"items": [{"id": str(item.id), "valid_count": 4}]},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+
+        assert response.status_code == 422
+        db.refresh(item)
+        assert item.total_count == 5
+        assert item.valid_count == 5
+
     def test_update_transaction_items_delete(self, client, db, admin_token):
         from app.models.transaction import Transaction
         from app.models.transaction_item import TransactionItem
