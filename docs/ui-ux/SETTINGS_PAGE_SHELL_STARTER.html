@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>الإعدادات — Lab Receipt System</title>
+
+    <!-- للمعاينة فقط. في الإنتاج استخدم Tailwind المجمّع داخل Vite ولا تعتمد على CDN. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: '#2563EB',
+              'primary-strong': '#1E3A5F',
+              accent: '#EA580C',
+              app: '#F8FAFC',
+              ink: '#1E293B',
+              muted: '#475569',
+              border: '#E2E8F0',
+              danger: '#DC2626',
+              success: '#15803D',
+              info: '#1D4ED8'
+            },
+            boxShadow: {
+              panel: '0 1px 2px rgba(15, 23, 42, 0.05)'
+            }
+          }
+        }
+      }
+    </script>
+
+    <style>
+      :root {
+        font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+        color: #1e293b;
+        background: #f8fafc;
+      }
+
+      body {
+        min-width: 320px;
+      }
+
+      :focus-visible {
+        outline: 3px solid #2563eb;
+        outline-offset: 2px;
+      }
+
+      .tabular-nums {
+        font-variant-numeric: tabular-nums;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+        }
+      }
+    </style>
+  </head>
+
+  <body class="bg-app text-ink antialiased">
+    <div id="settings-app" class="min-h-screen lg:flex">
+      <!-- Mobile overlay: hidden until the sidebar is open. -->
+      <button
+        id="sidebar-overlay"
+        type="button"
+        class="fixed inset-0 z-30 hidden bg-slate-950/40 lg:hidden"
+        aria-label="إغلاق قائمة الإعدادات"
+      ></button>
+
+      <!-- Settings navigation -->
+      <aside
+        id="settings-sidebar"
+        class="fixed inset-y-0 right-0 z-40 w-80 translate-x-full overflow-y-auto border-l border-border bg-white p-4 shadow-xl transition-transform duration-200 lg:static lg:z-auto lg:w-72 lg:translate-x-0 lg:shrink-0 lg:border-l-0 lg:border-r lg:shadow-none"
+        aria-label="تنقل الإعدادات"
+      >
+        <div class="mb-6 flex items-center justify-between gap-3 border-b border-border pb-4">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted">Lab Receipt System</p>
+            <h2 class="mt-1 text-lg font-bold text-primary-strong">الإعدادات</h2>
+          </div>
+          <button
+            id="close-sidebar"
+            type="button"
+            class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-2xl text-muted hover:bg-slate-100 lg:hidden"
+            aria-label="إغلاق قائمة الإعدادات"
+          >
+            ×
+          </button>
+        </div>
+
+        <nav class="space-y-1" aria-label="أقسام الإعدادات">
+          <p class="mb-2 px-3 text-xs font-bold text-muted">الحساب والوصول</p>
+
+          <button
+            type="button"
+            class="settings-nav-item flex min-h-11 w-full items-center gap-3 rounded-lg bg-blue-50 px-3 py-2 text-right text-sm font-semibold text-primary-strong"
+            data-section="account"
+            aria-current="page"
+          >
+            <span class="text-lg" aria-hidden="true">◉</span>
+            <span>الحساب والجلسة</span>
+          </button>
+
+          <button
+            type="button"
+            class="settings-nav-item flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-right text-sm font-medium text-muted hover:bg-slate-100"
+            data-section="users"
+            data-permission="manage-users"
+          >
+            <span class="text-lg" aria-hidden="true">◌</span>
+            <span>المستخدمون والأدوار</span>
+          </button>
+
+          <p class="mb-2 mt-6 px-3 text-xs font-bold text-muted">التشغيل والأجهزة</p>
+
+          <button
+            type="button"
+            class="settings-nav-item flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-right text-sm font-medium text-muted hover:bg-slate-100"
+            data-section="organization"
+            data-permission="read-organizations"
+          >
+            <span class="text-lg" aria-hidden="true">□</span>
+            <span>المؤسسات والمنشآت</span>
+          </button>
+
+          <button
+            type="button"
+            class="settings-nav-item flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-right text-sm font-medium text-muted hover:bg-slate-100"
+            data-section="devices"
+            data-permission="manage-devices"
+          >
+            <span class="text-lg" aria-hidden="true">▣</span>
+            <span>الأجهزة والطباعة</span>
+          </button>
+
+          <button
+            type="button"
+            class="settings-nav-item flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-right text-sm font-medium text-muted"
+            data-section="sync"
+          >
+            <span class="text-lg" aria-hidden="true">⇄</span>
+            <span>المزامنة وOffline</span>
+            <span class="mr-auto rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">3</span>
+          </button>
+
+          <p class="mb-2 mt-6 px-3 text-xs font-bold text-muted">الخصوصية والدعم</p>
+
+          <button
+            type="button"
+            class="settings-nav-item flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-right text-sm font-medium text-muted hover:bg-slate-100"
+            data-section="privacy"
+          >
+            <span class="text-lg" aria-hidden="true">◇</span>
+            <span>الخصوصية والميزات</span>
+          </button>
+
+          <button
+            type="button"
+            class="settings-nav-item flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-right text-sm font-medium text-muted hover:bg-slate-100"
+            data-section="notifications"
+          >
+            <span class="text-lg" aria-hidden="true">◍</span>
+            <span>الإشعارات</span>
+          </button>
+
+          <button
+            type="button"
+            class="settings-nav-item flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-right text-sm font-medium text-muted hover:bg-slate-100"
+            data-section="support"
+            data-permission="run-recovery"
+          >
+            <span class="text-lg" aria-hidden="true">?</span>
+            <span>الدعم والاستعادة</span>
+          </button>
+        </nav>
+
+        <div class="mt-8 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+          <p class="font-semibold">النطاق الحالي</p>
+          <p class="mt-1 text-xs leading-5 text-blue-800">مختبر بغداد · الفرع الرئيسي</p>
+          <p class="mt-2 text-xs text-blue-700">مصدر النطاق: جلسة المستخدم والخادم</p>
+        </div>
+      </aside>
+
+      <!-- Main shell -->
+      <main class="min-w-0 flex-1">
+        <div class="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+          <header class="mb-6 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div class="mb-3 flex items-center gap-3 lg:hidden">
+                <button
+                  id="open-sidebar"
+                  type="button"
+                  class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-border bg-white text-xl text-primary-strong shadow-panel"
+                  aria-label="فتح قائمة الإعدادات"
+                  aria-controls="settings-sidebar"
+                  aria-expanded="false"
+                >
+                  ☰
+                </button>
+                <span class="text-sm font-semibold text-muted">أقسام الإعدادات</span>
+              </div>
+              <p class="text-sm font-semibold text-primary">نطاق التشغيل: مختبر بغداد · الفرع الرئيسي</p>
+              <h1 class="mt-2 text-2xl font-bold tracking-tight text-primary-strong sm:text-3xl">الإعدادات</h1>
+              <p class="mt-2 max-w-2xl text-sm leading-6 text-muted">
+                إدارة الحسابات والأجهزة والمزامنة والإعدادات المحلية ضمن النطاق المصرح.
+              </p>
+            </div>
+
+            <div class="flex items-center gap-2 text-sm text-muted">
+              <span class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 font-semibold text-emerald-800">
+                <span class="h-2 w-2 rounded-full bg-emerald-600" aria-hidden="true"></span>
+                متصل
+              </span>
+              <span class="hidden sm:inline">آخر تحديث: 10:42</span>
+            </div>
+          </header>
+
+          <!-- Persistent operational status -->
+          <section
+            class="mb-6 flex flex-wrap items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="text-lg" aria-hidden="true">!</span>
+            <div class="min-w-0 flex-1">
+              <p class="font-bold">لديك 3 أحداث بانتظار المزامنة</p>
+              <p class="mt-1 text-xs leading-5 text-amber-900">
+                تم حفظ البيانات محليًا. لا تعتبر العملية مكتملة عن بُعد حتى تنجح المزامنة.
+              </p>
+            </div>
+            <button type="button" class="min-h-11 rounded-lg border border-amber-300 px-4 font-semibold text-amber-900 hover:bg-amber-100">
+              فتح الطابور
+            </button>
+          </section>
+
+          <!-- Unsaved changes banner; hidden until a setting changes. -->
+          <section
+            id="unsaved-banner"
+            class="mb-6 hidden items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="text-lg" aria-hidden="true">●</span>
+            <div class="min-w-0 flex-1">
+              <p class="font-bold">لديك تغييرات غير محفوظة</p>
+              <p class="mt-1 text-xs text-blue-800">احفظ التغييرات أو ألغها قبل مغادرة هذا القسم.</p>
+            </div>
+            <button type="button" class="min-h-11 rounded-lg bg-primary-strong px-4 font-semibold text-white hover:bg-blue-900">حفظ التغييرات</button>
+            <button type="button" class="min-h-11 rounded-lg border border-blue-300 px-4 font-semibold text-blue-900 hover:bg-blue-100">إلغاء</button>
+          </section>
+
+          <!-- Active panel -->
+          <section id="settings-panel" class="rounded-xl border border-border bg-white p-5 shadow-panel sm:p-6" aria-labelledby="panel-title">
+            <div class="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-border pb-5">
+              <div>
+                <p class="text-xs font-bold uppercase tracking-wide text-primary">الحساب والجلسة</p>
+                <h2 id="panel-title" class="mt-1 text-xl font-bold text-primary-strong">بيانات الحساب</h2>
+                <p class="mt-2 text-sm leading-6 text-muted">راجع بيانات الجلسة وأمان الحساب دون تغيير الصلاحيات من هذا القسم.</p>
+              </div>
+              <span class="rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-muted">آخر حفظ: منذ 5 دقائق</span>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <div>
+                <label for="username" class="mb-2 block text-sm font-semibold text-ink">اسم المستخدم</label>
+                <input id="username" type="text" value="operator.baghdad" readonly class="min-h-11 w-full rounded-lg border border-border bg-slate-50 px-3 text-sm text-muted" />
+                <p class="mt-2 text-xs leading-5 text-muted">يُدار اسم المستخدم من مسؤول النظام.</p>
+              </div>
+
+              <div>
+                <label for="role" class="mb-2 block text-sm font-semibold text-ink">الدور</label>
+                <input id="role" type="text" value="مشغّل — Operator" readonly class="min-h-11 w-full rounded-lg border border-border bg-slate-50 px-3 text-sm text-muted" />
+                <p class="mt-2 text-xs leading-5 text-muted">الصلاحيات مرتبطة بالدور والنطاق المؤسسي.</p>
+              </div>
+
+              <div>
+                <label for="language" class="mb-2 block text-sm font-semibold text-ink">لغة الواجهة</label>
+                <select id="language" class="min-h-11 w-full rounded-lg border border-border bg-white px-3 text-sm text-ink">
+                  <option selected>العربية — RTL</option>
+                  <option>English — LTR</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="idle-timeout" class="mb-2 block text-sm font-semibold text-ink">مهلة الخمول</label>
+                <select id="idle-timeout" class="min-h-11 w-full rounded-lg border border-border bg-white px-3 text-sm text-ink">
+                  <option>15 دقيقة</option>
+                  <option selected>30 دقيقة</option>
+                  <option>60 دقيقة</option>
+                </select>
+                <p class="mt-2 text-xs leading-5 text-muted">العمليات الحساسة قد تطلب إعادة التحقق حتى قبل انتهاء المهلة.</p>
+              </div>
+            </div>
+
+            <div class="mt-8 border-t border-border pt-6">
+              <h3 class="text-lg font-bold text-primary-strong">إجراءات الحساب</h3>
+              <div class="mt-4 flex flex-wrap gap-3">
+                <button type="button" class="min-h-11 rounded-lg bg-primary-strong px-4 font-semibold text-white hover:bg-blue-900">تغيير كلمة المرور</button>
+                <button type="button" class="min-h-11 rounded-lg border border-border bg-white px-4 font-semibold text-muted hover:bg-slate-50">إنهاء الجلسات الأخرى</button>
+              </div>
+            </div>
+
+            <div class="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
+              <p class="text-xs text-muted">لن تُرسل البيانات أو تُحفظ مركزيًا إلا بعد تأكيد العملية.</p>
+              <div class="flex gap-3">
+                <button type="button" class="min-h-11 rounded-lg border border-border bg-white px-4 font-semibold text-muted hover:bg-slate-50">إلغاء</button>
+                <button type="button" class="min-h-11 rounded-lg bg-primary-strong px-5 font-semibold text-white hover:bg-blue-900">حفظ التغييرات</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Danger zone -->
+          <section class="mt-6 rounded-xl border border-red-200 bg-red-50 p-5 sm:p-6" aria-labelledby="danger-title">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p class="text-xs font-bold uppercase tracking-wide text-danger">منطقة حساسة</p>
+                <h2 id="danger-title" class="mt-1 text-lg font-bold text-red-900">إجراءات لا يمكن التراجع عنها بسهولة</h2>
+                <p class="mt-2 max-w-2xl text-sm leading-6 text-red-800">
+                  تتطلب هذه الإجراءات صلاحية مناسبة، وتأكيدًا صريحًا، وإعادة تحقق عند الحاجة، وتُسجل في سجل التدقيق.
+                </p>
+              </div>
+              <button type="button" class="min-h-11 rounded-lg border border-red-300 bg-white px-4 font-semibold text-red-700 hover:bg-red-100">
+                عرض الإجراءات
+              </button>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const sidebar = document.querySelector('#settings-sidebar')
+      const overlay = document.querySelector('#sidebar-overlay')
+      const openButton = document.querySelector('#open-sidebar')
+      const closeButton = document.querySelector('#close-sidebar')
+      const navItems = document.querySelectorAll('.settings-nav-item')
+
+      function setSidebar(open) {
+        sidebar.classList.toggle('translate-x-full', !open)
+        overlay.classList.toggle('hidden', !open)
+        openButton?.setAttribute('aria-expanded', String(open))
+        if (open) closeButton?.focus()
+        else openButton?.focus()
+      }
+
+      openButton?.addEventListener('click', () => setSidebar(true))
+      closeButton?.addEventListener('click', () => setSidebar(false))
+      overlay?.addEventListener('click', () => setSidebar(false))
+
+      navItems.forEach((item) => {
+        item.addEventListener('click', () => {
+          navItems.forEach((candidate) => {
+            candidate.classList.remove('bg-blue-50', 'font-semibold', 'text-primary-strong')
+            candidate.classList.add('font-medium', 'text-muted')
+            candidate.removeAttribute('aria-current')
+          })
+          item.classList.add('bg-blue-50', 'font-semibold', 'text-primary-strong')
+          item.classList.remove('font-medium', 'text-muted')
+          item.setAttribute('aria-current', 'page')
+          if (window.innerWidth < 1024) setSidebar(false)
+        })
+      })
+    </script>
+  </body>
+</html>
