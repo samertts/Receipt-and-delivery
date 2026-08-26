@@ -13,10 +13,13 @@ class FakeWebSocket {
   constructor(url) {
     this.url = url
     this.readyState = FakeWebSocket.CONNECTING
+    this.sent = []
     FakeWebSocket.instances.push(this)
   }
 
-  send() {}
+  send(payload) {
+    this.sent.push(payload)
+  }
 
   open() {
     this.readyState = FakeWebSocket.OPEN
@@ -46,8 +49,10 @@ describe('notifications store and WebSocket integration', () => {
     store.connect()
     const socket = FakeWebSocket.instances[0]
 
-    expect(socket.url).toContain('/api/ws/notifications?token=access-token')
+    expect(socket.url).toContain('/api/ws/notifications')
+    expect(socket.url).not.toContain('access-token')
     socket.open()
+    expect(JSON.parse(socket.sent[0])).toEqual({ type: 'auth', token: 'access-token' })
     socket.emit({ type: 'connected', message: 'جاهز' })
     socket.emit({
       id: 'notification-1',

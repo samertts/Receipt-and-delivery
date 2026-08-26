@@ -50,7 +50,7 @@ def _get_snapshot_dir() -> Path:
 def _validate_path_in_dir(path: Path, allowed_dir: Path) -> Path:
     resolved = path.resolve()
     allowed = allowed_dir.resolve()
-    if not str(resolved).startswith(str(allowed)):
+    if not resolved.is_relative_to(allowed):
         raise ValueError(f"Path {resolved} is not inside {allowed}")
     return resolved
 

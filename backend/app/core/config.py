@@ -1,13 +1,17 @@
 import json
+import os
 import secrets
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-_SECRET_KEY_FILE = (
-    Path(__file__).resolve().parent.parent.parent / ".generated_secret_key.json"
-)
+_SECRET_KEY_FILE = Path(
+    os.getenv(
+        "SECRET_KEY_FILE",
+        str(Path.home() / ".lab_receipt_system" / "generated_secret_key.json"),
+    )
+).expanduser()
 
 
 def _load_or_persist_secret_key() -> str:
@@ -22,7 +26,14 @@ def _load_or_persist_secret_key() -> str:
     key = secrets.token_hex(32)
     try:
         _SECRET_KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
-        _SECRET_KEY_FILE.write_text(json.dumps({"secret_key": key}))
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+        file_descriptor = os.open(_SECRET_KEY_FILE, flags, 0o600)
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as stream:
+            stream.write(json.dumps({"secret_key": key}))
+        try:
+            _SECRET_KEY_FILE.chmod(0o600)
+        except OSError:
+            pass
     except OSError:
         pass
     return key
@@ -96,5 +107,16 @@ class Settings(BaseSettings):
             raise ValueError("ALLOWED_ORIGINS must be configured")
         return origins
 
+    def validate_runtime_security(self) -> None:
+        """Reject known-insecure production defaults before serving requests."""
+        if self.environment.lower() not in {"prod", "production", "staging"}:
+            return
+        if "lab_user:lab_pass@" in self.database_url:
+            raise ValueError("DATABASE_URL must be configured with non-default credentials")
+        origins = self.origin_list
+        if "*" in origins or any(origin.startswith("http://") for origin in origins):
+            raise ValueError("Production CORS origins must be explicit HTTPS origins")
+
 
 settings = Settings()
+settings.validate_runtime_security()

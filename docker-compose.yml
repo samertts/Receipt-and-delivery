@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: lab_user
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in .env}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -25,12 +25,12 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+psycopg://lab_user:${POSTGRES_PASSWORD:-lab_pass}@db:5432/lab_txn
+      DATABASE_URL: postgresql+psycopg://lab_user:${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD}@db:5432/lab_txn
     depends_on:
       db:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./backend:/app
       - lab_data:/app/storage
@@ -42,7 +42,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules

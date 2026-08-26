@@ -2,6 +2,8 @@ import os
 import re
 import time
 from collections import defaultdict
+from threading import Lock
+from uuid import uuid4
 from typing import Optional
 
 from app.core.config import settings
@@ -41,26 +43,29 @@ class MemoryRateLimiter:
         self.window_seconds = window_seconds
         self.requests: dict[str, list[float]] = defaultdict(list)
         self._cleanup_counter = 0
+        self._lock = Lock()
 
     def is_rate_limited(self, key: str) -> bool:
-        now = time.time()
-        self.requests[key] = [
-            t for t in self.requests[key] if now - t < self.window_seconds
-        ]
+        with self._lock:
+            now = time.time()
+            self.requests[key] = [
+                t for t in self.requests[key] if now - t < self.window_seconds
+            ]
 
-        # Periodic cleanup every 1000 requests
-        self._cleanup_counter += 1
-        if self._cleanup_counter >= 1000:
-            self._cleanup_counter = 0
-            cutoff = now - self.window_seconds
-            self.requests = {
-                k: v for k, v in self.requests.items() if v and v[-1] > cutoff
-            }
+            # Periodic cleanup every 1000 requests
+            self._cleanup_counter += 1
+            if self._cleanup_counter >= 1000:
+                self._cleanup_counter = 0
+                cutoff = now - self.window_seconds
+                self.requests = defaultdict(
+                    list,
+                    {k: v for k, v in self.requests.items() if v and v[-1] > cutoff},
+                )
 
-        if len(self.requests[key]) >= self.max_requests:
-            return True
-        self.requests[key].append(now)
-        return False
+            if len(self.requests[key]) >= self.max_requests:
+                return True
+            self.requests[key].append(now)
+            return False
 
 
 class RedisRateLimiter:
@@ -105,7 +110,7 @@ class RedisRateLimiter:
             _, count, _ = pipe.execute()
             if count >= self.max_requests:
                 return True
-            self._redis.zadd(key, {str(now): now})
+            self._redis.zadd(key, {f"{now}:{uuid4().hex}": now})
             return False
         except Exception as e:
             logger.warning(f"Redis rate limiter error: {e}, falling back to in-memory")

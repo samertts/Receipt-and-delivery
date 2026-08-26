@@ -12,14 +12,21 @@ from fastapi import WebSocket
 class NotificationManager:
     """Manage authenticated WebSocket subscribers in the current process."""
 
+    MAX_CONNECTIONS_PER_USER = 5
+
     def __init__(self) -> None:
         self._connections: dict[str, set[WebSocket]] = defaultdict(set)
         self._lock = asyncio.Lock()
 
-    async def connect(self, user_id: str, websocket: WebSocket) -> None:
-        await websocket.accept()
+    async def connect(self, user_id: str, websocket: WebSocket, *, accepted=False) -> None:
+        if not accepted:
+            await websocket.accept()
         async with self._lock:
-            self._connections[user_id].add(websocket)
+            subscribers = self._connections[user_id]
+            if len(subscribers) >= self.MAX_CONNECTIONS_PER_USER:
+                return False
+            subscribers.add(websocket)
+            return True
 
     async def disconnect(self, user_id: str, websocket: WebSocket) -> None:
         async with self._lock:

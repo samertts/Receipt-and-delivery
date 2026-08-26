@@ -128,6 +128,18 @@ class TestDetectCorruption:
 
 
 class TestEnforceRetention:
+    @pytest.fixture(autouse=True)
+    def isolate_recovery_storage(self, monkeypatch, tmp_path):
+        from dataclasses import replace
+        import lab_system.app.services.recovery_service as recovery_service
+
+        isolated_config = replace(
+            recovery_service.CONFIG,
+            storage_dir=tmp_path / "storage",
+            db_path=tmp_path / "storage" / "database" / "lab_system.db",
+        )
+        monkeypatch.setattr(recovery_service, "CONFIG", isolated_config)
+
     def test_no_deletion_when_under_limit(self, fresh_db, seed_data):
         from lab_system.app.services.recovery_service import enforce_retention
         deleted = enforce_retention(max_backups=100)

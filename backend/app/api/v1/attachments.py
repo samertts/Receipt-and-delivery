@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import hashlib
 import os
+import tempfile
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.attachment import Attachment
 from app.models.transaction import Transaction
@@ -13,8 +18,9 @@ from app.models.user import User
 
 router = APIRouter(prefix="/attachments", tags=["المرفقات"])
 
-UPLOAD_DIR = "uploads/attachments"
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+UPLOAD_DIR = (Path(settings.storage_root) / "uploads" / "attachments").resolve()
+MAX_FILE_SIZE = 50 * 1024 * 1024
+CHUNK_SIZE = 1024 * 1024
 ALLOWED_TYPES = {
     "application/pdf": ".pdf",
     "image/jpeg": ".jpg",
@@ -22,10 +28,58 @@ ALLOWED_TYPES = {
 }
 MAGIC_BYTES = {
     b"\x25\x50\x44\x46": "application/pdf",
-    b"\xff\xd8\xff\xe0": "image/jpeg",
-    b"\xff\xd8\xff\xe1": "image/jpeg",
+    b"\xff\xd8\xff": "image/jpeg",
     b"\x89\x50\x4e\x47": "image/png",
 }
+
+
+def _detect_content_type(header: bytes) -> str | None:
+    for magic, mime in MAGIC_BYTES.items():
+        if header.startswith(magic):
+            return mime
+    return None
+
+
+async def _save_upload_to_disk(file: UploadFile) -> tuple[Path, int, str, str]:
+    """Stream an upload to a private temporary file before validating and renaming it."""
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    digest = hashlib.sha256()
+    header = b""
+    size = 0
+    fd, temporary_name = tempfile.mkstemp(prefix="upload-", suffix=".tmp", dir=UPLOAD_DIR)
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            while chunk := await file.read(CHUNK_SIZE):
+                if not header:
+                    header = chunk[:8]
+                size += len(chunk)
+                if size > MAX_FILE_SIZE:
+                    raise HTTPException(status_code=400, detail="حجم الملف يتجاوز 50 ميغابايت")
+                digest.update(chunk)
+                stream.write(chunk)
+            stream.flush()
+            os.fsync(stream.fileno())
+
+        actual_type = _detect_content_type(header)
+        if file.content_type not in ALLOWED_TYPES:
+            raise HTTPException(status_code=400, detail="نوع الملف غير مدعوم")
+        if actual_type is None:
+            raise HTTPException(status_code=400, detail="محتوى الملف لا يتطابق مع النوع المعلن")
+        if actual_type != file.content_type:
+            raise HTTPException(status_code=400, detail="نوع الملف غير متطابق")
+
+        storage_name = f"{uuid.uuid4()}{ALLOWED_TYPES[actual_type]}"
+        target = (UPLOAD_DIR / storage_name).resolve()
+        if not target.is_relative_to(UPLOAD_DIR):
+            raise HTTPException(status_code=400, detail="مسار الملف غير صالح")
+        os.replace(temporary_path, target)
+        temporary_path = None
+        return target, size, digest.hexdigest(), storage_name
+    finally:
+        if temporary_path:
+            temporary_path.unlink(missing_ok=True)
 
 
 @router.post("/upload")
@@ -35,61 +89,28 @@ async def upload_attachment(
     current_user: User = Depends(require_permission("create_transaction")),
     db: Session = Depends(get_db),
 ):
-    # Validate transaction exists
     transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
     if not transaction:
         raise HTTPException(status_code=404, detail="المعاملة غير موجودة")
 
-    # Validate file type
-    if file.content_type not in ALLOWED_TYPES:
-        raise HTTPException(status_code=400, detail="نوع الملف غير مدعوم")
-
-    # Read file content
-    content = await file.read()
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=400, detail="حجم الملف يتجاوز 50 ميغابايت")
-
-    # Validate magic bytes
-    actual_type = None
-    for magic, mime in MAGIC_BYTES.items():
-        if content[: len(magic)] == magic:
-            actual_type = mime
-            break
-    if actual_type is None:
-        raise HTTPException(
-            status_code=400, detail="محتوى الملف لا يتطابق مع النوع المعلن"
+    target, size, sha256_hash, storage_name = await _save_upload_to_disk(file)
+    try:
+        attachment = Attachment(
+            transaction_id=transaction_id,
+            original_name=file.filename or storage_name,
+            storage_name=storage_name,
+            content_type=file.content_type or "application/octet-stream",
+            sha256_hash=sha256_hash,
+            size_bytes=size,
+            path=str(target),
         )
-    if actual_type != file.content_type:
-        raise HTTPException(status_code=400, detail="نوع الملف غير متطابق")
-
-    # Generate unique filename
-    file_ext = ALLOWED_TYPES[file.content_type]
-    storage_name = f"{uuid.uuid4()}{file_ext}"
-
-    # Create upload directory if it doesn't exist
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-    # Save file
-    file_path = os.path.join(UPLOAD_DIR, storage_name)
-    with open(file_path, "wb") as f:
-        f.write(content)
-
-    # Compute hash
-    sha256_hash = hashlib.sha256(content).hexdigest()
-
-    # Create database record
-    attachment = Attachment(
-        transaction_id=transaction_id,
-        original_name=file.filename,
-        storage_name=storage_name,
-        content_type=file.content_type,
-        sha256_hash=sha256_hash,
-        size_bytes=len(content),
-        path=file_path,
-    )
-    db.add(attachment)
-    db.commit()
-    db.refresh(attachment)
+        db.add(attachment)
+        db.commit()
+        db.refresh(attachment)
+    except Exception:
+        target.unlink(missing_ok=True)
+        db.rollback()
+        raise
 
     return {
         "id": str(attachment.id),
@@ -109,20 +130,16 @@ async def download_attachment(
     if not attachment:
         raise HTTPException(status_code=404, detail="المرفق غير موجود")
 
-    from pathlib import Path
-
     resolved_path = Path(attachment.path).resolve()
-    upload_dir = Path("uploads/attachments").resolve()
-    if not str(resolved_path).startswith(str(upload_dir)):
+    if not resolved_path.is_relative_to(UPLOAD_DIR):
         raise HTTPException(status_code=403, detail="مرفوض")
-
-    if not resolved_path.exists():
+    if not resolved_path.is_file():
         raise HTTPException(status_code=404, detail="ملف المرفق غير موجود")
 
     from fastapi.responses import FileResponse
 
     return FileResponse(
         path=str(resolved_path),
-        filename=attachment.original_name,
+        filename=attachment.original_name or attachment.storage_name,
         media_type=attachment.content_type,
     )

@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+from urllib.parse import urlsplit
 import subprocess
 import tempfile
 import urllib.error
@@ -139,14 +140,18 @@ def _validate_manifest(manifest: Any) -> dict[str, Any]:
 
 def fetch_manifest(manifest_url: str = DEFAULT_MANIFEST_URL, timeout: float = 10.0) -> dict[str, Any]:
     """Fetch and authenticate an update manifest over HTTPS."""
-    if not manifest_url.lower().startswith("https://"):
+    parsed_manifest_url = urlsplit(manifest_url)
+    if parsed_manifest_url.scheme.lower() != "https" or not parsed_manifest_url.netloc:
         raise UpdateSecurityError("Update manifest URL must use HTTPS")
     request = urllib.request.Request(
         manifest_url,
         headers={"Accept": "application/json", "User-Agent": "LabReceiptSystem-Updater"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310 - HTTPS-only URL and final redirect are validated
+            final_url = response.geturl() if hasattr(response, "geturl") else request.full_url
+            if urlsplit(final_url).scheme.lower() != "https":
+                raise UpdateSecurityError("Update manifest redirect must use HTTPS")
             payload = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, ValueError, UnicodeDecodeError) as exc:
         raise UpdateError(f"Unable to fetch update manifest: {exc}") from exc
@@ -175,8 +180,12 @@ def download_installer(
     destination_dir = destination_dir or (CONFIG.storage_dir / "updates")
     destination_dir.mkdir(parents=True, exist_ok=True)
 
+    installer_url = str(manifest["installer_url"])
+    parsed_installer_url = urlsplit(installer_url)
+    if parsed_installer_url.scheme.lower() != "https" or not parsed_installer_url.netloc:
+        raise UpdateSecurityError("Installer URL must use HTTPS")
     request = urllib.request.Request(
-        str(manifest["installer_url"]),
+        installer_url,
         headers={"Accept": "application/octet-stream", "User-Agent": "LabReceiptSystem-Updater"},
     )
     expected_size = int(manifest.get("size", 0) or 0)
@@ -187,7 +196,10 @@ def download_installer(
     digest = hashlib.sha256()
     total = 0
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310 - signed manifest URL is HTTPS and redirect is checked
+            final_url = response.geturl() if hasattr(response, "geturl") else request.full_url
+            if urlsplit(final_url).scheme.lower() != "https":
+                raise UpdateSecurityError("Installer redirect must use HTTPS")
             with tempfile.NamedTemporaryFile(
                 prefix="LabReceiptSetup-",
                 suffix=".exe.part",

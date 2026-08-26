@@ -12,4 +12,4 @@ exec uvicorn app.main:app \
     --workers "${WEB_CONCURRENCY:-1}" \
     --log-level info \
     --proxy-headers \
-    --forwarded-allow-ips='*'
+    --forwarded-allow-ips="${FORWARDED_ALLOW_IPS:-127.0.0.1}"

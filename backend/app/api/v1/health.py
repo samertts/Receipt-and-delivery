@@ -11,14 +11,17 @@ router = APIRouter(prefix="/health", tags=["health"])
 
 
 def _check_db() -> tuple[bool, str | None]:
+    db = None
     try:
         db = SessionLocal()
         db.execute(text("SELECT 1"))
-        db.close()
         return True, None
-    except Exception as e:
-        logger.warning(f"Health check DB error: {e}")
-        return False, str(e)
+    except Exception:
+        logger.warning("Health check DB error", exc_info=True)
+        return False, "database unavailable"
+    finally:
+        if db is not None:
+            db.close()
 
 
 def _utcnow() -> str:

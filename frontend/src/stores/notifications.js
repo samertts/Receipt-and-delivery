@@ -7,13 +7,12 @@ const MAX_NOTIFICATIONS = 50
 const INITIAL_RECONNECT_DELAY = 1000
 const MAX_RECONNECT_DELAY = 30000
 
-function buildSocketUrl(token) {
+function buildSocketUrl() {
   const apiUrl = import.meta.env.VITE_API_URL || '/api'
   const url = new URL(apiUrl, window.location.origin)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
   url.pathname = `${url.pathname.replace(/\/$/, '')}/ws/notifications`
   url.search = ''
-  url.searchParams.set('token', token)
   return url.toString()
 }
 
@@ -53,9 +52,10 @@ export const useNotificationStore = defineStore('notifications', () => {
     manuallyClosed = false
     connecting.value = true
     lastError.value = null
-    socket = new WebSocket(buildSocketUrl(getAccessToken()))
+    socket = new WebSocket(buildSocketUrl())
 
     socket.onopen = () => {
+      socket.send(JSON.stringify({ type: 'auth', token: getAccessToken() }))
       connected.value = true
       connecting.value = false
       reconnectAttempt = 0
